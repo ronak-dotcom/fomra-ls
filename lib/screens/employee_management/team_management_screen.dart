@@ -24,6 +24,15 @@ class TeamManagementScreen extends StatefulWidget {
 
 class _TeamManagementScreenState extends State<TeamManagementScreen> {
   bool _loading = true;
+  String _search = '';
+
+  bool _matchesSearch(EmployeeProfile e) {
+    final q = _search.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    return e.fullName.toLowerCase().contains(q) ||
+        e.designation.toLowerCase().contains(q) ||
+        e.email.toLowerCase().contains(q);
+  }
 
   @override
   void initState() {
@@ -105,6 +114,23 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               children: [
+                if (me != null && (me.isReportingManager || me.isHead)) ...[
+                  TextField(
+                    onChanged: (v) => setState(() => _search = v),
+                    decoration: InputDecoration(
+                      hintText: 'Search by name, designation or email…',
+                      prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                      isDense: true,
+                      filled: true,
+                      fillColor: context.fomraSurfaceVar,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
                 if (me == null)
                   const AppCard(
                     child: EmptyState(
@@ -135,6 +161,7 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
   // ── Reporting Manager: assign executives ───────────────────────────────────
   Widget _reportingManagerView(EmployeeProfile me) {
     final execs = TeamHierarchy.executivesUnder(me.email);
+    final visibleExecs = execs.where(_matchesSearch).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -163,8 +190,16 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
               message: 'Use Add to assign executives to your team.',
             ),
           )
+        else if (visibleExecs.isEmpty)
+          AppCard(
+            child: EmptyState(
+              icon: Icons.search_off_rounded,
+              title: 'No matches',
+              message: 'No one matches "$_search".',
+            ),
+          )
         else
-          for (final e in execs) _memberTile(e, onRemove: () => _assign(e.email, '')),
+          for (final e in visibleExecs) _memberTile(e, onRemove: () => _assign(e.email, '')),
       ],
     );
   }
@@ -172,6 +207,20 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
   // ── Head: assign reporting managers, expand to executives ──────────────────
   Widget _headView(EmployeeProfile me) {
     final rms = TeamHierarchy.managersUnder(me.email);
+    final searching = _search.trim().isNotEmpty;
+    final visible = <MapEntry<EmployeeProfile, List<EmployeeProfile>>>[];
+    for (final rm in rms) {
+      final execs = TeamHierarchy.executivesUnder(rm.email);
+      if (!searching) {
+        visible.add(MapEntry(rm, execs));
+        continue;
+      }
+      final managerMatches = _matchesSearch(rm);
+      final matchingExecs = execs.where(_matchesSearch).toList();
+      if (managerMatches || matchingExecs.isNotEmpty) {
+        visible.add(MapEntry(rm, managerMatches ? execs : matchingExecs));
+      }
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -200,12 +249,22 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
               message: 'Use Add to assign reporting managers to your team.',
             ),
           )
+        else if (visible.isEmpty)
+          AppCard(
+            child: EmptyState(
+              icon: Icons.search_off_rounded,
+              title: 'No matches',
+              message: 'No one matches "$_search".',
+            ),
+          )
         else
-          for (final rm in rms)
+          for (final entry in visible)
             _ManagerExpansionCard(
-              manager: rm,
-              executives: TeamHierarchy.executivesUnder(rm.email),
-              onRemove: () => _assign(rm.email, ''),
+              key: ValueKey('${entry.key.email}-$searching'),
+              manager: entry.key,
+              executives: entry.value,
+              onRemove: () => _assign(entry.key.email, ''),
+              initiallyExpanded: searching,
             ),
       ],
     );
@@ -450,11 +509,14 @@ class _ManagerExpansionCard extends StatefulWidget {
   final EmployeeProfile manager;
   final List<EmployeeProfile> executives;
   final VoidCallback onRemove;
+  final bool initiallyExpanded;
 
   const _ManagerExpansionCard({
+    super.key,
     required this.manager,
     required this.executives,
     required this.onRemove,
+    this.initiallyExpanded = false,
   });
 
   @override
@@ -462,7 +524,7 @@ class _ManagerExpansionCard extends StatefulWidget {
 }
 
 class _ManagerExpansionCardState extends State<_ManagerExpansionCard> {
-  bool _expanded = false;
+  late bool _expanded = widget.initiallyExpanded;
 
   @override
   Widget build(BuildContext context) {

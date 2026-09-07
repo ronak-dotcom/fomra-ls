@@ -385,6 +385,16 @@ class _TaskManagementScreenState extends State<TaskManagementScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final List<TaskNotification> _notifications = [];
+  String _search = '';
+
+  bool _matchesSearch(Task t) {
+    final q = _search.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    return t.title.toLowerCase().contains(q) ||
+        t.description.toLowerCase().contains(q) ||
+        t.module.toLowerCase().contains(q) ||
+        t.assignedTo.any((a) => a.toLowerCase().contains(q));
+  }
 
   /// Management sees every task; an Executive only sees tasks assigned to them.
   List<Task> get _tasks {
@@ -472,14 +482,17 @@ class _TaskManagementScreenState extends State<TaskManagementScreen>
   }
 
   List<Task> _tasksForTab(int index) {
-    if (index == 0) return _tasks;
-    final status = [
-      TaskStatus.todo,
-      TaskStatus.inProgress,
-      TaskStatus.done,
-      TaskStatus.overdue
-    ][index - 1];
-    return _tasks.where((t) => t.status == status).toList();
+    final base = index == 0
+        ? _tasks
+        : _tasks
+            .where((t) => t.status == [
+                  TaskStatus.todo,
+                  TaskStatus.inProgress,
+                  TaskStatus.done,
+                  TaskStatus.overdue
+                ][index - 1])
+            .toList();
+    return base.where(_matchesSearch).toList();
   }
 
   int get _unread => _notifications.where((n) => !n.isRead).length;
@@ -850,17 +863,37 @@ class _TaskManagementScreenState extends State<TaskManagementScreen>
           onStatusChange: _applyStatusChange,
           onTap: (task) => _showTaskDetail(task),
           onPrimaryAction: i == 0 ? _openAddTask : null,
+          isSearching: _search.trim().isNotEmpty,
         ),
       ),
     );
 
     final fab = _tabController.index == 0 ? _buildAddTaskFab() : null;
 
+    final searchField = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+      child: TextField(
+        onChanged: (v) => setState(() => _search = v),
+        decoration: InputDecoration(
+          hintText: 'Search tasks by title, module or assignee…',
+          prefixIcon: const Icon(Icons.search_rounded, size: 20),
+          isDense: true,
+          filled: true,
+          fillColor: context.fomraSurfaceVar,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+        ),
+      ),
+    );
+
     if (widget.isTab) {
       return Scaffold(
         backgroundColor: context.fomraPageBg,
         body: Column(children: [
           _buildTaskTabBar(onPageBg: true),
+          searchField,
           Expanded(child: taskListView),
         ]),
         floatingActionButton: fab,
@@ -900,7 +933,10 @@ class _TaskManagementScreenState extends State<TaskManagementScreen>
         ],
         bottom: taskTabBar,
       ),
-      body: taskListView,
+      body: Column(children: [
+        searchField,
+        Expanded(child: taskListView),
+      ]),
       floatingActionButton: fab,
     );
   }
@@ -969,6 +1005,7 @@ class _TaskList extends StatelessWidget {
   final void Function(Task, TaskStatus) onStatusChange;
   final void Function(Task) onTap;
   final VoidCallback? onPrimaryAction;
+  final bool isSearching;
 
   const _TaskList({
     required this.tasks,
@@ -976,6 +1013,7 @@ class _TaskList extends StatelessWidget {
     required this.onStatusChange,
     required this.onTap,
     this.onPrimaryAction,
+    this.isSearching = false,
   });
 
   Widget _buildEmptyState(BuildContext context) => Center(
@@ -1002,7 +1040,9 @@ class _TaskList extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             Text(
-              tabIndex == 0 ? 'No tasks yet' : 'No tasks in this tab',
+              isSearching
+                  ? 'No matches'
+                  : (tabIndex == 0 ? 'No tasks yet' : 'No tasks in this tab'),
               style: TextStyle(
                 color: context.fomraTextPrimary,
                 fontSize: 18,
@@ -1011,16 +1051,18 @@ class _TaskList extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              tabIndex == 0
-                  ? 'Create your first task to start tracking assignments and progress.'
-                  : 'Try another status tab or create a new task to continue.',
+              isSearching
+                  ? 'No tasks match your search in this tab.'
+                  : (tabIndex == 0
+                      ? 'Create your first task to start tracking assignments and progress.'
+                      : 'Try another status tab or create a new task to continue.'),
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: context.fomraTextSecondary,
                 fontSize: 13,
               ),
             ),
-            if (onPrimaryAction != null) ...[
+            if (onPrimaryAction != null && !isSearching) ...[
               const SizedBox(height: 14),
               ElevatedButton.icon(
                 onPressed: onPrimaryAction,
