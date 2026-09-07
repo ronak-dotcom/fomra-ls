@@ -1428,8 +1428,8 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
                                   hint: 'e.g. Kottamedu 2.15 acres',
                                   icon: Icons.badge_outlined,
                                 ),
-                                const Padding(
-                                  padding: EdgeInsets.only(top: 4, left: 4),
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4, left: 4),
                                   child: Text(
                                     'This is how the lead will appear everywhere '
                                     '(lists, dashboard, reports). Leave blank and '
