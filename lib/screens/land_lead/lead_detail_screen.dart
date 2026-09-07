@@ -1479,8 +1479,9 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
       // to the actual previous page (workspace, map, search, notifications…)
       // instead of always jumping Home. The breadcrumb names the lead itself.
       appBar: FomraSubPageAppBar(
-        title: 'Lead #${lead.leadId}',
-        subtitle: _displayName == 'Lead #${lead.leadId}' ? null : _displayName,
+        title: _displayName,
+        subtitle:
+            _displayName == 'Lead #${lead.leadId}' ? null : 'Lead #${lead.leadId}',
         // Default to Home > Land Workspace > Lead #id when a caller didn't pass
         // an explicit trail, so the lead always reads as living under the
         // workspace.

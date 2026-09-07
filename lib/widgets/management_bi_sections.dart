@@ -984,14 +984,10 @@ class _SlaList extends StatelessWidget {
                   ? null
                   : () => onViewLead!(item.lead),
               title: Text(
-                '${item.kind.label} · Lead #${item.lead.leadId}',
+                '${item.kind.label} · ${item.lead.displayName}',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
-              subtitle: Text(
-                item.lead.ownerName.trim().isEmpty
-                    ? '${item.ageDays}d old'
-                    : '${item.lead.ownerName} · ${item.ageDays}d old',
-              ),
+              subtitle: Text('#${item.lead.leadId} · ${item.ageDays}d old'),
               trailing: Text(
                 item.daysRemaining < 0
                     ? '${-item.daysRemaining}d late'

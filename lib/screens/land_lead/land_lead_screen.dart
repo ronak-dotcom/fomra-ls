@@ -1232,6 +1232,18 @@ class _LeadListRowState extends State<_LeadListRow> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            Text(
+                              _title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w800,
+                                height: 1.2,
+                                color: context.fomraTextPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
                             Row(
                               children: [
                                 Text(
@@ -1249,18 +1261,6 @@ class _LeadListRowState extends State<_LeadListRow> {
                                   color: priorityColor,
                                 ),
                               ],
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              _title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.w800,
-                                height: 1.2,
-                                color: context.fomraTextPrimary,
-                              ),
                             ),
                             const SizedBox(height: 4),
                             _LeadCompactMetaRow(

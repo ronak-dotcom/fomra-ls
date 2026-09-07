@@ -195,8 +195,9 @@ class IntelApprovalQueueSection extends StatelessWidget {
           else
             for (final item in items.take(12))
               _IntelRow(
-                title: '${item.kind.label} · Lead #${item.lead.leadId}',
-                subtitle: '${item.detail} · ${item.pendingDays}d pending',
+                title: '${item.kind.label} · ${item.lead.displayName}',
+                subtitle:
+                    '#${item.lead.leadId} · ${item.detail} · ${item.pendingDays}d pending',
                 color: AppColors.secondary,
                 onTap: onViewLead == null
                     ? null
@@ -303,7 +304,7 @@ class IntelDuplicatesSection extends StatelessWidget {
                       children: [
                         for (final lead in g.leads)
                           ActionChip(
-                            label: Text('#${lead.leadId}'),
+                            label: Text(lead.displayName),
                             onPressed: onViewLead == null
                                 ? null
                                 : () => onViewLead!(lead),
@@ -606,9 +607,9 @@ class _RecoBlock extends StatelessWidget {
           else
             for (final r in items)
               _IntelRow(
-                title: '${r.nextAction} · #${r.lead.leadId}',
+                title: '${r.nextAction} · ${r.lead.displayName}',
                 subtitle:
-                    '${r.confidence.round()}% confidence · ${r.rationale}',
+                    '#${r.lead.leadId} · ${r.confidence.round()}% confidence · ${r.rationale}',
                 color: AppColors.primary,
                 onTap: onViewLead == null ? null : () => onViewLead!(r.lead),
               ),
