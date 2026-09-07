@@ -125,6 +125,7 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
   final _landTypeOtherCtrl = TextEditingController();
 
   // Section 2 — location fill-up
+  final _leadNameCtrl   = TextEditingController();
   final _locationCtrl   = TextEditingController();
   final _gpsCtrl        = TextEditingController();
   final _villageCtrl    = TextEditingController();
@@ -353,6 +354,7 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
       c.removeListener(_onMandatoryFieldChanged);
     }
     for (final c in [
+      _leadNameCtrl,
       _locationCtrl, _gpsCtrl, _villageCtrl, _talukCtrl, _districtCtrl,
       _pincodeCtrl, _surveyCtrl, _subDivCtrl, _extentValueCtrl,
       _brokerNameCtrl, _brokerContactCtrl,
@@ -1182,6 +1184,10 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
       additionalSurveyNumbers: additionalSurveyNumbers,
       landExtent: landExtent,
       ownerName: _owners[0].nameCtrl.text.trim(),
+      leadName: existing == null ? _leadNameCtrl.text.trim() : existing.leadName,
+      leadNameLocked: existing == null
+          ? _leadNameCtrl.text.trim().isNotEmpty
+          : existing.leadNameLocked,
       contactDetails: _owners[0].contactCtrl.text.trim(),
       additionalOwners: additionalOwners,
       brokerName: _isBrokerSource ? _brokerNameCtrl.text.trim() : '',
@@ -1415,6 +1421,28 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
+                              if (widget.existingLead == null) ...[
+                                _Field(
+                                  ctrl: _leadNameCtrl,
+                                  label: 'Lead Name',
+                                  hint: 'e.g. Kottamedu 2.15 acres',
+                                  icon: Icons.badge_outlined,
+                                ),
+                                const Padding(
+                                  padding: EdgeInsets.only(top: 4, left: 4),
+                                  child: Text(
+                                    'This is how the lead will appear everywhere '
+                                    '(lists, dashboard, reports). Leave blank and '
+                                    "the owner's name is used instead. You can "
+                                    'rename it later if needed.',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: context.fomraTextSecondary,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: AddLeadUi.fieldGap),
+                              ],
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 12, vertical: 10),
