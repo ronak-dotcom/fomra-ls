@@ -59,6 +59,8 @@ class FilteredLeadsScreen extends StatefulWidget {
 }
 
 class _FilteredLeadsScreenState extends State<FilteredLeadsScreen> {
+  String _search = '';
+
   @override
   void initState() {
     super.initState();
@@ -73,15 +75,30 @@ class _FilteredLeadsScreenState extends State<FilteredLeadsScreen> {
 
   void _rebuild() => setState(() {});
 
+  bool _matchesSearch(LandLead l) {
+    final q = _search.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    return l.displayName.toLowerCase().contains(q) ||
+        l.ownerName.toLowerCase().contains(q) ||
+        l.leadId.toLowerCase().contains(q) ||
+        l.location.toLowerCase().contains(q) ||
+        l.village.toLowerCase().contains(q) ||
+        l.taluk.toLowerCase().contains(q) ||
+        l.district.toLowerCase().contains(q) ||
+        l.surveyNumber.toLowerCase().contains(q) ||
+        l.brokerName.toLowerCase().contains(q);
+  }
+
   @override
   Widget build(BuildContext context) {
     final filter = widget.filter;
     final title = widget.presetTitle ?? filter?.title ?? 'Leads';
     final subtitle = widget.presetSubtitle ?? filter?.subtitle ?? '';
-    final leads = widget.presetLeads ??
+    final allLeads = widget.presetLeads ??
         (filter != null
             ? filterLeads(AppStore.instance.visibleLeads, filter)
             : const <LandLead>[]);
+    final leads = allLeads.where(_matchesSearch).toList();
 
     return FomraAppShell(
       currentRoute: '/land-lead',
@@ -99,18 +116,52 @@ class _FilteredLeadsScreenState extends State<FilteredLeadsScreen> {
         children: [
           Padding(
             padding: FomraLayout.pagePadding(context),
-            child: SectionHeader(
-              title: title,
-              subtitle:
-                  '${leads.length} lead${leads.length == 1 ? '' : 's'}${subtitle.isEmpty ? '' : ' · $subtitle'}',
-              icon: Icons.list_alt_rounded,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SectionHeader(
+                  title: title,
+                  subtitle:
+                      '${leads.length} lead${leads.length == 1 ? '' : 's'}'
+                      '${allLeads.length == leads.length ? '' : ' of ${allLeads.length}'}'
+                      '${subtitle.isEmpty ? '' : ' · $subtitle'}',
+                  icon: Icons.list_alt_rounded,
+                ),
+                if (allLeads.length > 1) ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    onChanged: (q) => setState(() => _search = q),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      hintText: 'Search within this list — name, village, '
+                          'district, survey no…',
+                      prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                      suffixIcon: _search.isEmpty
+                          ? null
+                          : IconButton(
+                              icon: const Icon(Icons.close_rounded, size: 18),
+                              onPressed: () => setState(() => _search = ''),
+                            ),
+                      filled: true,
+                      fillColor: context.fomraSurface,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            BorderSide(color: context.fomraBorder),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           Expanded(
             child: leads.isEmpty
                 ? Center(
                     child: Text(
-                      'No leads in this category yet.',
+                      allLeads.isEmpty
+                          ? 'No leads in this category yet.'
+                          : 'No leads match "$_search".',
                       style: TextStyle(color: context.fomraTextSecondary),
                     ),
                   )
@@ -154,8 +205,8 @@ class _FilteredLeadRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final owner = lead.ownerName.trim();
-    final title = owner.isNotEmpty ? owner : 'Lead #${lead.leadId}';
+    final title = lead.displayName;
+    final showId = title != 'Lead #${lead.leadId}';
     final location = [
       lead.location,
       lead.village,
@@ -176,15 +227,6 @@ class _FilteredLeadRow extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '#${lead.leadId}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: context.fomraTextSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
                       title,
                       style: TextStyle(
                         fontSize: 15,
@@ -192,6 +234,17 @@ class _FilteredLeadRow extends StatelessWidget {
                         color: context.fomraTextPrimary,
                       ),
                     ),
+                    if (showId) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '#${lead.leadId}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: context.fomraTextSecondary,
+                        ),
+                      ),
+                    ],
                     if (location.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
