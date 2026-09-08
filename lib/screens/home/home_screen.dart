@@ -283,11 +283,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     var categories = const <MonthlyTargetCategoryProgress>[];
     final tv = _approvedTargetValues;
     if (_monthlyTargetFromEmployee && tv.isNotEmpty) {
+      final myName =
+          (AuthService.instance.currentUser?.fullName ?? '').trim().toLowerCase();
       final visitDates = [
         for (final v in _targetSiteVisits)
           if (v.visitType == LandLeadSiteVisitType.employee &&
               visibleIds.contains(v.leadId))
             v.visitedAt,
+        // A lead created with a verified live GPS fix means the person was
+        // physically at the site at that moment — that's a site visit in
+        // its own right, not just a data-entry event. See
+        // LandLead.isLiveGpsVerified for what "verified" means here.
+        for (final l in visible)
+          if (l.isLiveGpsVerified &&
+              l.createdByName.trim().toLowerCase() == myName)
+            l.addedOn,
       ];
       // Self vs Management Meetings is a real distinction, not a relabeling —
       // it's exactly what land_lead_meetings.management_present already

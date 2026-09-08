@@ -1161,3 +1161,43 @@ class _AnimatedCounterState extends State<AnimatedCounter>
     );
   }
 }
+
+/// Small pill shown on a lead that was captured with a verified live GPS
+/// fix (see LandLead.isLiveGpsVerified) — physical proof the person was at
+/// the site when the lead was created, distinct from a typed/picked
+/// location entered before or after the actual visit.
+class LiveGpsBadge extends StatelessWidget {
+  const LiveGpsBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Added on-site with live, verified GPS — not a manually '
+          'typed or picked location.',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+        decoration: BoxDecoration(
+          color: AppColors.success.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: AppColors.success.withValues(alpha: 0.28)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.gps_fixed_rounded, size: 9, color: AppColors.success),
+            const SizedBox(width: 3),
+            Text(
+              'Live',
+              style: TextStyle(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.2,
+                color: AppColors.success,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

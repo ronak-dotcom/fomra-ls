@@ -495,4 +495,15 @@ extension LandLeadDisplayName on LandLead {
       : ownerName.trim().isEmpty
           ? 'Lead #$leadId'
           : ownerName.trim();
+
+  /// Whether this lead's location came from a verified live GPS capture
+  /// (GpsVerificationService.captureLive — rejects mock locations and
+  /// readings below its accuracy threshold) rather than a typed/manually
+  /// picked coordinate. Storage format is GpsFix.toStorage()'s
+  /// 'LIVE|<lat>|<lng>|<accuracy>|<timestamp>' — see lib/models/gps_fix.dart.
+  ///
+  /// Being physically present with a verified GPS fix at the moment a lead
+  /// is created is itself proof of a site visit, distinct from (and not a
+  /// substitute for) a later logged revisit in land_lead_site_visits.
+  bool get isLiveGpsVerified => gpsCoordinates.trim().startsWith('LIVE|');
 }

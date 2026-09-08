@@ -313,6 +313,7 @@ class _ManagementExecutiveDashboardState
         );
       case 'monthlyTargets':
         return _TeamMonthlyTargetsCard(
+          leads: widget.leads,
           meetings: _activity.meetings,
           siteVisits: _activity.siteVisits,
         );
@@ -2108,10 +2109,12 @@ class _ActivityTile extends StatelessWidget {
 /// complex bootstrap sequence. meetings/siteVisits are passed in since the
 /// parent already loads them for other cards — no need to fetch twice.
 class _TeamMonthlyTargetsCard extends StatefulWidget {
+  final List<LandLead> leads;
   final List<LandLeadMeeting> meetings;
   final List<LandLeadSiteVisit> siteVisits;
 
   const _TeamMonthlyTargetsCard({
+    required this.leads,
     required this.meetings,
     required this.siteVisits,
   });
@@ -2136,7 +2139,8 @@ class _TeamMonthlyTargetsCardState extends State<_TeamMonthlyTargetsCard> {
     super.didUpdateWidget(oldWidget);
     // Re-derive rows when the underlying activity (meetings/visits) refreshes
     // — cheap, no network call, just a rebuild against the cached submissions.
-    if (oldWidget.meetings.length != widget.meetings.length ||
+    if (oldWidget.leads.length != widget.leads.length ||
+        oldWidget.meetings.length != widget.meetings.length ||
         oldWidget.siteVisits.length != widget.siteVisits.length) {
       setState(() {});
     }
@@ -2205,6 +2209,9 @@ class _TeamMonthlyTargetsCardState extends State<_TeamMonthlyTargetsCard> {
         if (v.visitType == LandLeadSiteVisitType.employee &&
             v.loggedByName.trim().toLowerCase() == name)
           v.visitedAt,
+      for (final l in widget.leads)
+        if (l.isLiveGpsVerified && l.createdByName.trim().toLowerCase() == name)
+          l.addedOn,
     ];
     final selfMeetingDates = [
       for (final m in widget.meetings)

@@ -1260,6 +1260,10 @@ class _LeadListRowState extends State<_LeadListRow> {
                                   label: priorityLabel,
                                   color: priorityColor,
                                 ),
+                                if (lead.isLiveGpsVerified) ...[
+                                  const SizedBox(width: 8),
+                                  const LiveGpsBadge(),
+                                ],
                               ],
                             ),
                             const SizedBox(height: 4),

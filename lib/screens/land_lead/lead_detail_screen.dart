@@ -1464,12 +1464,21 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
     final leadPoint = parseLeadGps(lead.gpsCoordinates);
     final locationMap = leadPoint == null
         ? null
-        : LeadLocationMapCard(
-            point: leadPoint,
-            tileUrl: MapTilerTiles.standard,
-            title: _displayName == 'Lead #${lead.leadId}'
-                ? 'Lead #${lead.leadId}'
-                : _displayName,
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (lead.isLiveGpsVerified) ...[
+                const LiveGpsBadge(),
+                const SizedBox(height: 8),
+              ],
+              LeadLocationMapCard(
+                point: leadPoint,
+                tileUrl: MapTilerTiles.standard,
+                title: _displayName == 'Lead #${lead.leadId}'
+                    ? 'Lead #${lead.leadId}'
+                    : _displayName,
+              ),
+            ],
           );
 
     return FomraAppShell(
