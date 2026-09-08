@@ -5,12 +5,17 @@ import 'package:flutter/material.dart';
 
 import '../analytics/management_bi_metrics.dart';
 import '../analytics/management_intelligence.dart';
+import '../analytics/monthly_target_progress.dart';
 import '../models/app_notification.dart';
 import '../models/land_lead.dart';
+import '../models/land_lead_meeting.dart';
+import '../models/land_lead_site_visit.dart';
+import '../models/monthly_target_submission.dart';
 import '../screens/land_lead/filtered_leads_screen.dart';
 import '../services/app_store.dart';
 import '../services/dashboard_layout_prefs.dart';
 import '../services/management_bi_activity_service.dart';
+import '../services/monthly_target_submission_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/fomra_theme_context.dart';
 import '../utils/lead_location_parser.dart';
@@ -305,6 +310,11 @@ class _ManagementExecutiveDashboardState
               signature: '${c.maxWidth.round()}|${widget.leads.length}',
             );
           },
+        );
+      case 'monthlyTargets':
+        return _TeamMonthlyTargetsCard(
+          meetings: _activity.meetings,
+          siteVisits: _activity.siteVisits,
         );
       case 'reminders':
         return IntelRemindersSection(
@@ -2085,6 +2095,209 @@ class _ActivityTile extends StatelessWidget {
 }
 
 // ── Row 5: Employee Leaderboard ─────────────────────────────────────────────
+
+/// Every employee with an approved monthly target this period, each
+/// category shown against real achieved counts — the same computation
+/// home_screen.dart already does for a single employee's own progress card
+/// (site visits from LandLeadSiteVisit, self/management meetings split by
+/// LandLeadMeeting.managementPresent), just run per-employee by matching
+/// loggedByName rather than scoping to one person's visible leads.
+///
+/// Self-contained: fetches its own approved-submissions list rather than
+/// threading a new async dependency through the parent dashboard's already
+/// complex bootstrap sequence. meetings/siteVisits are passed in since the
+/// parent already loads them for other cards — no need to fetch twice.
+class _TeamMonthlyTargetsCard extends StatefulWidget {
+  final List<LandLeadMeeting> meetings;
+  final List<LandLeadSiteVisit> siteVisits;
+
+  const _TeamMonthlyTargetsCard({
+    required this.meetings,
+    required this.siteVisits,
+  });
+
+  @override
+  State<_TeamMonthlyTargetsCard> createState() =>
+      _TeamMonthlyTargetsCardState();
+}
+
+class _TeamMonthlyTargetsCardState extends State<_TeamMonthlyTargetsCard> {
+  List<MonthlyTargetSubmission> _approved = const [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _TeamMonthlyTargetsCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Re-derive rows when the underlying activity (meetings/visits) refreshes
+    // — cheap, no network call, just a rebuild against the cached submissions.
+    if (oldWidget.meetings.length != widget.meetings.length ||
+        oldWidget.siteVisits.length != widget.siteVisits.length) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _load() async {
+    final now = DateTime.now();
+    final period = MonthlyTargetSubmission.periodOf(now.year, now.month);
+    final all = await MonthlyTargetSubmissionService.allForPeriod(period);
+    if (!mounted) return;
+    setState(() {
+      _approved = all.where((s) => s.isApproved).toList()
+        ..sort((a, b) => a.employeeName.compareTo(b.employeeName));
+      _loading = false;
+    });
+  }
+
+  static const _categories = [
+    (TargetCategory.siteVisits, 'Site Visits', AppColors.primary),
+    (TargetCategory.selfMeetings, 'Self Meetings', AppColors.success),
+    (TargetCategory.managementMeetings, 'Management Meetings', AppColors.warning),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final subtitle =
+        '${MonthlyTargetSubmission.monthName(now.month)} ${now.year}';
+
+    return _DashboardCard(
+      title: 'Monthly Targets',
+      subtitle: subtitle,
+      icon: Icons.flag_outlined,
+      child: _loading
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          : _approved.isEmpty
+              ? Text(
+                  'No approved targets set for this month yet.',
+                  style: TextStyle(color: context.fomraTextSecondary),
+                )
+              : Column(
+                  children: [
+                    for (final s in _approved) ...[
+                      _employeeTargetRow(context, s),
+                      if (s != _approved.last)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 10),
+                          child: Divider(height: 1),
+                        ),
+                    ],
+                  ],
+                ),
+    );
+  }
+
+  Widget _employeeTargetRow(BuildContext context, MonthlyTargetSubmission s) {
+    final now = DateTime.now();
+    final name = s.employeeName.trim().toLowerCase();
+    final tv = s.effectiveValues;
+
+    final visitDates = [
+      for (final v in widget.siteVisits)
+        if (v.visitType == LandLeadSiteVisitType.employee &&
+            v.loggedByName.trim().toLowerCase() == name)
+          v.visitedAt,
+    ];
+    final selfMeetingDates = [
+      for (final m in widget.meetings)
+        if (m.loggedByName.trim().toLowerCase() == name &&
+            !m.managementPresent)
+          m.metAt,
+    ];
+    final managementMeetingDates = [
+      for (final m in widget.meetings)
+        if (m.loggedByName.trim().toLowerCase() == name &&
+            m.managementPresent)
+          m.metAt,
+    ];
+    final datesByCategory = {
+      TargetCategory.siteVisits: visitDates,
+      TargetCategory.selfMeetings: selfMeetingDates,
+      TargetCategory.managementMeetings: managementMeetingDates,
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          s.employeeName.isEmpty ? s.employeeEmail : s.employeeName,
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: context.fomraTextPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        for (final (category, label, color) in _categories)
+          if (tv.containsKey(category.key))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: _targetProgressLine(
+                context,
+                label: label,
+                color: color,
+                progress: MonthlyTargetProgress.forMonth(
+                  target: tv[category.key] ?? 0,
+                  now: now,
+                  completedOn: datesByCategory[category] ?? const [],
+                ),
+              ),
+            ),
+      ],
+    );
+  }
+
+  Widget _targetProgressLine(
+    BuildContext context, {
+    required String label,
+    required Color color,
+    required MonthlyTargetProgress progress,
+  }) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 132,
+          child: Text(
+            label,
+            style: TextStyle(fontSize: 12, color: context.fomraTextSecondary),
+          ),
+        ),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress.completionPercent / 100,
+              minHeight: 6,
+              backgroundColor: color.withValues(alpha: 0.15),
+              valueColor: AlwaysStoppedAnimation(color),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 52,
+          child: Text(
+            '${progress.achieved}/${progress.target}',
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: context.fomraTextPrimary,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class _EmployeeLeaderboardCard extends StatelessWidget {
   final List<PortalTeamPerf> teamRows;

@@ -1061,6 +1061,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     widgetIds: const [
                       'pipelineDeals',
                       'leaderboard',
+                      'monthlyTargets',
                       'pendingWorkflow',
                     ],
                     onViewLead: (lead) {
