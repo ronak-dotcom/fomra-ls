@@ -288,6 +288,15 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
     ]) {
       c.addListener(_onMandatoryFieldChanged);
     }
+    // Auto-suggest the Lead Name from Location + Extent as the user fills
+    // them in — both are mandatory fields (Village is not, so it would
+    // sometimes produce an incomplete-looking name), so this can never
+    // itself end up blank the way a purely optional field would. Stops
+    // updating the moment the user types their own name (see
+    // _onLeadNameChanged) — this is a starting point, not a lock-in.
+    _locationCtrl.addListener(_maybeSuggestLeadName);
+    _extentValueCtrl.addListener(_maybeSuggestLeadName);
+    _leadNameCtrl.addListener(_onLeadNameChanged);
     final existing = widget.existingLead;
     if (existing == null) return;
 
@@ -389,6 +398,38 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
 
   void _onMandatoryFieldChanged() {
     if (mounted) setState(() {});
+  }
+
+  // Lead Name auto-suggestion (create mode only — see the guard inside
+  // _maybeSuggestLeadName). _settingLeadNameProgrammatically distinguishes
+  // "I just wrote the suggestion into the field" from "the user actually
+  // typed something", since both fire _leadNameCtrl's listener the same way.
+  bool _leadNameEditedByUser = false;
+  bool _settingLeadNameProgrammatically = false;
+
+  void _onLeadNameChanged() {
+    if (_settingLeadNameProgrammatically) return;
+    _leadNameEditedByUser = true;
+  }
+
+  String? _suggestedLeadName() {
+    final location = _locationCtrl.text.trim();
+    final extentValue = _extentValueCtrl.text.trim();
+    final extent = extentValue.isEmpty
+        ? ''
+        : (_extentUnit == null ? extentValue : '$extentValue ${_extentUnit!.label}');
+    if (location.isEmpty && extent.isEmpty) return null;
+    return [location, extent].where((s) => s.isNotEmpty).join(' ');
+  }
+
+  void _maybeSuggestLeadName() {
+    if (widget.existingLead != null) return;
+    if (_leadNameEditedByUser) return;
+    final suggestion = _suggestedLeadName();
+    if (suggestion == null) return;
+    _settingLeadNameProgrammatically = true;
+    _leadNameCtrl.text = suggestion;
+    _settingLeadNameProgrammatically = false;
   }
 
   /// Whether every currently-required field is filled — drives the Save
@@ -1432,9 +1473,9 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
                                   padding: const EdgeInsets.only(top: 4, left: 4),
                                   child: Text(
                                     'This is how the lead will appear everywhere '
-                                    '(lists, dashboard, reports). Leave blank and '
-                                    "the owner's name is used instead. You can "
-                                    'rename it later if needed.',
+                                    '(lists, dashboard, reports). Auto-filled from '
+                                    'Location + Extent below as you enter them — '
+                                    'edit it anytime to use your own name instead.',
                                     style: TextStyle(
                                       fontSize: 11.5,
                                       color: context.fomraTextSecondary,
@@ -1668,8 +1709,10 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
                                 ),
                                 _MeasurementUnitDropdown(
                                   value: _extentUnit,
-                                  onChanged: (v) =>
-                                      setState(() => _extentUnit = v),
+                                  onChanged: (v) => setState(() {
+                                    _extentUnit = v;
+                                    _maybeSuggestLeadName();
+                                  }),
                                 ),
                               ),
                               const SizedBox(height: AddLeadUi.fieldGap),
