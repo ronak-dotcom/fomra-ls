@@ -147,6 +147,17 @@ class _SetPasswordScreenState extends State<SetPasswordScreen> {
               controller: _pwCtrl,
               obscureText: _obscure,
               autofillHints: const [AutofillHints.newPassword],
+              // Corrupting a character here is worse than at login: the
+              // person would silently set a different password than what
+              // they typed and see it "confirmed" successfully (both
+              // fields get corrupted identically), then be locked out the
+              // moment they retype it correctly anywhere else. See
+              // login_screen.dart's password field for the full mechanism.
+              autocorrect: false,
+              enableSuggestions: false,
+              smartDashesType: SmartDashesType.disabled,
+              smartQuotesType: SmartQuotesType.disabled,
+              keyboardType: TextInputType.visiblePassword,
               validator: _validatePassword,
               decoration: InputDecoration(
                 labelText: 'New password',
@@ -166,6 +177,11 @@ class _SetPasswordScreenState extends State<SetPasswordScreen> {
               controller: _confirmCtrl,
               obscureText: _obscure,
               autofillHints: const [AutofillHints.newPassword],
+              autocorrect: false,
+              enableSuggestions: false,
+              smartDashesType: SmartDashesType.disabled,
+              smartQuotesType: SmartQuotesType.disabled,
+              keyboardType: TextInputType.visiblePassword,
               onFieldSubmitted: (_) => _submit(),
               decoration: InputDecoration(
                 labelText: 'Confirm password',

@@ -221,6 +221,15 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
                                 TextFormField(
                                   controller: _passwordCtrl,
                                   obscureText: _obscure,
+                                  // See login_screen.dart's password field
+                                  // for why: a mobile keyboard silently
+                                  // altering a character here caused a real,
+                                  // hard-to-diagnose login failure.
+                                  autocorrect: false,
+                                  enableSuggestions: false,
+                                  smartDashesType: SmartDashesType.disabled,
+                                  smartQuotesType: SmartQuotesType.disabled,
+                                  keyboardType: TextInputType.visiblePassword,
                                   textInputAction: TextInputAction.done,
                                   onFieldSubmitted: (_) => _login(),
                                   validator: (v) =>

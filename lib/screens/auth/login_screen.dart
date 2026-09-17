@@ -396,6 +396,18 @@ class _LoginScreenState extends State<LoginScreen> {
             TextFormField(
               controller: _passwordCtrl,
               obscureText: _obscure,
+              // Confirmed root cause of a real, hard-to-diagnose login
+              // failure: some mobile keyboards (Samsung Keyboard observed)
+              // silently replace straight quotes/dashes with "smart" curly
+              // variants as you type, even in an obscured field, since
+              // Flutter doesn't disable this just because obscureText is
+              // true — it's a separate setting. Whatever gets typed must
+              // reach the server byte-for-byte.
+              autocorrect: false,
+              enableSuggestions: false,
+              smartDashesType: SmartDashesType.disabled,
+              smartQuotesType: SmartQuotesType.disabled,
+              keyboardType: TextInputType.visiblePassword,
               textInputAction: TextInputAction.done,
               onFieldSubmitted: (_) => _login(),
               validator: (v) =>
