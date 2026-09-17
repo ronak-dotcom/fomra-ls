@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/land_lead.dart';
+import '../../services/app_store.dart';
 import '../../services/land_lead_legal_service.dart';
 import '../../services/land_lead_signed_service.dart';
 import '../../theme/app_theme.dart';
@@ -179,7 +180,7 @@ class _SignedProjectDialogState extends State<SignedProjectDialog> {
                           ),
                         ),
                         Text(
-                          'Lead #${widget.leadId}',
+                          AppStore.instance.displayNameForLeadId(widget.leadId),
                           style: TextStyle(
                             fontSize: 12,
                             color: context.fomraTextSecondary,

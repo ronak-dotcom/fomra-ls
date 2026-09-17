@@ -1181,9 +1181,7 @@ class _ApprovalSignedRowState extends State<_ApprovalSignedRow> {
   Widget build(BuildContext context) {
     final req = widget.request;
     final lead = widget.lead;
-    final ownerLabel = lead != null && lead.ownerName.trim().isNotEmpty
-        ? lead.ownerName.trim()
-        : 'Lead #${req.leadId}';
+    final ownerLabel = lead?.displayName ?? 'Lead #${req.leadId}';
     final attachments = req.photoUrls.length;
 
     return Container(
@@ -1331,9 +1329,7 @@ class _ApprovalDropRowState extends State<_ApprovalDropRow> {
   Widget build(BuildContext context) {
     final req = widget.request;
     final lead = widget.lead;
-    final ownerLabel = lead != null && lead.ownerName.trim().isNotEmpty
-        ? lead.ownerName.trim()
-        : 'Lead #${req.leadId}';
+    final ownerLabel = lead?.displayName ?? 'Lead #${req.leadId}';
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.sm),
@@ -1480,12 +1476,11 @@ class _ApprovalVisitRowState extends State<_ApprovalVisitRow> {
   Widget build(BuildContext context) {
     final visit = widget.visit;
     final lead = widget.lead;
-    final ownerLabel = lead != null && lead.ownerName.trim().isNotEmpty
-        ? lead.ownerName.trim()
-        : null;
+    final displayName = lead?.displayName ?? 'Lead #${visit.leadId}';
+    final showId = displayName != 'Lead #${visit.leadId}';
     final subtitleParts = <String>[
-      'Lead #${visit.leadId}',
-      if (ownerLabel != null) ownerLabel,
+      displayName,
+      if (showId) '#${visit.leadId}',
       if (visit.loggedByName.isNotEmpty) 'Requested by ${visit.loggedByName}',
       _portalFormatVisitDateTime(visit.visitedAt.toLocal()),
     ];

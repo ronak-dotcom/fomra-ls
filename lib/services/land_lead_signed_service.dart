@@ -186,7 +186,7 @@ class LandLeadSignedService {
         title: 'Project Signed approval requested',
         message:
             '${current.requestedByName.isEmpty ? 'An executive' : current.requestedByName} · '
-            'Lead #${current.leadId} approved by $reviewer — awaiting ${next.level.label}',
+            '${AppStore.instance.displayNameForLeadId(current.leadId)} approved by $reviewer — awaiting ${next.level.label}',
         leadId: current.leadId,
         referenceId: id,
       ).catchError((_) {});
@@ -195,7 +195,7 @@ class LandLeadSignedService {
         current,
         title: 'Signed request progressed',
         message:
-            'Lead #${current.leadId} was approved by $reviewer and is now with ${next.level.label}',
+            '${AppStore.instance.displayNameForLeadId(current.leadId)} was approved by $reviewer and is now with ${next.level.label}',
       );
       return advanced;
     }
@@ -230,9 +230,9 @@ class LandLeadSignedService {
       request,
       title: approve ? 'Project approved & signed' : 'Signed request rejected',
       message: approve
-          ? 'Lead #${request.leadId} was approved and marked as Signed'
+          ? '${AppStore.instance.displayNameForLeadId(request.leadId)} was approved and marked as Signed'
               '${notes.trim().isNotEmpty ? ' — $notes' : ''}'
-          : 'Lead #${request.leadId} signed request was rejected by $reviewer'
+          : '${AppStore.instance.displayNameForLeadId(request.leadId)} signed request was rejected by $reviewer'
               '${notes.trim().isNotEmpty ? ' — $notes' : ''}',
     );
 

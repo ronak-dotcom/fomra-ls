@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../widgets/ui/app_components.dart';
 
+import '../../services/app_store.dart';
 import '../../services/land_lead_legal_service.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/fomra_theme_context.dart';
@@ -200,7 +201,7 @@ class _LegalDocumentsDialogState extends State<LegalDocumentsDialog> {
                           ),
                         ),
                         Text(
-                          'Lead #${widget.leadId}',
+                          AppStore.instance.displayNameForLeadId(widget.leadId),
                           style: TextStyle(
                             fontSize: 12,
                             color: context.fomraTextSecondary,

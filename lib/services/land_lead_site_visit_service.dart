@@ -183,7 +183,7 @@ class LandLeadSiteVisitService {
         type: 'site_visit',
         title: 'Management site visit requested',
         message:
-            'Lead #${current.leadId} site visit approved by $reviewer — awaiting ${next.level.label}',
+            '${AppStore.instance.displayNameForLeadId(current.leadId)} site visit approved by $reviewer — awaiting ${next.level.label}',
         leadId: current.leadId,
         referenceId: visitId,
       ).catchError((_) {});
@@ -192,7 +192,7 @@ class LandLeadSiteVisitService {
         current,
         title: 'Site visit request progressed',
         message:
-            'Lead #${current.leadId} site visit was approved by $reviewer and is now with ${next.level.label}',
+            '${AppStore.instance.displayNameForLeadId(current.leadId)} site visit was approved by $reviewer and is now with ${next.level.label}',
       );
       return LandLeadSiteVisit.fromJson(row);
     }
@@ -242,9 +242,9 @@ class LandLeadSiteVisitService {
           ? 'Management visit approved'
           : 'Management visit rejected',
       message: approved
-          ? 'Lead #${visit.leadId} management site visit was approved'
+          ? '${AppStore.instance.displayNameForLeadId(visit.leadId)} management site visit was approved'
               '${notes.trim().isNotEmpty ? ' — $notes' : ''}'
-          : 'Lead #${visit.leadId} management site visit was rejected by $reviewer'
+          : '${AppStore.instance.displayNameForLeadId(visit.leadId)} management site visit was rejected by $reviewer'
               '${notes.trim().isNotEmpty ? ' — $notes' : ''}',
       leadId: visit.leadId,
       referenceId: visit.id,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../widgets/ui/app_components.dart';
 
 import '../../models/land_lead_site_visit.dart';
+import '../../services/app_store.dart';
 import '../../services/auth_service.dart';
 import '../../services/land_lead_site_visit_service.dart';
 import '../../theme/app_theme.dart';
@@ -173,7 +174,7 @@ class _SiteVisitDialogState extends State<SiteVisitDialog> {
                           ),
                         ),
                         Text(
-                          'Lead #${widget.leadId}',
+                          AppStore.instance.displayNameForLeadId(widget.leadId),
                           style: TextStyle(
                             fontSize: 12,
                             color: context.fomraTextSecondary,

@@ -3,6 +3,7 @@ import '../../widgets/ui/app_components.dart';
 import 'package:flutter/services.dart';
 
 import '../../models/lead_call_log.dart';
+import '../../services/app_store.dart';
 import '../../services/lead_call_log_service.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/fomra_theme_context.dart';
@@ -178,7 +179,7 @@ class _CallsLogDialogState extends State<CallsLogDialog> {
                           ),
                         ),
                         Text(
-                          'Lead #${widget.leadId}',
+                          AppStore.instance.displayNameForLeadId(widget.leadId),
                           style: TextStyle(
                             fontSize: 12,
                             color: context.fomraTextSecondary,

@@ -25,6 +25,21 @@ class AppStore extends ChangeNotifier {
   /// across the whole app. See [LeadVisibility] for the rule itself.
   List<LandLead> get visibleLeads => LeadVisibility.scope(leads);
 
+  /// For the several dialogs (notes, calls, meetings, site visits, legal
+  /// docs, signed-project) that are only ever passed a bare leadId, not the
+  /// full LandLead — looks up its display name so dialog headers can show
+  /// "Kottamedu 2.15 acres" instead of "Lead #47". Searches the raw [leads]
+  /// list, not [visibleLeads]: the person already has this exact lead's
+  /// dialog open, so scoping would only risk an unnecessary fallback, never
+  /// add real protection. Falls back to the bare ID format on a miss,
+  /// matching what every call site already showed before this existed.
+  String displayNameForLeadId(String leadId) {
+    for (final l in leads) {
+      if (l.leadId == leadId) return l.displayName;
+    }
+    return 'Lead #$leadId';
+  }
+
   void addLead(LandLead lead) {
     leads.insert(0, lead);
     notifyListeners();

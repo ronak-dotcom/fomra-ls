@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/lead_follow_up.dart';
+import '../../services/app_store.dart';
 import '../../services/lead_follow_up_service.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/fomra_theme_context.dart';
@@ -250,7 +251,7 @@ class _FollowUpDialogState extends State<_FollowUpDialog> {
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
                         color: context.fomraTextPrimary)),
-                Text('Lead #${widget.leadId}',
+                Text(AppStore.instance.displayNameForLeadId(widget.leadId),
                     style: TextStyle(
                         fontSize: 12, color: context.fomraTextSecondary)),
               ],

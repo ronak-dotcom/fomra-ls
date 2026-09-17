@@ -152,7 +152,7 @@ class _NotesLogDialogState extends State<NotesLogDialog> {
                           ),
                         ),
                         Text(
-                          'Lead #${widget.lead.leadId}',
+                          widget.lead.displayName,
                           style: TextStyle(
                             fontSize: 12,
                             color: context.fomraTextSecondary,

@@ -3,6 +3,7 @@ import '../../widgets/ui/app_components.dart';
 import 'package:flutter/services.dart';
 
 import '../../models/land_lead_meeting.dart';
+import '../../services/app_store.dart';
 import '../../services/land_lead_meeting_service.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/fomra_theme_context.dart';
@@ -182,7 +183,7 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
                           ),
                         ),
                         Text(
-                          'Lead #${widget.leadId}',
+                          AppStore.instance.displayNameForLeadId(widget.leadId),
                           style: TextStyle(
                             fontSize: 12,
                             color: context.fomraTextSecondary,

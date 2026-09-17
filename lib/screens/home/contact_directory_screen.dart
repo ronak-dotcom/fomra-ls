@@ -137,22 +137,28 @@ class _ContactDirectoryScreenState extends State<ContactDirectoryScreen> {
                         lead.village,
                         lead.district,
                       ].where((s) => s.trim().isNotEmpty).join(', ');
+                      final showId =
+                          lead.displayName != 'Lead #${lead.leadId}';
+                      final subtitleText = [
+                        if (showId) '#${lead.leadId}',
+                        if (location.isNotEmpty) location,
+                      ].join(' · ');
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text(
-                          'Lead #${lead.leadId}',
+                          lead.displayName,
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             color: context.fomraTextPrimary,
                           ),
                         ),
-                        subtitle: location.isNotEmpty
-                            ? Text(
-                                location,
+                        subtitle: subtitleText.isEmpty
+                            ? null
+                            : Text(
+                                subtitleText,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                              )
-                            : null,
+                              ),
                         trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: () {
                           Navigator.pop(ctx);

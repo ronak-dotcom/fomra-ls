@@ -212,11 +212,9 @@ abstract final class UniversalSearchService {
       ].join(', ');
       hits.add(UniversalSearchHit(
         kind: UniversalSearchKind.lead,
-        title: lead.ownerName.trim().isNotEmpty
-            ? lead.ownerName.trim()
-            : 'Lead #${lead.leadId}',
+        title: lead.displayName,
         subtitle: [
-          'Lead #${lead.leadId}',
+          if (lead.displayName != 'Lead #${lead.leadId}') '#${lead.leadId}',
           if (location.isNotEmpty) location,
           lead.status.name,
         ].join(' · '),
@@ -243,7 +241,7 @@ abstract final class UniversalSearchService {
         title: doc.fileName,
         subtitle: [
           cat.label,
-          'Lead #${doc.leadId}',
+          AppStore.instance.displayNameForLeadId(doc.leadId),
           if (num != null) 'Doc #$num',
         ].join(' · '),
         document: doc,

@@ -81,9 +81,9 @@ class IntelRemindersSection extends StatelessWidget {
           else
             for (final item in items.take(12))
               _IntelRow(
-                title: item.kind.label,
+                title: '${item.kind.label} · ${item.lead.displayName}',
                 subtitle:
-                    'Lead #${item.lead.leadId} · ${item.detail} · ${item.daysStale}d',
+                    '#${item.lead.leadId} · ${item.detail} · ${item.daysStale}d',
                 color: AppColors.warning,
                 onTap: onViewLead == null
                     ? null
@@ -126,9 +126,8 @@ class IntelEscalationsSection extends StatelessWidget {
           else
             for (final item in items.take(10))
               _IntelRow(
-                title: item.reason,
-                subtitle:
-                    'Lead #${item.lead.leadId} · ${item.overdueDays}d overdue',
+                title: '${item.reason} · ${item.lead.displayName}',
+                subtitle: '#${item.lead.leadId} · ${item.overdueDays}d overdue',
                 color: AppColors.error,
                 onTap: onViewLead == null
                     ? null

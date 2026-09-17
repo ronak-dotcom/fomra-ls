@@ -158,7 +158,7 @@ class LeadDropApprovalService {
         type: 'verification',
         title: 'Drop request progressed',
         message:
-            'Lead #${request.leadId} drop request was approved by $reviewer and is now with ${next.level.label}',
+            '${AppStore.instance.displayNameForLeadId(request.leadId)} drop request was approved by $reviewer and is now with ${next.level.label}',
       );
       return;
     }
@@ -178,8 +178,8 @@ class LeadDropApprovalService {
       type: approve ? 'verification' : 'alert',
       title: approve ? 'Drop request approved' : 'Drop request rejected',
       message: approve
-          ? 'Lead #${request.leadId} was approved and marked as Dropped'
-          : 'Lead #${request.leadId} drop request was rejected by $reviewer — the stage is unchanged',
+          ? '${AppStore.instance.displayNameForLeadId(request.leadId)} was approved and marked as Dropped'
+          : '${AppStore.instance.displayNameForLeadId(request.leadId)} drop request was rejected by $reviewer — the stage is unchanged',
     );
   }
 

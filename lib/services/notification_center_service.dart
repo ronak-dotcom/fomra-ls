@@ -58,8 +58,7 @@ abstract final class NotificationCenterService {
         key: 'approval_${item.kind.name}_${item.lead.leadId}',
         audience: audience,
         title: 'Pending Approval · ${item.kind.label}',
-        message:
-            'Lead #${item.lead.leadId} · ${item.lead.ownerName} — ${item.detail}',
+        message: '${item.lead.displayName} — ${item.detail}',
         type: 'pending_approval',
         leadId: item.lead.leadId,
         referenceId: item.visitId,
@@ -73,7 +72,7 @@ abstract final class NotificationCenterService {
         audience: audience,
         title: 'SLA Breach · ${item.kind.label}',
         message:
-            'Lead #${item.lead.leadId} · ${item.lead.ownerName} exceeded ${item.kind.targetDays}-day SLA.',
+            '${item.lead.displayName} exceeded ${item.kind.targetDays}-day SLA.',
         type: 'sla_breach',
         leadId: item.lead.leadId,
       );
@@ -97,7 +96,7 @@ abstract final class NotificationCenterService {
         audience: audience,
         title: 'Pending Lead',
         message:
-            'Lead #${lead.leadId} · ${lead.ownerName} still open (${DateTime.now().difference(lead.addedOn).inDays} days).',
+            '${lead.displayName} still open (${DateTime.now().difference(lead.addedOn).inDays} days).',
         type: 'pending_lead',
         leadId: lead.leadId,
       );
@@ -125,7 +124,7 @@ abstract final class NotificationCenterService {
         audience: audience,
         title: 'Pending Lead',
         message:
-            'Lead #${lead.leadId} · ${lead.ownerName} needs follow-up ($days days).',
+            '${lead.displayName} needs follow-up ($days days).',
         type: 'pending_lead',
         leadId: lead.leadId,
       );
@@ -139,7 +138,7 @@ abstract final class NotificationCenterService {
         key: 'emp_meeting_${lead.leadId}',
         audience: audience,
         title: 'Reminder · Meeting pending',
-        message: 'Schedule or complete meeting for Lead #${lead.leadId}.',
+        message: 'Schedule or complete meeting for ${lead.displayName}.',
         type: 'reminder',
         leadId: lead.leadId,
       );
@@ -168,7 +167,7 @@ abstract final class NotificationCenterService {
           audience: audience,
           title: 'Follow-up Reminder',
           message:
-              'Lead #${f.leadId}\n${f.title}\n\nScheduled:\n${f.scheduledLabel}',
+              '${AppStore.instance.displayNameForLeadId(f.leadId)}\n${f.title}\n\nScheduled:\n${f.scheduledLabel}',
           type: 'reminder',
           leadId: f.leadId,
           referenceId: f.id,
