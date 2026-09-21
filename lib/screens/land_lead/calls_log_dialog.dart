@@ -619,6 +619,18 @@ class _PreviousCallTile extends StatelessWidget {
               ],
             ),
           ],
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.bottomRight,
+            child: Text(
+              'Logged ${formatCallDateTime(log.createdAt)}',
+              style: TextStyle(
+                fontSize: 10.5,
+                fontStyle: FontStyle.italic,
+                color: context.fomraTextSecondary.withValues(alpha: 0.8),
+              ),
+            ),
+          ),
         ],
       ),
     );

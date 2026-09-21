@@ -57,6 +57,10 @@ class LeadCallLog {
   /// When a follow-up was scheduled for this call, or null if none.
   final DateTime? followUpAt;
 
+  /// When this record was actually entered — distinct from [calledAt], the
+  /// date the call itself took place. See LandLeadMeeting.createdAt.
+  final DateTime createdAt;
+
   const LeadCallLog({
     required this.id,
     required this.leadId,
@@ -67,6 +71,7 @@ class LeadCallLog {
     this.outcome = CallOutcome.answered,
     required this.loggedByName,
     this.followUpAt,
+    required this.createdAt,
   });
 
   factory LeadCallLog.fromJson(Map<String, dynamic> j) => LeadCallLog(
@@ -81,6 +86,9 @@ class LeadCallLog {
         followUpAt: (j['follow_up_at'] as String?) != null
             ? DateTime.tryParse(j['follow_up_at'] as String)?.toLocal()
             : null,
+        createdAt: j['created_at'] != null
+            ? DateTime.parse(j['created_at'] as String)
+            : DateTime.parse(j['called_at'] as String),
       );
 
   bool get isAnswered => outcome == CallOutcome.answered;

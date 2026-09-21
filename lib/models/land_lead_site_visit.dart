@@ -48,11 +48,17 @@ class LandLeadSiteVisit {
   final String pendingWith;
   final String requestedByEmail;
 
+  /// When this record was actually entered — distinct from [visitedAt],
+  /// the date the visit itself took place. See LandLeadMeeting.createdAt
+  /// for why this matters.
+  final DateTime createdAt;
+
   const LandLeadSiteVisit({
     required this.id,
     required this.leadId,
     required this.visitedAt,
     required this.loggedByName,
+    required this.createdAt,
     this.visitType = LandLeadSiteVisitType.employee,
     this.approvalStatus = SiteVisitApprovalStatus.approved,
     this.managementNotes = '',
@@ -79,6 +85,9 @@ class LandLeadSiteVisit {
       leadId: j['lead_id'] as String,
       visitedAt: DateTime.parse(j['visited_at'] as String),
       loggedByName: j['logged_by_name'] as String? ?? '',
+      createdAt: j['created_at'] != null
+          ? DateTime.parse(j['created_at'] as String)
+          : DateTime.parse(j['visited_at'] as String),
       visitType: visitType,
       approvalStatus:
           SiteVisitApprovalStatus.parse(j['approval_status'] as String?),

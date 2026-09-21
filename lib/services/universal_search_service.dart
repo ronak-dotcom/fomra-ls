@@ -54,10 +54,25 @@ abstract final class UniversalSearchService {
   static bool _contains(String? value, String q) =>
       value != null && value.trim().isNotEmpty && value.toLowerCase().contains(q);
 
+  /// "Lead ID #9", "Lead #9", "#9", and "9" should all find lead 9 — strips
+  /// that common phrasing down to the bare id so the substring check below
+  /// has something it can actually match against. Without this, a query
+  /// longer than the id itself (e.g. "lead id #9" vs the stored "9") could
+  /// never match at all, since containment only works one direction.
+  static String _bareLeadIdQuery(String q) {
+    var s = q.replaceAll(RegExp(r'\blead\b'), '');
+    s = s.replaceAll(RegExp(r'\bid\b'), '');
+    s = s.replaceAll('#', '');
+    return s.trim();
+  }
+
   /// Lead ID, owner, mobile, village, broker, survey number (+ location extras).
   static bool _leadMatches(LandLead lead, String q) {
-    return _contains(lead.leadId, q) ||
-        _contains(lead.ownerName, q) ||
+    final idQuery = _bareLeadIdQuery(q);
+    if (idQuery.isNotEmpty && lead.leadId.toLowerCase().contains(idQuery)) {
+      return true;
+    }
+    return _contains(lead.ownerName, q) ||
         _contains(lead.contactDetails, q) ||
         _contains(lead.brokerName, q) ||
         _contains(lead.brokerContact, q) ||
@@ -78,8 +93,9 @@ abstract final class UniversalSearchService {
   static bool _documentMatches(LandLeadLegalDocument doc, String q) {
     final cat = LegalDocumentCatalog.classify(doc.fileName);
     final num = LegalDocumentCatalog.extractDocumentNumber(doc.fileName);
+    final idQuery = _bareLeadIdQuery(q);
     return _contains(doc.fileName, q) ||
-        _contains(doc.leadId, q) ||
+        (idQuery.isNotEmpty && doc.leadId.toLowerCase().contains(idQuery)) ||
         _contains(cat.label, q) ||
         _contains(num, q) ||
         _contains(doc.loggedByName, q);

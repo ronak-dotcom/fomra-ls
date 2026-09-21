@@ -35,6 +35,13 @@ class LandLeadMeeting {
   final List<String> attendeeTypes;
   final bool managementPresent;
 
+  /// When this record was actually entered into the system — distinct from
+  /// [metAt], the date the meeting itself took place (which the person
+  /// picks). A meeting logged well after it happened (e.g. no signal at the
+  /// time, or catching up on a backlog) will have these differ, sometimes
+  /// by weeks. Both are shown in the UI so this is never ambiguous.
+  final DateTime createdAt;
+
   const LandLeadMeeting({
     required this.id,
     required this.leadId,
@@ -42,6 +49,7 @@ class LandLeadMeeting {
     required this.duration,
     required this.notes,
     required this.loggedByName,
+    required this.createdAt,
     this.attendeeTypes = const [],
     this.managementPresent = false,
   });
@@ -53,6 +61,11 @@ class LandLeadMeeting {
         duration: j['duration'] as String? ?? '',
         notes: j['notes'] as String? ?? '',
         loggedByName: j['logged_by_name'] as String? ?? '',
+        // Fallback to metAt only for the unexpected case created_at is
+        // somehow absent — Postgres always sets it on insert.
+        createdAt: j['created_at'] != null
+            ? DateTime.parse(j['created_at'] as String)
+            : DateTime.parse(j['met_at'] as String),
         attendeeTypes: (j['attendee_types'] as List?)
                 ?.map((e) => e.toString())
                 .toList() ??

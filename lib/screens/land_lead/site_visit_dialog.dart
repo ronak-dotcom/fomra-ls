@@ -296,44 +296,61 @@ class _PreviousVisitTile extends StatelessWidget {
         border: Border.all(color: context.fomraBorder),
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.check_circle, size: 16, color: AppColors.purple),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  formatCallDateTime(visit.visitedAt),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: context.fomraTextPrimary,
-                  ),
+          Row(
+            children: [
+              const Icon(Icons.check_circle, size: 16, color: AppColors.purple),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      formatCallDateTime(visit.visitedAt),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: context.fomraTextPrimary,
+                      ),
+                    ),
+                    if (visit.visitType == LandLeadSiteVisitType.management &&
+                        visit.approvalStatus != SiteVisitApprovalStatus.approved)
+                      Text(
+                        visit.approvalStatus.label,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: visit.approvalStatus ==
+                                  SiteVisitApprovalStatus.rejected
+                              ? AppColors.error
+                              : AppColors.warning,
+                        ),
+                      ),
+                    if (visit.loggedByName.isNotEmpty)
+                      Text(
+                        visit.loggedByName,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: context.fomraTextSecondary,
+                        ),
+                      ),
+                  ],
                 ),
-                if (visit.visitType == LandLeadSiteVisitType.management &&
-                    visit.approvalStatus != SiteVisitApprovalStatus.approved)
-                  Text(
-                    visit.approvalStatus.label,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: visit.approvalStatus ==
-                              SiteVisitApprovalStatus.rejected
-                          ? AppColors.error
-                          : AppColors.warning,
-                    ),
-                  ),
-                if (visit.loggedByName.isNotEmpty)
-                  Text(
-                    visit.loggedByName,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: context.fomraTextSecondary,
-                    ),
-                  ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.bottomRight,
+            child: Text(
+              'Logged ${formatCallDateTime(visit.createdAt)}',
+              style: TextStyle(
+                fontSize: 10.5,
+                fontStyle: FontStyle.italic,
+                color: context.fomraTextSecondary.withValues(alpha: 0.8),
+              ),
             ),
           ),
         ],
