@@ -57,7 +57,7 @@ class _LeadsMapScreenState extends State<LeadsMapScreen> {
   final Set<LeadStatus> _stages = {};
   Set<String> _executive = {};
   Set<String> _broker = {};
-  DateTime? _dateFilter;
+  DateTimeRange? _dateFilter;
 
   /// Filters excluding the free-text search — drives the "Filters" badge.
   bool get _hasFieldFilters =>
@@ -113,9 +113,11 @@ class _LeadsMapScreenState extends State<LeadsMapScreen> {
       }
       if (_dateFilter != null) {
         final d = DateTime(l.addedOn.year, l.addedOn.month, l.addedOn.day);
-        final sel =
-            DateTime(_dateFilter!.year, _dateFilter!.month, _dateFilter!.day);
-        if (d != sel) return false;
+        final start = DateTime(
+            _dateFilter!.start.year, _dateFilter!.start.month, _dateFilter!.start.day);
+        final end = DateTime(
+            _dateFilter!.end.year, _dateFilter!.end.month, _dateFilter!.end.day);
+        if (d.isBefore(start) || d.isAfter(end)) return false;
       }
       if (q.isNotEmpty) {
         final match = <String>[
@@ -739,11 +741,14 @@ class _LeadsMapScreenState extends State<LeadsMapScreen> {
       borderRadius: BorderRadius.circular(_kFieldRadius),
       onTap: () async {
         final now = DateTime.now();
-        final picked = await showDatePicker(
+        final picked = await showDateRangePicker(
           context: context,
-          initialDate: _dateFilter ?? now,
           firstDate: DateTime(now.year - 5),
           lastDate: DateTime(now.year + 1),
+          initialDateRange: _dateFilter,
+          // A compact input dialog instead of the full-screen calendar (tap
+          // the calendar icon inside to switch to the month view if needed)
+          // — matches reports_screen.dart's date range picker.
           initialEntryMode: DatePickerEntryMode.input,
         );
         if (picked != null) apply(() => _dateFilter = picked);
@@ -763,7 +768,11 @@ class _LeadsMapScreenState extends State<LeadsMapScreen> {
               : null,
         ),
         child: Text(
-          hasDate ? df.format(_dateFilter!) : 'Any date',
+          hasDate
+              ? (_dateFilter!.start == _dateFilter!.end
+                  ? df.format(_dateFilter!.start)
+                  : '${df.format(_dateFilter!.start)} – ${df.format(_dateFilter!.end)}')
+              : 'Any date',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(

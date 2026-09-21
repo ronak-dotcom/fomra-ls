@@ -2203,39 +2203,72 @@ class _TeamMonthlyTargetsCardState extends State<_TeamMonthlyTargetsCard> {
     final now = DateTime.now();
     final name = s.employeeName.trim().toLowerCase();
     final tv = s.effectiveValues;
+    final displayName = s.employeeName.isEmpty ? s.employeeEmail : s.employeeName;
 
-    final visitDates = [
-      for (final v in widget.siteVisits)
-        if (v.visitType == LandLeadSiteVisitType.employee &&
-            v.loggedByName.trim().toLowerCase() == name)
-          v.visitedAt,
-      for (final l in widget.leads)
-        if (l.isLiveGpsVerified && l.createdByName.trim().toLowerCase() == name)
-          l.addedOn,
-    ];
-    final selfMeetingDates = [
-      for (final m in widget.meetings)
-        if (m.loggedByName.trim().toLowerCase() == name &&
-            !m.managementPresent)
-          m.metAt,
-    ];
-    final managementMeetingDates = [
-      for (final m in widget.meetings)
-        if (m.loggedByName.trim().toLowerCase() == name &&
-            m.managementPresent)
-          m.metAt,
-    ];
+    bool inMonth(DateTime d) => d.year == now.year && d.month == now.month;
+
+    LandLead? findLead(String leadId) {
+      for (final l in widget.leads) {
+        if (l.leadId == leadId) return l;
+      }
+      return null;
+    }
+
+    // Same matching rules as the achieved-count calculation below, but also
+    // keeping the leadId of each contributing event so tapping a line can
+    // show exactly those leads — same date window (this calendar month) as
+    // MonthlyTargetProgress.forMonth uses, so the drill-down list's length
+    // always matches the number shown next to it.
+    final visitDates = <DateTime>[];
+    final visitLeadIds = <String>{};
+    for (final v in widget.siteVisits) {
+      if (v.visitType == LandLeadSiteVisitType.employee &&
+          v.loggedByName.trim().toLowerCase() == name &&
+          inMonth(v.visitedAt)) {
+        visitDates.add(v.visitedAt);
+        visitLeadIds.add(v.leadId);
+      }
+    }
+    for (final l in widget.leads) {
+      if (l.isLiveGpsVerified &&
+          l.createdByName.trim().toLowerCase() == name &&
+          inMonth(l.addedOn)) {
+        visitDates.add(l.addedOn);
+        visitLeadIds.add(l.leadId);
+      }
+    }
+    final selfMeetingDates = <DateTime>[];
+    final selfMeetingLeadIds = <String>{};
+    final managementMeetingDates = <DateTime>[];
+    final managementMeetingLeadIds = <String>{};
+    for (final m in widget.meetings) {
+      if (m.loggedByName.trim().toLowerCase() != name || !inMonth(m.metAt)) {
+        continue;
+      }
+      if (m.managementPresent) {
+        managementMeetingDates.add(m.metAt);
+        managementMeetingLeadIds.add(m.leadId);
+      } else {
+        selfMeetingDates.add(m.metAt);
+        selfMeetingLeadIds.add(m.leadId);
+      }
+    }
     final datesByCategory = {
       TargetCategory.siteVisits: visitDates,
       TargetCategory.selfMeetings: selfMeetingDates,
       TargetCategory.managementMeetings: managementMeetingDates,
+    };
+    final leadIdsByCategory = {
+      TargetCategory.siteVisits: visitLeadIds,
+      TargetCategory.selfMeetings: selfMeetingLeadIds,
+      TargetCategory.managementMeetings: managementMeetingLeadIds,
     };
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          s.employeeName.isEmpty ? s.employeeEmail : s.employeeName,
+          displayName,
           style: TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
@@ -2256,6 +2289,21 @@ class _TeamMonthlyTargetsCardState extends State<_TeamMonthlyTargetsCard> {
                   now: now,
                   completedOn: datesByCategory[category] ?? const [],
                 ),
+                onTap: () {
+                  final ids = leadIdsByCategory[category] ?? const <String>{};
+                  final matchedLeads = [
+                    for (final id in ids)
+                      if (findLead(id) != null) findLead(id)!,
+                  ];
+                  if (matchedLeads.isEmpty) return;
+                  FilteredLeadsScreen.openList(
+                    context,
+                    title: '$displayName — $label',
+                    subtitle:
+                        '${matchedLeads.length} this month',
+                    leads: matchedLeads,
+                  );
+                },
               ),
             ),
       ],
@@ -2267,41 +2315,57 @@ class _TeamMonthlyTargetsCardState extends State<_TeamMonthlyTargetsCard> {
     required String label,
     required Color color,
     required MonthlyTargetProgress progress,
+    required VoidCallback onTap,
   }) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 132,
-          child: Text(
-            label,
-            style: TextStyle(fontSize: 12, color: context.fomraTextSecondary),
-          ),
-        ),
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress.completionPercent / 100,
-              minHeight: 6,
-              backgroundColor: color.withValues(alpha: 0.15),
-              valueColor: AlwaysStoppedAnimation(color),
+    final clickable = progress.achieved > 0;
+    return InkWell(
+      onTap: clickable ? onTap : null,
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 132,
+              child: Text(
+                label,
+                style: TextStyle(fontSize: 12, color: context.fomraTextSecondary),
+              ),
             ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 52,
-          child: Text(
-            '${progress.achieved}/${progress.target}',
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: context.fomraTextPrimary,
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: progress.completionPercent / 100,
+                  minHeight: 6,
+                  backgroundColor: color.withValues(alpha: 0.15),
+                  valueColor: AlwaysStoppedAnimation(color),
+                ),
+              ),
             ),
-          ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 52,
+              child: Text(
+                '${progress.achieved}/${progress.target}',
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: context.fomraTextPrimary,
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 16,
+              child: clickable
+                  ? Icon(Icons.chevron_right_rounded,
+                      size: 16, color: context.fomraTextSecondary)
+                  : null,
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
