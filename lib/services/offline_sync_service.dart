@@ -308,6 +308,8 @@ class OfflineSyncService extends ChangeNotifier {
   }) =>
       {
         'lead_id': overrideId ?? lead.leadId,
+        'lead_name': lead.leadName,
+        'lead_name_locked': lead.leadNameLocked,
         'input_source': lead.inputSource.name,
         'location': lead.location,
         'gps_coordinates': lead.gpsCoordinates,
@@ -317,6 +319,8 @@ class OfflineSyncService extends ChangeNotifier {
         'pincode': lead.pincode,
         'survey_number': lead.surveyNumber,
         'sub_division': lead.subDivision,
+        'additional_survey_numbers':
+            lead.additionalSurveyNumbers.map((s) => s.toJson()).toList(),
         'land_extent': lead.landExtent,
         'owner_name': lead.ownerName,
         'contact_details': lead.contactDetails,
@@ -324,6 +328,8 @@ class OfflineSyncService extends ChangeNotifier {
             lead.additionalOwners.map((o) => o.toJson()).toList(),
         'broker_name': lead.brokerName,
         'broker_contact': lead.brokerContact,
+        'additional_brokers':
+            lead.additionalBrokers.map((o) => o.toJson()).toList(),
         'source_contact_name': lead.sourceContactName,
         'source_contact_number': lead.sourceContactNumber,
         'land_type': lead.landType.name,
@@ -344,6 +350,8 @@ class OfflineSyncService extends ChangeNotifier {
   static LandLead _leadFromMap(Map<String, dynamic> m) {
     return LandLead(
       leadId: m['lead_id'] as String? ?? '',
+      leadName: m['lead_name'] as String? ?? '',
+      leadNameLocked: m['lead_name_locked'] as bool? ?? false,
       inputSource: InputSource.values.firstWhere(
         (e) => e.name == m['input_source'],
         orElse: () => InputSource.landowner,
@@ -356,6 +364,11 @@ class OfflineSyncService extends ChangeNotifier {
       pincode: m['pincode'] as String? ?? '',
       surveyNumber: m['survey_number'] as String? ?? '',
       subDivision: m['sub_division'] as String? ?? '',
+      additionalSurveyNumbers: (m['additional_survey_numbers'] as List?)
+              ?.whereType<Map>()
+              .map((e) => SurveyEntry.fromJson(Map<String, dynamic>.from(e)))
+              .toList() ??
+          const [],
       landExtent: m['land_extent'] as String? ?? '',
       ownerName: m['owner_name'] as String? ?? '',
       contactDetails: m['contact_details'] as String? ?? '',
@@ -366,6 +379,11 @@ class OfflineSyncService extends ChangeNotifier {
           const [],
       brokerName: m['broker_name'] as String? ?? '',
       brokerContact: m['broker_contact'] as String? ?? '',
+      additionalBrokers: (m['additional_brokers'] as List?)
+              ?.whereType<Map>()
+              .map((e) => OwnerContact.fromJson(Map<String, dynamic>.from(e)))
+              .toList() ??
+          const [],
       sourceContactName: m['source_contact_name'] as String? ?? '',
       sourceContactNumber: m['source_contact_number'] as String? ?? '',
       landType: LandType.values.firstWhere(
