@@ -2184,18 +2184,66 @@ class _TeamMonthlyTargetsCardState extends State<_TeamMonthlyTargetsCard> {
                   'No approved targets set for this month yet.',
                   style: TextStyle(color: context.fomraTextSecondary),
                 )
-              : Column(
-                  children: [
-                    for (final s in _approved) ...[
-                      _employeeTargetRow(context, s),
-                      if (s != _approved.last)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 10),
-                          child: Divider(height: 1),
-                        ),
-                    ],
-                  ],
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    // Side by side once there's genuinely room for two
+                    // legible columns; stacks on a narrow phone rather than
+                    // forcing a cramped 2-up layout everywhere.
+                    final columns = constraints.maxWidth >= 480 ? 2 : 1;
+                    const spacing = 12.0;
+                    final cardWidth = columns == 1
+                        ? constraints.maxWidth
+                        : (constraints.maxWidth - spacing) / columns;
+                    return Wrap(
+                      spacing: spacing,
+                      runSpacing: spacing,
+                      children: [
+                        for (final s in _approved)
+                          SizedBox(
+                            width: cardWidth,
+                            child: _employeeTargetCard(context, s),
+                          ),
+                      ],
+                    );
+                  },
                 ),
+    );
+  }
+
+  Widget _employeeTargetCard(BuildContext context, MonthlyTargetSubmission s) {
+    final displayName = s.employeeName.isEmpty ? s.employeeEmail : s.employeeName;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: context.fomraSurfaceVar,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.fomraBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              ProfileAvatar(email: s.employeeEmail, name: displayName, radius: 13),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: context.fomraTextPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _employeeTargetRow(context, s),
+        ],
+      ),
     );
   }
 
@@ -2267,15 +2315,6 @@ class _TeamMonthlyTargetsCardState extends State<_TeamMonthlyTargetsCard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          displayName,
-          style: TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: context.fomraTextPrimary,
-          ),
-        ),
-        const SizedBox(height: 8),
         for (final (category, label, color) in _categories)
           if (tv.containsKey(category.key))
             Padding(
@@ -2322,46 +2361,51 @@ class _TeamMonthlyTargetsCardState extends State<_TeamMonthlyTargetsCard> {
       onTap: clickable ? onTap : null,
       borderRadius: BorderRadius.circular(6),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
-        child: Row(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(
-              width: 132,
-              child: Text(
-                label,
-                style: TextStyle(fontSize: 12, color: context.fomraTextSecondary),
-              ),
-            ),
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: progress.completionPercent / 100,
-                  minHeight: 6,
-                  backgroundColor: color.withValues(alpha: 0.15),
-                  valueColor: AlwaysStoppedAnimation(color),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: context.fomraTextSecondary,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 52,
-              child: Text(
-                '${progress.achieved}/${progress.target}',
-                textAlign: TextAlign.right,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: context.fomraTextPrimary,
+                const SizedBox(width: 6),
+                Text(
+                  '${progress.achieved}/${progress.target}',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                    color: context.fomraTextPrimary,
+                  ),
                 ),
-              ),
+                SizedBox(
+                  width: 14,
+                  child: clickable
+                      ? Icon(Icons.chevron_right_rounded,
+                          size: 14, color: context.fomraTextSecondary)
+                      : null,
+                ),
+              ],
             ),
-            SizedBox(
-              width: 16,
-              child: clickable
-                  ? Icon(Icons.chevron_right_rounded,
-                      size: 16, color: context.fomraTextSecondary)
-                  : null,
+            const SizedBox(height: 3),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: LinearProgressIndicator(
+                value: progress.completionPercent / 100,
+                minHeight: 5,
+                backgroundColor: color.withValues(alpha: 0.15),
+                valueColor: AlwaysStoppedAnimation(color),
+              ),
             ),
           ],
         ),
