@@ -83,6 +83,7 @@ class _TargetTabState extends State<_TargetTab> {
   List<LandLeadMeeting> _meetings = const [];
   List<LandLeadSiteVisit> _siteVisits = const [];
   bool _loading = true;
+  String _search = '';
 
   String get _period => MonthlyTargetSubmission.periodOf(_now.year, _now.month);
 
@@ -218,20 +219,62 @@ class _TargetTabState extends State<_TargetTab> {
                 'Set or edit each executive\'s targets for ${MonthlyTargetSubmission.monthName(_now.month)} ${_now.year}.',
             icon: Icons.flag_outlined,
           ),
-          if (_employees.isEmpty)
-            const AppCard(
-              interactive: false,
-              child: EmptyState(
-                icon: Icons.people_outline,
-                title: 'No active executives',
-                message: 'Active executives will appear here.',
+          if (_employees.length > 1) ...[
+            const SizedBox(height: 12),
+            TextField(
+              onChanged: (v) => setState(() => _search = v),
+              decoration: InputDecoration(
+                hintText: 'Search by name or designation…',
+                prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                isDense: true,
+                filled: true,
+                fillColor: context.fomraSurfaceVar,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
               ),
-            )
-          else
-            for (final e in _employees) ...[
-              _row(context, e),
-              const SizedBox(height: AppSpacing.sm),
-            ],
+            ),
+          ],
+          const SizedBox(height: 12),
+          Builder(builder: (context) {
+            final q = _search.trim().toLowerCase();
+            final visible = q.isEmpty
+                ? _employees
+                : _employees
+                    .where((e) =>
+                        e.fullName.toLowerCase().contains(q) ||
+                        e.designation.toLowerCase().contains(q))
+                    .toList();
+            if (_employees.isEmpty) {
+              return const AppCard(
+                interactive: false,
+                child: EmptyState(
+                  icon: Icons.people_outline,
+                  title: 'No active executives',
+                  message: 'Active executives will appear here.',
+                ),
+              );
+            }
+            if (visible.isEmpty) {
+              return AppCard(
+                interactive: false,
+                child: EmptyState(
+                  icon: Icons.search_off_rounded,
+                  title: 'No matches',
+                  message: 'No one matches "$_search".',
+                ),
+              );
+            }
+            return Column(
+              children: [
+                for (final e in visible) ...[
+                  _row(context, e),
+                  const SizedBox(height: AppSpacing.sm),
+                ],
+              ],
+            );
+          }),
         ],
       ),
     );

@@ -76,6 +76,10 @@ abstract final class UniversalSearchService {
         _contains(lead.contactDetails, q) ||
         _contains(lead.brokerName, q) ||
         _contains(lead.brokerContact, q) ||
+        lead.additionalOwners
+            .any((o) => _contains(o.name, q) || _contains(o.contact, q)) ||
+        lead.additionalBrokers
+            .any((o) => _contains(o.name, q) || _contains(o.contact, q)) ||
         _contains(lead.location, q) ||
         _contains(lead.village, q) ||
         _contains(lead.taluk, q) ||

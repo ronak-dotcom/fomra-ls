@@ -179,6 +179,54 @@ class _FomraUniversalSearchBarState extends State<FomraUniversalSearchBar> {
     );
   }
 
+  /// Matches '#9', '# 9', etc. — deliberately only the '#' form, not a bare
+  /// number, so typing an ordinary numeric search term (a pincode, a
+  /// partial phone number) never accidentally jumps somewhere instead of
+  /// showing normal results.
+  static final _hashLeadIdPattern = RegExp(r'^#\s*(\d+)$');
+
+  void _onSubmitted(String rawValue) {
+    final value = rawValue.trim();
+    if (value.isEmpty) return;
+
+    final hashMatch = _hashLeadIdPattern.firstMatch(value);
+    if (hashMatch != null) {
+      final id = hashMatch.group(1)!;
+      LandLead? lead;
+      for (final l in AppStore.instance.leads) {
+        if (l.leadId == id) {
+          lead = l;
+          break;
+        }
+      }
+      _hideOverlay();
+      _focus.unfocus();
+      if (lead != null) {
+        final found = lead;
+        _clear();
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => LeadDetailScreen(lead: found)),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No lead found with ID #$id')),
+        );
+      }
+      return;
+    }
+
+    // Any other query (owner/broker name, phone number, village, etc.):
+    // if it matched one or more leads, show them as a proper full-screen
+    // list rather than leaving the person stuck in the capped dropdown —
+    // the same screen the "See all" tile already opens for >5 matches.
+    final leadHits =
+        _results.where((h) => h.kind == UniversalSearchKind.lead).toList();
+    if (leadHits.isNotEmpty) {
+      _openAllLeadResults(leadHits);
+    }
+  }
+
   Future<void> _openHit(UniversalSearchHit hit) async {
     _hideOverlay();
     _focus.unfocus();
@@ -336,6 +384,7 @@ class _FomraUniversalSearchBarState extends State<FomraUniversalSearchBar> {
           controller: _ctrl,
           focusNode: _focus,
           onChanged: _onChanged,
+          onSubmitted: _onSubmitted,
           textInputAction: TextInputAction.search,
           style: TextStyle(
             fontSize: 12,
