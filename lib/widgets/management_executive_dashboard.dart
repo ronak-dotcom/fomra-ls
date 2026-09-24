@@ -2190,7 +2190,7 @@ class _TeamMonthlyTargetsCardState extends State<_TeamMonthlyTargetsCard> {
                     // legible columns; stacks on a narrow phone rather than
                     // forcing a cramped 2-up layout everywhere.
                     final columns = constraints.maxWidth >= 480 ? 2 : 1;
-                    const spacing = 12.0;
+                    const spacing = 8.0;
                     final cardWidth = columns == 1
                         ? constraints.maxWidth
                         : (constraints.maxWidth - spacing) / columns;
@@ -2213,10 +2213,10 @@ class _TeamMonthlyTargetsCardState extends State<_TeamMonthlyTargetsCard> {
   Widget _employeeTargetCard(BuildContext context, MonthlyTargetSubmission s) {
     final displayName = s.employeeName.isEmpty ? s.employeeEmail : s.employeeName;
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(9),
       decoration: BoxDecoration(
         color: context.fomraSurfaceVar,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: context.fomraBorder),
       ),
       child: Column(
@@ -2224,15 +2224,15 @@ class _TeamMonthlyTargetsCardState extends State<_TeamMonthlyTargetsCard> {
         children: [
           Row(
             children: [
-              ProfileAvatar(email: s.employeeEmail, name: displayName, radius: 13),
-              const SizedBox(width: 8),
+              ProfileAvatar(email: s.employeeEmail, name: displayName, radius: 10),
+              const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   displayName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: context.fomraTextPrimary,
                   ),
@@ -2240,7 +2240,7 @@ class _TeamMonthlyTargetsCardState extends State<_TeamMonthlyTargetsCard> {
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           _employeeTargetRow(context, s),
         ],
       ),
@@ -2318,7 +2318,7 @@ class _TeamMonthlyTargetsCardState extends State<_TeamMonthlyTargetsCard> {
         for (final (category, label, color) in _categories)
           if (tv.containsKey(category.key))
             Padding(
-              padding: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.only(bottom: 3),
               child: _targetProgressLine(
                 context,
                 label: label,
@@ -2361,7 +2361,7 @@ class _TeamMonthlyTargetsCardState extends State<_TeamMonthlyTargetsCard> {
       onTap: clickable ? onTap : null,
       borderRadius: BorderRadius.circular(6),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(vertical: 2),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2373,36 +2373,36 @@ class _TeamMonthlyTargetsCardState extends State<_TeamMonthlyTargetsCard> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 10,
                       fontWeight: FontWeight.w600,
                       color: context.fomraTextSecondary,
                     ),
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 5),
                 Text(
                   '${progress.achieved}/${progress.target}',
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: 10.5,
                     fontWeight: FontWeight.w800,
                     color: context.fomraTextPrimary,
                   ),
                 ),
                 SizedBox(
-                  width: 14,
+                  width: 12,
                   child: clickable
                       ? Icon(Icons.chevron_right_rounded,
-                          size: 14, color: context.fomraTextSecondary)
+                          size: 12, color: context.fomraTextSecondary)
                       : null,
                 ),
               ],
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 2),
             ClipRRect(
               borderRadius: BorderRadius.circular(3),
               child: LinearProgressIndicator(
                 value: progress.completionPercent / 100,
-                minHeight: 5,
+                minHeight: 4,
                 backgroundColor: color.withValues(alpha: 0.15),
                 valueColor: AlwaysStoppedAnimation(color),
               ),
