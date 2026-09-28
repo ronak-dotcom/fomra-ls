@@ -13,6 +13,7 @@ import '../../models/land_lead_meeting.dart';
 import '../../models/land_lead_site_visit.dart';
 import '../../models/lead_call_log.dart';
 import '../../models/lead_follow_up.dart';
+import '../../models/lead_review.dart';
 import '../../services/app_store.dart';
 import 'filtered_leads_screen.dart';
 import '../../services/employee_service.dart';
@@ -28,6 +29,7 @@ import '../../services/lead_change_approval_service.dart';
 import '../../services/land_lead_service.dart';
 import '../../services/land_lead_signed_service.dart';
 import '../../services/lead_follow_up_service.dart';
+import '../../services/lead_review_service.dart';
 import '../../services/nearby_features_service.dart';
 import '../../utils/lead_auto_notes.dart';
 import '../../utils/lead_location_parser.dart';
@@ -54,6 +56,7 @@ import 'calls_log_dialog.dart';
 import 'follow_up_dialog.dart';
 import 'lead_drop_reason_dialog.dart';
 import 'management_visit_review_dialog.dart';
+import 'property_review_dialog.dart';
 import 'legal_documents_dialog.dart';
 import 'deal_risk_details_dialog.dart';
 import 'split_lead_dialog.dart';
@@ -174,6 +177,9 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
   List<LandLeadSignedRequest> _signedRequests = [];
   List<LeadFollowUp> _followUps = [];
 
+  /// Property reviews by RM / Head / Management, newest first.
+  List<LeadReview> _reviews = [];
+
   /// Mobile only: whether the "View more details" dropdown (Contact & Lead /
   /// Property Information / Status & Timeline) is expanded.
   bool _showMoreDetails = false;
@@ -220,12 +226,29 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
     _tabController = TabController(length: _tabs.length, vsync: this);
     _tabController.addListener(_onTabChanged);
     _loadActivityData();
+    _loadReviews();
     _refreshAutoNotes();
     if (AuthService.instance.isManagement) {
       _loadPendingRename();
       _loadPendingChanges();
       _loadPendingSiteVisit();
     }
+  }
+
+  Future<void> _loadReviews() async {
+    final reviews = await LeadReviewService.getForLead(lead.leadId);
+    if (mounted) setState(() => _reviews = reviews);
+  }
+
+  /// Opens the Property Review dialog; recording is limited to RM / Head /
+  /// Management and disabled once the lead is locked (history stays visible).
+  Future<void> _openPropertyReview() async {
+    final saved = await showPropertyReviewDialog(
+      context,
+      lead.leadId,
+      canRecord: !_isLocked,
+    );
+    if (saved && mounted) await _loadReviews();
   }
 
   Future<void> _loadPendingSiteVisit() async {
@@ -1461,6 +1484,13 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
       showStatusTimeline: true,
     );
 
+    final reviewCard = PropertyReviewCard(
+      latest: _reviews.isEmpty ? null : _reviews.first,
+      reviewCount: _reviews.length,
+      canRecord: LeadReviewService.canReview && !_isLocked,
+      onOpen: _openPropertyReview,
+    );
+
     final leadPoint = parseLeadGps(lead.gpsCoordinates);
     final locationMap = leadPoint == null
         ? null
@@ -1546,6 +1576,8 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
                                             siteVisitBanner,
                                           ],
                                           const SizedBox(height: 12),
+                                          reviewCard,
+                                          const SizedBox(height: 12),
                                           infoCards,
                                           if (locationMap != null) ...[
                                             const SizedBox(height: 12),
@@ -1593,6 +1625,8 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
                                     const SizedBox(height: 12),
                                     siteVisitBanner,
                                   ],
+                                  const SizedBox(height: 12),
+                                  reviewCard,
                                   const SizedBox(height: 12),
                                   _viewMoreDetailsHeader(),
                                   if (_showMoreDetails) ...[
