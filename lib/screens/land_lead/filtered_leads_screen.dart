@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../models/land_lead.dart';
+import '../../widgets/land_workspace_ui.dart';
+import '../../widgets/lead_filter_bar.dart';
 import '../../models/lead_list_filter.dart';
 import '../../services/app_store.dart';
 import '../../theme/fomra_layout.dart';
@@ -60,6 +62,7 @@ class FilteredLeadsScreen extends StatefulWidget {
 
 class _FilteredLeadsScreenState extends State<FilteredLeadsScreen> {
   String _search = '';
+  final LandWorkspaceFilters _filters = LandWorkspaceFilters();
 
   @override
   void initState() {
@@ -98,7 +101,9 @@ class _FilteredLeadsScreenState extends State<FilteredLeadsScreen> {
         (filter != null
             ? filterLeads(AppStore.instance.visibleLeads, filter)
             : const <LandLead>[]);
-    final leads = allLeads.where(_matchesSearch).toList();
+    final leads = allLeads
+        .where((l) => _filters.matches(l) && _matchesSearch(l))
+        .toList();
 
     return FomraAppShell(
       currentRoute: '/land-lead',
@@ -127,29 +132,14 @@ class _FilteredLeadsScreenState extends State<FilteredLeadsScreen> {
                       '${subtitle.isEmpty ? '' : ' · $subtitle'}',
                   icon: Icons.list_alt_rounded,
                 ),
-                if (allLeads.length > 1) ...[
+                if (allLeads.isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  TextField(
-                    onChanged: (q) => setState(() => _search = q),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      hintText: 'Search within this list — name, village, '
-                          'district, survey no…',
-                      prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                      suffixIcon: _search.isEmpty
-                          ? null
-                          : IconButton(
-                              icon: const Icon(Icons.close_rounded, size: 18),
-                              onPressed: () => setState(() => _search = ''),
-                            ),
-                      filled: true,
-                      fillColor: context.fomraSurface,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide:
-                            BorderSide(color: context.fomraBorder),
-                      ),
-                    ),
+                  LeadFilterBar(
+                    filters: _filters,
+                    onChanged: () => setState(() {}),
+                    onSearch: (q) => setState(() => _search = q),
+                    hintText: 'Search within this list — name, village, '
+                        'district, survey no…',
                   ),
                 ],
               ],
@@ -161,7 +151,7 @@ class _FilteredLeadsScreenState extends State<FilteredLeadsScreen> {
                     child: Text(
                       allLeads.isEmpty
                           ? 'No leads in this category yet.'
-                          : 'No leads match "$_search".',
+                          : 'No leads match the search or filters.',
                       style: TextStyle(color: context.fomraTextSecondary),
                     ),
                   )

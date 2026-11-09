@@ -8,6 +8,8 @@ import '../../theme/fomra_theme_context.dart';
 import '../../widgets/ui/app_components.dart';
 import '../../widgets/ui/app_feedback.dart';
 import '../../widgets/fomra_app_bar.dart';
+import '../../widgets/land_workspace_ui.dart';
+import '../../widgets/lead_filter_bar.dart';
 import '../../widgets/fomra_app_shell.dart';
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
@@ -23,6 +25,8 @@ class LegalVerificationScreen extends StatefulWidget {
 
 class _LegalVerificationScreenState extends State<LegalVerificationScreen> {
   LandLead? _selectedLead;
+  String _search = '';
+  final LandWorkspaceFilters _leadFilters = LandWorkspaceFilters();
 
   // Legal Review fields
   final _ownershipCtrl       = TextEditingController();
@@ -174,11 +178,39 @@ class _LegalVerificationScreenState extends State<LegalVerificationScreen> {
       );
     }
 
+    final leads = _leads
+        .where((l) => _leadFilters.matches(l) && leadMatchesSearch(l, _search))
+        .toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: LeadFilterBar(
+            filters: _leadFilters,
+            onChanged: () => setState(() {}),
+            onSearch: (v) => setState(() => _search = v),
+          ),
+        ),
+        Expanded(
+          child: leads.isEmpty
+              ? const EmptyState(
+                  icon: Icons.filter_alt_off,
+                  title: 'No leads match',
+                  message: 'Try a different search or clear the filters.',
+                )
+              : _leadListView(leads),
+        ),
+      ],
+    );
+  }
+
+  Widget _leadListView(List<LandLead> leads) {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: _leads.length,
+      itemCount: leads.length,
       itemBuilder: (_, i) {
-        final lead = _leads[i];
+        final lead = leads[i];
         final result = _loadedReviews[lead.leadId]?['legal_result'] as String? ?? '';
         return GestureDetector(
           onTap: () => _openLead(lead),

@@ -8,8 +8,11 @@ import '../../theme/app_theme.dart';
 import '../../theme/fomra_layout.dart';
 import '../../theme/fomra_theme_context.dart';
 import '../../utils/legal_document_catalog.dart';
+import '../../widgets/land_workspace_ui.dart';
+import '../../widgets/lead_filter_bar.dart';
 import '../../widgets/fomra_app_bar.dart';
-import '../../widgets/fomra_app_shell.dart';
+import '../../widgets/fomra_app_shell.dart';
+
 import '../../widgets/ui/app_components.dart';
 import '../../widgets/ui/app_loader.dart';
 import '../land_lead/lead_detail_screen.dart';
@@ -29,6 +32,7 @@ class _LegalTrackerScreenState extends State<LegalTrackerScreen> {
   final Map<String, Map<String, dynamic>> _reviews = {};
   bool _loading = true;
   String _query = '';
+  final LandWorkspaceFilters _leadFilters = LandWorkspaceFilters();
   _LegalTrackFilter _filter = _LegalTrackFilter.all;
 
   @override
@@ -81,6 +85,7 @@ class _LegalTrackerScreenState extends State<LegalTrackerScreen> {
   }
 
   bool _matches(LandLead lead) {
+    if (!_leadFilters.matches(lead)) return false;
     final q = _query.trim().toLowerCase();
     if (q.isNotEmpty) {
       final hay =
@@ -119,7 +124,8 @@ class _LegalTrackerScreenState extends State<LegalTrackerScreen> {
     return FomraAppShell(
       currentRoute: '/legal-tracker',
       appBar: const FomraAppBar(
-        moduleName: 'Legal Tracker',
+        moduleName: 'Legal Tracker',
+
       ),
       body: RefreshIndicator(
         onRefresh: _load,
@@ -173,18 +179,11 @@ class _LegalTrackerScreenState extends State<LegalTrackerScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            TextField(
-              onChanged: (v) => setState(() => _query = v),
-              decoration: InputDecoration(
-                hintText: 'Search leads…',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: context.fomraSurfaceVar,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
-                ),
-              ),
+            LeadFilterBar(
+              filters: _leadFilters,
+              onChanged: () => setState(() {}),
+              onSearch: (v) => setState(() => _query = v),
+              hintText: 'Search leads…',
             ),
             const SizedBox(height: 10),
             SingleChildScrollView(

@@ -7,12 +7,15 @@ import 'package:latlong2/latlong.dart';
 
 import '../../config/maptiler_tiles.dart';
 import '../../models/land_lead.dart';
+import '../../models/lead_review.dart';
+import '../../services/lead_review_service.dart';
 import '../../services/lead_visibility.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/fomra_theme_context.dart';
 import '../../utils/lead_location_parser.dart';
 import '../../utils/maps_navigation.dart';
 import '../../widgets/fomra_app_shell.dart';
+import '../../widgets/land_workspace_ui.dart';
 import '../../widgets/lead_portfolio_breakdown.dart';
 import '../../widgets/map_layer_toggle.dart';
 import '../../widgets/fomra_breadcrumb.dart';
@@ -59,12 +62,18 @@ class _LeadsMapScreenState extends State<LeadsMapScreen> {
   Set<String> _broker = {};
   DateTimeRange? _dateFilter;
 
+  /// Everything else from the shared Land Workspace filter panel (location,
+  /// land type, source, acres, pending, property review …). The map's own
+  /// stage / executive / broker / date controls above stay as they were.
+  final LandWorkspaceFilters _moreFilters = LandWorkspaceFilters();
+
   /// Filters excluding the free-text search — drives the "Filters" badge.
   bool get _hasFieldFilters =>
       _stages.isNotEmpty ||
       _executive.isNotEmpty ||
       _broker.isNotEmpty ||
-      _dateFilter != null;
+      _dateFilter != null ||
+      _moreFilters.hasActive;
 
   bool get _hasActiveFilters => _hasFieldFilters || _search.trim().isNotEmpty;
 
@@ -75,10 +84,23 @@ class _LeadsMapScreenState extends State<LeadsMapScreen> {
     _executive = {};
     _broker = {};
     _dateFilter = null;
+    _moreFilters.clear();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    LeadReviewIndex.instance.addListener(_onReviewsChanged);
+    LeadReviewIndex.instance.ensureLoaded();
+  }
+
+  void _onReviewsChanged() {
+    if (mounted && _moreFilters.reviewStatus != null) setState(() {});
   }
 
   @override
   void dispose() {
+    LeadReviewIndex.instance.removeListener(_onReviewsChanged);
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -103,6 +125,7 @@ class _LeadsMapScreenState extends State<LeadsMapScreen> {
   List<LandLead> get _filteredLeads {
     final q = _search.trim().toLowerCase();
     return _scopedLeads.where((l) {
+      if (!_moreFilters.matches(l)) return false;
       if (_stages.isNotEmpty && !_stages.contains(l.status)) return false;
       if (_executive.isNotEmpty &&
           !_executive.contains(l.createdByName.trim())) {
@@ -658,6 +681,58 @@ class _LeadsMapScreenState extends State<LeadsMapScreen> {
         ),
         const SizedBox(height: _kControlGap),
         _dateField(context, apply),
+        const SizedBox(height: _kControlGap),
+        _sectionLabel(context, 'PROPERTY REVIEW'),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<ReviewFilter?>(
+          // Keyed on the value so "Clear All Filters" resets the field.
+          key: ValueKey(_moreFilters.reviewStatus),
+          initialValue: _moreFilters.reviewStatus,
+          isExpanded: true,
+          decoration: _fieldDecoration(
+            context,
+            label: 'Review status',
+            prefixIcon: Icon(Icons.fact_check_outlined,
+                size: 16, color: context.fomraTextSecondary),
+          ),
+          items: [
+            const DropdownMenuItem<ReviewFilter?>(
+                value: null, child: Text('Any')),
+            for (final r in ReviewFilter.values)
+              DropdownMenuItem<ReviewFilter?>(value: r, child: Text(r.label)),
+          ],
+          onChanged: (v) => apply(() => _moreFilters.reviewStatus = v),
+        ),
+        const SizedBox(height: _kControlGap),
+        SizedBox(
+          height: 38,
+          child: OutlinedButton.icon(
+            onPressed: () async {
+              final applied = await showLandWorkspaceFilterPanel(
+                context: context,
+                initial: _moreFilters,
+                showPendingStatus: true,
+              );
+              if (applied != null) {
+                apply(() => _moreFilters.assignFrom(applied));
+              }
+            },
+            icon: const Icon(Icons.tune_rounded, size: 16),
+            label: Text(
+              _moreFilters.hasActive
+                  ? 'More filters (${_moreFilters.activeCount})'
+                  : 'More filters — location, type, acres…',
+              style: const TextStyle(
+                  fontSize: 12.5, fontWeight: FontWeight.w700),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: context.fomraBorder),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(_kFieldRadius),
+              ),
+            ),
+          ),
+        ),
         const SizedBox(height: _kControlGap + 6),
         // Compact, full-width clear button at the bottom — replaces the small
         // top text link. Disabled (hidden) when nothing is active.
