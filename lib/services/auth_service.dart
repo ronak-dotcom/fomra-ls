@@ -214,16 +214,15 @@ class AuthService {
         message: 'Invalid email or password.',
       );
     }
-    if (portal == LoginPortal.employee &&
-        normalizedEmail != employeeEmail) {
-      final profile = await EmployeeService.findByEmail(normalizedEmail);
-      if (profile == null || profile.status != EmployeeStatus.active) {
-        throw const ApiException(
-          statusCode: 401,
-          message: 'Invalid email or password.',
-        );
-      }
-    }
+    // No pre-login employee_profiles lookup here. That table is readable by
+    // authenticated users only, so before sign-in the query returned nothing
+    // and login failed with "Invalid email or password" for a correct
+    // password — except on a device that happened to hold a cached employee
+    // list from an earlier login. That is exactly why the same account worked
+    // on one device and not another, and why Supabase's auth logs showed no
+    // rejected attempt at all. Supabase checks the password first; the
+    // employee's active status is checked right after, as an authenticated
+    // query (see _ensureActiveEmployee).
     // Prefer a REAL Supabase Auth session — that's what makes locked-down
     // (authenticated-only) RLS work. If Supabase accepts the credentials we're
     // done; the password that logs you in is guaranteed to be the auth password.
@@ -290,6 +289,10 @@ class AuthService {
       );
     }
 
+    if (portal == LoginPortal.employee && normalizedEmail != employeeEmail) {
+      await _ensureActiveEmployee(normalizedEmail);
+    }
+
     _portal = portal;
     _loginEmail = normalizedEmail;
     _loginDisplayName = await _resolveDisplayName(normalizedEmail, portal);
@@ -298,6 +301,38 @@ class AuthService {
     await tabSetString(_loginNameKey, _loginDisplayName!);
     await tabSetString(_localSessionKey, 'false');
     await tabSetString(_loginAtKey, DateTime.now().toIso8601String());
+  }
+
+  /// Post-sign-in gate for individual employee logins: a deactivated or
+  /// removed employee must not get in even though their Supabase Auth
+  /// password still works. Runs with the new session, so RLS allows the read.
+  /// Only a definite answer blocks — if the lookup itself fails (network,
+  /// table unavailable) the already-verified login is allowed through rather
+  /// than turned into a misleading "wrong password".
+  Future<void> _ensureActiveEmployee(String normalizedEmail) async {
+    Map<String, dynamic>? row;
+    try {
+      row = await _client
+          .from('employee_profiles')
+          .select('status')
+          .eq('email', normalizedEmail)
+          .maybeSingle();
+    } catch (e) {
+      debugPrint('[auth] employee status check skipped: $e');
+      return;
+    }
+    final status = (row?['status'] as String? ?? '').trim().toLowerCase();
+    if (row != null && status == EmployeeStatus.active.name) return;
+    try {
+      await _client.auth.signOut();
+    } catch (_) {}
+    throw ApiException(
+      statusCode: 403,
+      message: row == null
+          ? 'This login is not linked to an employee profile. '
+              'Please contact your admin.'
+          : 'Your account is inactive. Please contact your admin.',
+    );
   }
 
   Future<void> login(String email, String password) async {
@@ -310,20 +345,14 @@ class AuthService {
     // exactly this class of issue; the password field never did.
     password = password.trim();
 
-    LoginPortal? portal;
-    if (normalized == managementEmail) {
-      portal = LoginPortal.management;
-    } else if (normalized == employeeEmail ||
-        await EmployeeService.emailExists(normalized)) {
-      portal = LoginPortal.employee;
-    }
-
-    if (portal == null) {
-      throw const ApiException(
-        statusCode: 401,
-        message: 'Invalid email or password.',
-      );
-    }
+    // Every account other than the shared management login signs in through
+    // the employee portal. No pre-login database lookup decides this — that
+    // lookup is what made login depend on the device (see loginWithPortal).
+    // A wrong email or password is rejected by Supabase itself, and an
+    // inactive employee by the post-sign-in check.
+    final portal = normalized == managementEmail
+        ? LoginPortal.management
+        : LoginPortal.employee;
 
     await loginWithPortal(email, password, portal);
   }
