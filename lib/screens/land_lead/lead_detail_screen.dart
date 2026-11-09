@@ -1,6 +1,7 @@
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show AuthException, PostgrestException;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../config/maptiler_tiles.dart';
@@ -17,6 +18,7 @@ import '../../models/lead_review.dart';
 import '../../services/app_store.dart';
 import 'filtered_leads_screen.dart';
 import '../../services/employee_service.dart';
+import '../../services/error_log_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/role_access.dart';
 import '../../services/lead_drop_approval_service.dart';
@@ -503,6 +505,15 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
     }
   }
 
+  /// A readable one-line reason for a failed save (database/auth message
+  /// rather than the exception's type-prefixed toString).
+  static String _errorText(Object e) {
+    if (e is PostgrestException) return e.message;
+    if (e is AuthException) return e.message;
+    final text = e.toString();
+    return text.startsWith('Exception: ') ? text.substring(11) : text;
+  }
+
   Future<void> _changeStatus(LeadStatus? status) async {
     if (status == null || status == lead.status) return;
     if (_isLocked) {
@@ -538,9 +549,13 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
         );
         if (!mounted) return;
         AppFeedback.info(context, 'Drop request submitted for approval');
-      } catch (_) {
+      } catch (e, st) {
+        // Record the real cause — this used to be swallowed, which hid the
+        // database permission error behind a generic toast.
+        ErrorLogService.capture(e, stack: st, action: 'drop_request_submit');
         if (!mounted) return;
-        AppFeedback.error(context, 'Could not submit drop request');
+        AppFeedback.error(
+            context, 'Could not submit drop request: ${_errorText(e)}');
       }
       return;
     }

@@ -143,7 +143,12 @@ try {
   console.log('flutter test: ONE OR MORE TESTS FAILED (see output above) — continuing the build anyway, this step is non-blocking by design.');
 }
 
-run('flutter build web --release');
+// Stamp the commit into the build so error-log entries say which version of
+// the app produced them (read via String.fromEnvironment('APP_BUILD')).
+const appBuild = (process.env.VERCEL_GIT_COMMIT_SHA || 'local')
+  .slice(0, 7)
+  .replace(/[^A-Za-z0-9]/g, '');
+run(`flutter build web --release --dart-define=APP_BUILD=${appBuild}`);
 
 const index = path.join(repoRoot, 'build', 'web', 'index.html');
 if (!fs.existsSync(index)) {

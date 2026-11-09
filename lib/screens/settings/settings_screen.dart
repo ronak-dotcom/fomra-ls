@@ -22,6 +22,7 @@ import '../../widgets/portal_page_layout.dart';
 import '../audit/audit_trail_screen.dart';
 import '../employee_management/employee_management_portal_screen.dart';
 import 'employee_monthly_targets_page.dart';
+import 'error_log_page.dart';
 import 'feature_controls_page.dart';
 import 'monthly_targets_management_page.dart';
 import '../../services/csv_saver_stub.dart'
@@ -141,6 +142,16 @@ class SettingsScreen extends StatelessWidget {
                       builder: (_) =>
                           const AuditTrailScreen(asSettingsChild: true),
                     ),
+                  ),
+                ),
+              if (canViewAudit)
+                _SettingsTile(
+                  icon: Icons.bug_report_outlined,
+                  label: 'Error Log',
+                  accent: AppColors.error,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ErrorLogPage()),
                   ),
                 ),
               if (isManagement)

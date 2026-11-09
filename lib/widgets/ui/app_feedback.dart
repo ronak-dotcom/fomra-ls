@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../services/error_log_service.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/fomra_theme_context.dart';
 
@@ -36,15 +37,19 @@ class AppFeedback {
       _show(context, message, FeedbackTone.success,
           actionLabel: actionLabel, onAction: onAction, duration: duration);
 
+  /// Also records [message] in the error log (ErrorLogService) — every error
+  /// a user is shown becomes a log entry with who, when and which screen.
   static void error(
     BuildContext context,
     String message, {
     String? actionLabel,
     VoidCallback? onAction,
     Duration? duration,
-  }) =>
-      _show(context, message, FeedbackTone.error,
-          actionLabel: actionLabel, onAction: onAction, duration: duration);
+  }) {
+    ErrorLogService.captureShown(message);
+    _show(context, message, FeedbackTone.error,
+        actionLabel: actionLabel, onAction: onAction, duration: duration);
+  }
 
   static void info(
     BuildContext context,
@@ -75,6 +80,7 @@ class AppFeedback {
     required String title,
     required String message,
   }) {
+    ErrorLogService.captureShown('$title: $message');
     return showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(

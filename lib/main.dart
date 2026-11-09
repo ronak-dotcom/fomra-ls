@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'services/auth_link.dart';
 import 'services/auth_service.dart';
+import 'services/error_log_service.dart';
 import 'services/app_settings_service.dart';
 import 'services/session_scoped_local_storage.dart';
 import 'services/push_service.dart';
@@ -38,7 +40,21 @@ void main() {
   AuthLink.capture();
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
-    FlutterError.onError = FlutterError.presentError;
+    // Keep Flutter's own console output, and also record the error in
+    // app_error_logs so it is visible without access to the user's device.
+    FlutterError.onError = (details) {
+      FlutterError.presentError(details);
+      ErrorLogService.capture(
+        details.exception,
+        stack: details.stack,
+        source: 'flutter',
+        action: details.context?.toDescription() ?? '',
+      );
+    };
+    PlatformDispatcher.instance.onError = (error, stack) {
+      ErrorLogService.capture(error, stack: stack, source: 'uncaught');
+      return true;
+    };
     await ThemeController.instance.load();
     // Restore the Reporting Manager / Head Team-vs-Individual selection before
     // the first frame so their view doesn't flip after load.
@@ -46,6 +62,7 @@ void main() {
     runApp(const FomraLSApp());
   }, (error, stack) {
     debugPrint('ZONE ERROR: $error\n$stack');
+    ErrorLogService.capture(error, stack: stack, source: 'uncaught');
   });
 }
 
