@@ -5,6 +5,7 @@ import '../../analytics/business_module_metrics.dart';
 import '../../models/employee_profile.dart';
 import '../../models/land_lead.dart';
 import '../../models/land_lead_meeting.dart';
+import '../../services/lead_review_service.dart';
 import '../../services/app_store.dart';
 import '../../services/land_lead_meeting_service.dart';
 import '../../theme/app_theme.dart';
@@ -90,11 +91,15 @@ class _BrokerManagementScreenState extends State<BrokerManagementScreen> {
   void initState() {
     super.initState();
     AppStore.instance.addListener(_rebuild);
+    // Review status is a filter here; load it and refilter when it changes.
+    LeadReviewIndex.instance.addListener(_rebuild);
+    LeadReviewIndex.instance.ensureLoaded();
   }
 
   @override
   void dispose() {
     AppStore.instance.removeListener(_rebuild);
+    LeadReviewIndex.instance.removeListener(_rebuild);
     super.dispose();
   }
 
@@ -132,42 +137,7 @@ class _BrokerManagementScreenState extends State<BrokerManagementScreen> {
     );
     if (applied == null || !mounted) return;
     setState(() {
-      _filters.status = applied.status;
-      _filters.statuses
-        ..clear()
-        ..addAll(applied.statuses);
-      _filters.landTypes
-        ..clear()
-        ..addAll(applied.landTypes);
-      _filters.sources
-        ..clear()
-        ..addAll(applied.sources);
-      _filters.highPriority = applied.highPriority;
-      _filters.assignedEmployee = applied.assignedEmployee;
-      _filters.assignedEmployees
-        ..clear()
-        ..addAll(applied.assignedEmployees);
-      _filters.createdFrom = applied.createdFrom;
-      _filters.createdTo = applied.createdTo;
-      _filters.district = applied.district;
-      _filters.districts
-        ..clear()
-        ..addAll(applied.districts);
-      _filters.taluk = applied.taluk;
-      _filters.taluks
-        ..clear()
-        ..addAll(applied.taluks);
-      _filters.village = applied.village;
-      _filters.villages
-        ..clear()
-        ..addAll(applied.villages);
-      _filters.broker = applied.broker;
-      _filters.brokers
-        ..clear()
-        ..addAll(applied.brokers);
-      _filters.acresMin = applied.acresMin;
-      _filters.acresMax = applied.acresMax;
-      _filters.pendingStatus = applied.pendingStatus;
+      _filters.assignFrom(applied);
     });
   }
 

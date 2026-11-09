@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/land_lead.dart';
 import '../../models/lead_list_filter.dart';
 import '../../models/employee_profile.dart';
+import '../../services/lead_review_service.dart';
 import '../../services/app_store.dart';
 import '../../services/auth_service.dart';
 import '../../services/document_index_service.dart';
@@ -50,6 +51,9 @@ class _LandLeadScreenState extends State<LandLeadScreen> {
   void initState() {
     super.initState();
     AppStore.instance.addListener(_onStoreUpdate);
+    // Review status is a filter here; load it and refilter when it changes.
+    LeadReviewIndex.instance.addListener(_onStoreUpdate);
+    LeadReviewIndex.instance.ensureLoaded();
     _loadLeads();
     if (AuthService.instance.isManagement) _loadEmployees();
     DocumentIndexService.instance.ensureLoaded();
@@ -234,6 +238,7 @@ class _LandLeadScreenState extends State<LandLeadScreen> {
   @override
   void dispose() {
     AppStore.instance.removeListener(_onStoreUpdate);
+    LeadReviewIndex.instance.removeListener(_onStoreUpdate);
     super.dispose();
   }
 
@@ -301,42 +306,7 @@ class _LandLeadScreenState extends State<LandLeadScreen> {
 
   void _applyFilters(LandWorkspaceFilters next) {
     setState(() {
-      _filters.status = next.status;
-      _filters.statuses
-        ..clear()
-        ..addAll(next.statuses);
-      _filters.landTypes
-        ..clear()
-        ..addAll(next.landTypes);
-      _filters.sources
-        ..clear()
-        ..addAll(next.sources);
-      _filters.highPriority = next.highPriority;
-      _filters.assignedEmployee = next.assignedEmployee;
-      _filters.assignedEmployees
-        ..clear()
-        ..addAll(next.assignedEmployees);
-      _filters.createdFrom = next.createdFrom;
-      _filters.createdTo = next.createdTo;
-      _filters.district = next.district;
-      _filters.districts
-        ..clear()
-        ..addAll(next.districts);
-      _filters.taluk = next.taluk;
-      _filters.taluks
-        ..clear()
-        ..addAll(next.taluks);
-      _filters.village = next.village;
-      _filters.villages
-        ..clear()
-        ..addAll(next.villages);
-      _filters.broker = next.broker;
-      _filters.brokers
-        ..clear()
-        ..addAll(next.brokers);
-      _filters.acresMin = next.acresMin;
-      _filters.acresMax = next.acresMax;
-      _filters.pendingStatus = next.pendingStatus;
+      _filters.assignFrom(next);
     });
   }
 

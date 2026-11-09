@@ -8,8 +8,11 @@ import '../../theme/app_theme.dart';
 import '../../theme/fomra_layout.dart';
 import '../../theme/fomra_theme_context.dart';
 import '../../widgets/contact_call_whatsapp.dart';
+import '../../widgets/land_workspace_ui.dart';
+import '../../widgets/lead_filter_bar.dart';
 import '../../widgets/fomra_app_bar.dart';
-import '../../widgets/fomra_app_shell.dart';
+import '../../widgets/fomra_app_shell.dart';
+
 import '../../widgets/lead_portfolio_breakdown.dart';
 import '../../widgets/ui/app_components.dart';
 import '../land_lead/lead_detail_screen.dart';
@@ -42,6 +45,7 @@ class OwnerHistoryScreen extends StatefulWidget {
 class _OwnerHistoryScreenState extends State<OwnerHistoryScreen> {
   String _query = '';
   String? _expandedKey;
+  final LandWorkspaceFilters _leadFilters = LandWorkspaceFilters();
 
   @override
   void initState() {
@@ -60,6 +64,7 @@ class _OwnerHistoryScreenState extends State<OwnerHistoryScreen> {
   List<_OwnerHistoryGroup> get _groups {
     final map = <String, List<LandLead>>{};
     for (final lead in AppStore.instance.visibleLeads) {
+      if (!_leadFilters.matches(lead)) continue;
       final name = lead.ownerName.trim();
       if (name.isEmpty) continue;
       final contact = lead.contactDetails.replaceAll(RegExp(r'[^\d+]'), '');
@@ -97,7 +102,8 @@ class _OwnerHistoryScreenState extends State<OwnerHistoryScreen> {
     return FomraAppShell(
       currentRoute: '/owner-history',
       appBar: const FomraAppBar(
-        moduleName: 'Owner History',
+        moduleName: 'Owner History',
+
       ),
       body: ListView(
         padding: FomraLayout.pagePadding(context),
@@ -116,25 +122,19 @@ class _OwnerHistoryScreenState extends State<OwnerHistoryScreen> {
             style: TextStyle(fontSize: 13, color: context.fomraTextSecondary),
           ),
           const SizedBox(height: 14),
-          TextField(
-            onChanged: (v) => setState(() => _query = v),
-            decoration: InputDecoration(
-              hintText: 'Search owner, contact, village…',
-              prefixIcon: const Icon(Icons.search),
-              filled: true,
-              fillColor: context.fomraSurfaceVar,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide.none,
-              ),
-            ),
+          LeadFilterBar(
+            filters: _leadFilters,
+            onChanged: () => setState(() {}),
+            onSearch: (v) => setState(() => _query = v),
+            hintText: 'Search owner, contact, village…',
           ),
           const SizedBox(height: 14),
           if (groups.isEmpty)
             const AppCard(
               child: EmptyState(
                 title: 'No owner history',
-                message: 'Owners appear when leads include an owner name.',
+                message: 'Owners appear when leads include an owner name. '
+                    'If filters are applied, try clearing them.',
               ),
             )
           else
@@ -264,7 +264,8 @@ class _OwnerPortfolioSectionState extends State<_OwnerPortfolioSection> {
   Widget build(BuildContext context) {
     return LeadPortfolioBreakdown(
       leads: widget.leads,
-      meetingsBesideDropped: _meetingsConducted,
+      meetingsBesideDropped: _meetingsConducted,
+
       hideEmptyStatusCards: true,
       onOpenLead: (lead) => Navigator.push(
         context,

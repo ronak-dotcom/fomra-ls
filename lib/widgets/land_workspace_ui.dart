@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../models/land_lead.dart';
+import '../models/lead_review.dart';
 import '../services/app_store.dart';
+import '../services/lead_review_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/fomra_layout.dart';
 import '../theme/fomra_theme_context.dart';
@@ -208,6 +210,10 @@ class LandWorkspaceFilters {
   /// meeting | negotiation | survey | legal | overdue
   String? pendingStatus;
 
+  /// Property review status, judged on each lead's latest review
+  /// (LeadReviewIndex). Null = any.
+  ReviewFilter? reviewStatus;
+
   LandWorkspaceFilters({
     this.status,
     Set<LeadStatus>? statuses,
@@ -229,6 +235,7 @@ class LandWorkspaceFilters {
     this.acresMin,
     this.acresMax,
     this.pendingStatus,
+    this.reviewStatus,
   })  : landTypes = landTypes ?? {},
         statuses = statuses ?? {},
         sources = sources ?? {},
@@ -282,7 +289,51 @@ class LandWorkspaceFilters {
         acresMin: acresMin,
         acresMax: acresMax,
         pendingStatus: pendingStatus,
+        reviewStatus: reviewStatus,
       );
+
+  /// Overwrites every filter with [other]'s — one place to keep in sync when a
+  /// filter is added, instead of each screen copying fields by hand.
+  void assignFrom(LandWorkspaceFilters other) {
+    final o = other.copy();
+    status = o.status;
+    statuses
+      ..clear()
+      ..addAll(o.statuses);
+    landTypes
+      ..clear()
+      ..addAll(o.landTypes);
+    sources
+      ..clear()
+      ..addAll(o.sources);
+    highPriority = o.highPriority;
+    assignedEmployee = o.assignedEmployee;
+    assignedEmployees
+      ..clear()
+      ..addAll(o.assignedEmployees);
+    createdFrom = o.createdFrom;
+    createdTo = o.createdTo;
+    district = o.district;
+    districts
+      ..clear()
+      ..addAll(o.districts);
+    taluk = o.taluk;
+    taluks
+      ..clear()
+      ..addAll(o.taluks);
+    village = o.village;
+    villages
+      ..clear()
+      ..addAll(o.villages);
+    broker = o.broker;
+    brokers
+      ..clear()
+      ..addAll(o.brokers);
+    acresMin = o.acresMin;
+    acresMax = o.acresMax;
+    pendingStatus = o.pendingStatus;
+    reviewStatus = o.reviewStatus;
+  }
 
   void clear() {
     status = null;
@@ -305,6 +356,7 @@ class LandWorkspaceFilters {
     acresMin = null;
     acresMax = null;
     pendingStatus = null;
+    reviewStatus = null;
   }
 
   int get activeCount {
@@ -327,6 +379,7 @@ class LandWorkspaceFilters {
     n += brokers.length;
     if (acresMin != null || acresMax != null) n++;
     if (pendingStatus != null && pendingStatus!.isNotEmpty) n++;
+    if (reviewStatus != null) n++;
     return n;
   }
 
@@ -390,7 +443,13 @@ class LandWorkspaceFilters {
     final acres = leadAcres(lead);
     if (acresMin != null && acres < acresMin!) return false;
     if (acresMax != null && acres > acresMax!) return false;
-    return _matchesPending(lead);
+    if (!_matchesPending(lead)) return false;
+    final review = reviewStatus;
+    if (review != null &&
+        !review.matches(LeadReviewIndex.instance.latestFor(lead.leadId))) {
+      return false;
+    }
+    return true;
   }
 
   static double leadAcres(LandLead lead) {
@@ -525,6 +584,16 @@ class LandWorkspaceFilters {
         label: 'Pending: ${label ?? pendingStatus}',
         onRemove: () {
           pendingStatus = null;
+          notify();
+        },
+      ));
+    }
+    final review = reviewStatus;
+    if (review != null) {
+      chips.add((
+        label: review.label,
+        onRemove: () {
+          reviewStatus = null;
           notify();
         },
       ));
@@ -1133,6 +1202,21 @@ class _LandWorkspaceFilterPanelState extends State<_LandWorkspaceFilterPanel> {
                           );
                         }),
                       ],
+                      const Divider(height: 28),
+                      _sectionTitle('Property Review'),
+                      const SizedBox(height: 8),
+                      _radioTile(
+                        label: 'Any',
+                        selected: _draft.reviewStatus == null,
+                        onTap: () =>
+                            setState(() => _draft.reviewStatus = null),
+                      ),
+                      for (final r in ReviewFilter.values)
+                        _radioTile(
+                          label: r.label,
+                          selected: _draft.reviewStatus == r,
+                          onTap: () => setState(() => _draft.reviewStatus = r),
+                        ),
                       const Divider(height: 28),
                       _sectionTitle('Created Date Range'),
                       const SizedBox(height: 10),
