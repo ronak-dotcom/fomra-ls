@@ -4,6 +4,7 @@ import '../models/employee_profile.dart';
 import '../models/user.dart';
 import 'api_client.dart';
 import 'employee_service.dart';
+import 'error_log_service.dart';
 import 'tab_session_store.dart';
 
 enum LoginPortal { employee, management }
@@ -209,6 +210,12 @@ class AuthService {
 
     if (portal == LoginPortal.management &&
         normalizedEmail != managementEmail) {
+      ErrorLogService.capture(
+        'Non-management email used on the management portal',
+        action: 'login',
+        source: 'login',
+        emailOverride: normalizedEmail,
+      );
       throw const ApiException(
         statusCode: 401,
         message: 'Invalid email or password.',
@@ -236,6 +243,7 @@ class AuthService {
     // typing the password deserves to know which one they're looking at.
     String? networkOrOtherDetail;
     var rateLimited = false;
+    AuthApiException? authFailure;
     try {
       await _client.auth.signInWithPassword(
         email: normalizedEmail,
@@ -247,6 +255,7 @@ class AuthService {
       networkOrOtherDetail = e.message;
     } on AuthApiException catch (e) {
       supabaseOk = false;
+      authFailure = e;
       final code = (e.code ?? '').toLowerCase();
       final msg = e.message.toLowerCase();
       if (code.contains('rate_limit') || msg.contains('rate limit')) {
@@ -264,6 +273,20 @@ class AuthService {
     // default ('fomra@2024') or local-password fallback. Each account's
     // password is the one the user set (via their invite / a change).
     if (!supabaseOk) {
+      // Every failed login goes to the error log with its real reason (never
+      // the password), so "incorrect ID and password" reports can be checked
+      // against what actually happened.
+      ErrorLogService.capture(
+        authFailure ?? networkOrOtherDetail ?? 'Sign-in returned no session',
+        action: 'login',
+        source: 'login',
+        message: networkOrOtherDetail != null
+            ? 'Login failed: could not reach server ($networkOrOtherDetail)'
+            : rateLimited
+                ? 'Login failed: rate limited'
+                : 'Login failed: ${authFailure?.message ?? 'no session returned'}',
+        emailOverride: normalizedEmail,
+      );
       if (networkOrOtherDetail != null || rateLimited) {
         debugPrint(
           '[auth] sign-in did not succeed for $normalizedEmail '
@@ -323,6 +346,14 @@ class AuthService {
     }
     final status = (row?['status'] as String? ?? '').trim().toLowerCase();
     if (row != null && status == EmployeeStatus.active.name) return;
+    ErrorLogService.capture(
+      row == null
+          ? 'Signed in, but no employee profile for this email'
+          : 'Signed in, but employee status is "$status"',
+      action: 'login',
+      source: 'login',
+      emailOverride: normalizedEmail,
+    );
     try {
       await _client.auth.signOut();
     } catch (_) {}
