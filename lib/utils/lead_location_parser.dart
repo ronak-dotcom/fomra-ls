@@ -6,6 +6,23 @@ import '../models/gps_fix.dart';
 String formatLeadGps(double lat, double lng) =>
     '${lat.toStringAsFixed(6)}° N, ${lng.toStringAsFixed(6)}° E';
 
+/// Metres between two stored GPS values (any format [parseLeadGps] reads),
+/// or null when either can't be parsed.
+double? gpsDistanceMeters(String a, String b) {
+  final pa = parseLeadGps(a);
+  final pb = parseLeadGps(b);
+  if (pa == null || pb == null) return null;
+  return const Distance().as(LengthUnit.Meter, pa, pb);
+}
+
+/// A stored GPS value as plain readable coordinates (the LIVE| storage
+/// format carries accuracy and a timestamp nobody needs to read); falls back
+/// to the raw text when it can't be parsed.
+String gpsForDisplay(String gps) {
+  final p = parseLeadGps(gps);
+  return p == null ? gps.trim() : formatLeadGps(p.latitude, p.longitude);
+}
+
 /// Parses GPS strings from add-lead / lead records.
 ///
 /// Supports:

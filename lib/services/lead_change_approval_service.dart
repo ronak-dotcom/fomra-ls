@@ -20,13 +20,16 @@ const leadChangeFieldLabels = <String, String>{
   'village': 'Village',
   'taluk': 'Taluk',
   'district': 'District',
+  'location': 'Location',
+  'gps_coordinates': 'Map Location (GPS)',
 };
 
 /// Generalizes the same rule LandLeadRenameService established for the
 /// lead's name to the rest of its core info (see leadChangeFieldLabels):
 /// free to fill in a blank field any time; free to edit an already-filled
-/// field on the same calendar day the lead was saved; editing or clearing
-/// an already-filled field after that day needs management approval, and
+/// field within LandLeadService.freeEditWindow (1 hour) of the lead being
+/// saved; editing or clearing an already-filled field after that needs
+/// management approval, and
 /// — unlike the rename flow — is simply never written to land_leads
 /// unless/until approved, rather than applied then reverted.
 class LeadChangeApprovalService {
@@ -72,6 +75,15 @@ class LeadChangeApprovalService {
     } catch (_) {
       return const [];
     }
+  }
+
+  /// "Owner Name, Map Location (GPS)" for the lead's change request still
+  /// waiting on management, or null if none — so the screen that saved an
+  /// edit can say which fields were held back instead of a plain "updated".
+  static Future<String?> pendingFieldsSummary(String leadId) async {
+    final pending = await getPendingForLead(leadId);
+    if (pending == null || pending.changes.isEmpty) return null;
+    return pending.changes.map((c) => c.label).join(', ');
   }
 
   static Future<LeadChangeRequest?> getPendingForLead(String leadId) async {

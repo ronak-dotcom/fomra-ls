@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/land_lead.dart';
 import '../../models/lead_list_filter.dart';
 import '../../models/employee_profile.dart';
+import '../../services/lead_change_approval_service.dart';
 import '../../services/lead_review_service.dart';
 import '../../services/app_store.dart';
 import '../../services/auth_service.dart';
@@ -893,8 +894,19 @@ class _LandLeadScreenState extends State<LandLeadScreen> {
     );
     if (saved == null) return;
     AppStore.instance.replaceLead(saved);
-    if (mounted) {
+    // Same as Lead Detail: name any fields held back for approval.
+    final waiting =
+        await LeadChangeApprovalService.pendingFieldsSummary(saved.leadId);
+    if (!mounted) return;
+    if (waiting == null) {
       AppFeedback.success(context, 'Lead ${saved.leadId} updated.');
+    } else {
+      AppFeedback.warning(
+        context,
+        'Lead ${saved.leadId} saved. Waiting for management approval: '
+        '$waiting',
+        duration: const Duration(seconds: 7),
+      );
     }
   }
 

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/lead_location_parser.dart';
 import '../models/land_lead.dart';
 import '../models/lead_change_request.dart';
 import '../utils/image_compressor.dart';
@@ -35,6 +36,16 @@ class LandLeadService {
         .select()
         .order('added_on', ascending: false);
     return (rows as List).map((r) => _fromRow(r as Map<String, dynamic>)).toList();
+  }
+
+  /// The lead as currently stored, or null if there is no such row.
+  static Future<LandLead?> getById(String leadId) async {
+    final row = await _db
+        .from('land_leads')
+        .select()
+        .eq('id', leadId)
+        .maybeSingle();
+    return row == null ? null : _fromRow(row);
   }
 
   static Future<LandLead> create(
@@ -485,7 +496,30 @@ class LandLeadService {
     'village': (l) => l.village,
     'taluk': (l) => l.taluk,
     'district': (l) => l.district,
+    // Where the property is on the map — moving it is as significant as
+    // changing the survey number, so it's audited and approval-gated too.
+    'location': (l) => l.location,
+    'gps_coordinates': (l) => l.gpsCoordinates,
   };
+
+  /// After this long from when a lead was saved, editing an already-filled
+  /// core field needs management approval (filling a blank one never does).
+  static const freeEditWindow = Duration(hours: 1);
+
+  /// A GPS pin within this distance of the old one counts as unchanged: a
+  /// re-capture at the same spot always differs by a few metres, and the
+  /// stored text can differ in format for the same point.
+  static const gpsSameSpotMeters = 25.0;
+
+  /// Whether [oldVal] → [newVal] is no real change for [field].
+  static bool _isUnchanged(String field, String oldVal, String newVal) {
+    if (oldVal == newVal) return true;
+    if (field == 'gps_coordinates') {
+      final moved = gpsDistanceMeters(oldVal, newVal);
+      if (moved != null && moved < gpsSameSpotMeters) return true;
+    }
+    return false;
+  }
 
   static Future<void> _logFieldChanges(
     LandLead previous,
@@ -509,6 +543,47 @@ class LandLeadService {
         executiveName: updated.createdByName,
       );
     }
+  }
+
+  /// Core identifying info (see _auditedFields / leadChangeFieldLabels),
+  /// split into what [update] may write now ([apply]) and what needs
+  /// management approval ([pending]). Free: filling a blank field, or any
+  /// change within [freeEditWindow] of the lead being saved. Otherwise the
+  /// change is held back and never written until approved — unlike renaming,
+  /// there's no "apply then revert". A GPS pin moved less than
+  /// [gpsSameSpotMeters] counts as unchanged. Fields outside this set
+  /// (status, notes, photos, …) are not part of this rule.
+  ///
+  /// With no [previous] there is nothing to compare, so everything applies
+  /// (offline sync now always passes the server copy).
+  static ({Map<String, dynamic> apply, List<LeadFieldChange> pending})
+      splitCoreFieldChanges(LandLead lead, LandLead? previous,
+          {DateTime? now}) {
+    final apply = <String, dynamic>{};
+    final pending = <LeadFieldChange>[];
+    final withinFreeWindow = previous != null &&
+        (now ?? DateTime.now()).difference(previous.addedOn) < freeEditWindow;
+    for (final entry in _auditedFields.entries) {
+      final newVal = entry.value(lead).trim();
+      if (previous == null) {
+        apply[entry.key] = newVal;
+        continue;
+      }
+      final oldVal = entry.value(previous).trim();
+      if (_isUnchanged(entry.key, oldVal, newVal)) continue;
+      final blankToFilled = oldVal.isEmpty && newVal.isNotEmpty;
+      if (withinFreeWindow || blankToFilled) {
+        apply[entry.key] = newVal;
+      } else {
+        pending.add(LeadFieldChange(
+          field: entry.key,
+          label: leadChangeFieldLabels[entry.key] ?? entry.key,
+          oldValue: oldVal,
+          newValue: newVal,
+        ));
+      }
+    }
+    return (apply: apply, pending: pending);
   }
 
   static Future<LandLead> update(
@@ -539,47 +614,14 @@ class LandLeadService {
       onProgress?.call('Finalizing lead…');
     }
 
-    // Core identifying info (see _auditedFields / leadChangeFieldLabels):
-    // free to fill in when blank, free to change on the same calendar day
-    // the lead was saved, otherwise held back for management approval and
-    // simply never written below — unlike renaming, there's no "apply
-    // then revert" here, a pending field's DB value never moves until
-    // approved. Fields outside this curated set (status, GPS, notes,
-    // photos, etc.) are unaffected and keep applying immediately, same as
-    // always — they already have their own dedicated rules elsewhere
-    // (status) or aren't the kind of "lead info" this rule targets.
-    final pendingChanges = <LeadFieldChange>[];
-    final sameDay = previous != null &&
-        _isSameCalendarDay(previous.addedOn, DateTime.now());
-    final auditedPayload = <String, dynamic>{};
-    for (final entry in _auditedFields.entries) {
-      final newVal = entry.value(lead).trim();
-      if (previous == null) {
-        // No previous state to gate against — apply directly (matches the
-        // old, ungated behavior; every real call site passes previous).
-        auditedPayload[entry.key] = newVal;
-        continue;
-      }
-      final oldVal = entry.value(previous).trim();
-      if (oldVal == newVal) continue; // unchanged — nothing to do either way
-      final blankToFilled = oldVal.isEmpty && newVal.isNotEmpty;
-      if (sameDay || blankToFilled) {
-        auditedPayload[entry.key] = newVal;
-      } else {
-        pendingChanges.add(LeadFieldChange(
-          field: entry.key,
-          label: leadChangeFieldLabels[entry.key] ?? entry.key,
-          oldValue: oldVal,
-          newValue: newVal,
-        ));
-      }
-    }
+    final split = splitCoreFieldChanges(lead, previous);
+    final pendingChanges = split.pending;
+    final auditedPayload = split.apply;
 
     final row = await _updateLandLead(
       lead.leadId,
       {
         'input_source': lead.inputSource.name,
-        'gps_coordinates': lead.gpsCoordinates,
         'pincode': lead.pincode,
         'land_type': lead.landType.name,
         'land_type_other': lead.landTypeOther,
@@ -589,7 +631,6 @@ class LandLeadService {
         'status': lead.status.name,
         'source_contact_name': lead.sourceContactName,
         'source_contact_number': lead.sourceContactNumber,
-        'location': lead.location,
         'site_photo_url': sitePhotoUrl,
         'site_photo_urls': sitePhotoUrls,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
@@ -631,14 +672,6 @@ class LandLeadService {
       );
     }
     return updated;
-  }
-
-  /// Same calendar day, comparing local time — the free-edit window for
-  /// both this and LandLeadRenameService's identical rule.
-  static bool _isSameCalendarDay(DateTime a, DateTime b) {
-    final la = a.toLocal();
-    final lb = b.toLocal();
-    return la.year == lb.year && la.month == lb.month && la.day == lb.day;
   }
 
   /// Targeted update for the "Deal & Risk Details" dialog — touches only
