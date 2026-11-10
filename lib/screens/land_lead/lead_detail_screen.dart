@@ -500,8 +500,19 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
 
     AppStore.instance.replaceLead(saved);
     setState(() => lead = saved);
-    if (mounted) {
+    // Core-info changes after the free window are held for approval rather
+    // than saved — say so, or the executive thinks they went through.
+    final waiting =
+        await LeadChangeApprovalService.pendingFieldsSummary(saved.leadId);
+    if (!mounted) return;
+    if (waiting == null) {
       AppFeedback.success(context, 'Lead updated');
+    } else {
+      AppFeedback.warning(
+        context,
+        'Saved. Waiting for management approval: $waiting',
+        duration: const Duration(seconds: 7),
+      );
     }
   }
 
@@ -1751,6 +1762,21 @@ class _PendingSiteVisitBanner extends StatelessWidget {
   }
 }
 
+/// A requested change's value as shown to the approver — GPS as plain
+/// coordinates rather than its storage format.
+String _changeDisplay(String field, String value) =>
+    field == 'gps_coordinates' ? gpsForDisplay(value) : value;
+
+/// "  (moved 1.2 km)" for a GPS change, or empty when it can't be measured.
+String _gpsMovedLabel(String oldGps, String newGps) {
+  final m = gpsDistanceMeters(oldGps, newGps);
+  if (m == null) return '';
+  final text = m >= 1000
+      ? '${(m / 1000).toStringAsFixed(1)} km'
+      : '${m.round()} m';
+  return '  (moved $text)';
+}
+
 class _PendingChangesBanner extends StatefulWidget {
   final LeadChangeRequest request;
   final VoidCallback onDecided;
@@ -1827,17 +1853,53 @@ class _PendingChangesBannerState extends State<_PendingChangesBanner> {
                         text: '${c.label}: ',
                         style: const TextStyle(fontWeight: FontWeight.w700)),
                     TextSpan(
-                        text: c.oldValue.isEmpty ? '(blank)' : c.oldValue,
+                        text: c.oldValue.isEmpty
+                            ? '(blank)'
+                            : _changeDisplay(c.field, c.oldValue),
                         style: const TextStyle(
                             decoration: TextDecoration.lineThrough)),
                     const TextSpan(text: '  →  '),
                     TextSpan(
-                        text: c.newValue,
+                        text: _changeDisplay(c.field, c.newValue),
                         style: const TextStyle(fontWeight: FontWeight.w800)),
+                    if (c.field == 'gps_coordinates')
+                      TextSpan(
+                        text: _gpsMovedLabel(c.oldValue, c.newValue),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.warning),
+                      ),
                   ],
                 ),
               ),
             ),
+            // A location change is judged on the map, not by coordinates.
+            if (c.field == 'gps_coordinates')
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Wrap(
+                  spacing: 8,
+                  children: [
+                    if (c.oldValue.trim().isNotEmpty)
+                      OutlinedButton.icon(
+                        onPressed: () =>
+                            MapsNavigation.navigateFromGpsString(c.oldValue),
+                        icon: const Icon(Icons.map_outlined, size: 16),
+                        label: const Text('Old on map'),
+                        style: OutlinedButton.styleFrom(
+                            visualDensity: VisualDensity.compact),
+                      ),
+                    OutlinedButton.icon(
+                      onPressed: () =>
+                          MapsNavigation.navigateFromGpsString(c.newValue),
+                      icon: const Icon(Icons.map_outlined, size: 16),
+                      label: const Text('New on map'),
+                      style: OutlinedButton.styleFrom(
+                          visualDensity: VisualDensity.compact),
+                    ),
+                  ],
+                ),
+              ),
           ],
           const SizedBox(height: 4),
           Text(

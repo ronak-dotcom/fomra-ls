@@ -262,9 +262,14 @@ class OfflineSyncService extends ChangeNotifier {
       if (b != null) photos.add(b);
     }
     final lead = _leadFromMap(map);
+    // Compare against the lead as stored on the server, so an edit made
+    // offline goes through the same approval rule as an online one —
+    // without `previous`, update() writes every core field directly.
+    final previous = await LandLeadService.getById(lead.leadId);
     final updated = await LandLeadService.update(
       lead,
       sitePhotoBytes: photos,
+      previous: previous,
     );
     AppStore.instance.replaceLead(updated);
   }
@@ -281,9 +286,12 @@ class OfflineSyncService extends ChangeNotifier {
       if (b != null) photos.add(b);
     }
     if (photos.isEmpty) return;
+    // Photos only: passing the lead as its own previous state means no core
+    // field is treated as changed, so none is rewritten.
     final updated = await LandLeadService.update(
       lead,
       sitePhotoBytes: photos,
+      previous: lead,
     );
     AppStore.instance.replaceLead(updated);
   }
