@@ -78,8 +78,8 @@ void main() {
     await t.pump();
 
     expect(find.text('Vallakkottai 12 Acre'), findsOneWidget);
-    expect(find.text('Executive: Devaraj'), findsOneWidget);
-    expect(find.textContaining('Last reviewed'), findsOneWidget);
+    expect(find.text('Devaraj'), findsOneWidget);
+    expect(find.text('LAST REVIEWED'), findsOneWidget);
     expect(find.textContaining('by Management'), findsOneWidget);
     expect(find.text('Overdue 2d'), findsOneWidget);
     expect(find.text('Check patta copy before owner meeting'), findsOneWidget);

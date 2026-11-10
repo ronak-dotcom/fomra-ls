@@ -183,12 +183,9 @@ class _FilteredLeadsScreenState extends State<FilteredLeadsScreen> {
                     ),
                   )
                 : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                     itemCount: leads.length,
-                    separatorBuilder: (_, __) => Divider(
-                      height: 1,
-                      color: context.fomraBorder.withValues(alpha: 0.7),
-                    ),
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (_, index) {
                       final lead = leads[index];
                       return _FilteredLeadRow(
@@ -245,147 +242,142 @@ class _FilteredLeadRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final title = lead.displayName;
     final showId = title != 'Lead #${lead.leadId}';
-    final location = [
-      lead.location,
-      lead.village,
-      lead.district,
-    ].where((s) => s.trim().isNotEmpty).join(', ');
+    // Location, village and district often repeat each other; keep each
+    // comma-separated part once.
+    final seen = <String>{};
+    final location = [lead.location, lead.village, lead.district]
+        .expand((s) => s.split(','))
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty && seen.add(s.toLowerCase()))
+        .join(', ');
     final hasMap = parseLeadGps(lead.gpsCoordinates) != null;
     final review =
         showReview ? LeadReviewIndex.instance.latestFor(lead.leadId) : null;
     final canReview = showReview && LeadReviewService.canReview;
-    final secondary = TextStyle(fontSize: 12, color: context.fomraTextSecondary);
+    // Keep the app font (Inter) — a bare TextStyle here would drop it.
+    final buttonText = Theme.of(context)
+        .textTheme
+        .labelLarge
+        ?.copyWith(fontSize: 12.5, fontWeight: FontWeight.w700);
+    // On phones the stage chip moves under the title so long names get the
+    // full width instead of breaking mid-word.
+    final narrow = MediaQuery.sizeOf(context).width < 560;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
+    return Container(
+      decoration: BoxDecoration(
+        color: context.fomraSurface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.fomraBorder),
+        boxShadow: context.fomraCardShadow,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Name + stage ─────────────────────────────────────────
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: context.fomraTextPrimary,
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 16.5,
+                          fontWeight: FontWeight.w800,
+                          height: 1.25,
+                          color: context.fomraTextPrimary,
+                        ),
                       ),
                     ),
-                    if (showId) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        '#${lead.leadId}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: context.fomraTextSecondary,
-                        ),
-                      ),
+                    if (!narrow) ...[
+                      const SizedBox(width: 10),
+                      _StageChip(status: lead.status),
                     ],
-                    if (location.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        location,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: secondary,
-                      ),
-                    ],
-                    if (_executive.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Row(children: [
-                        Icon(Icons.person_outline_rounded,
-                            size: 14, color: context.fomraTextSecondary),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            'Executive: $_executive',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: secondary.copyWith(
-                                fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ]),
-                    ],
-                    if (showReview) ...[
-                      const SizedBox(height: 8),
-                      _ReviewSummary(review: review),
-                    ],
-                    if (hasMap || canReview) ...[
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          if (hasMap)
-                            OutlinedButton.icon(
-                              onPressed: () => _openMap(context),
-                              icon: const Icon(Icons.map_outlined, size: 16),
-                              label: const Text('Map'),
-                              style: OutlinedButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
-                                textStyle: const TextStyle(
-                                    fontSize: 12, fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                          if (canReview)
-                            FilledButton.icon(
-                              onPressed: () => showPropertyReviewDialog(
-                                  context, lead.leadId),
-                              icon: const Icon(Icons.task_alt_rounded,
-                                  size: 16),
-                              label: const Text('Review'),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: AppColors.purple,
-                                visualDensity: VisualDensity.compact,
-                                textStyle: const TextStyle(
-                                    fontSize: 12, fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
+                    Icon(Icons.chevron_right_rounded,
+                        color: context.fomraTextTertiary),
                   ],
                 ),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: lead.status.color.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: lead.status.color.withValues(alpha: 0.28),
+                const SizedBox(height: 8),
+                // ── ID · location · executive ───────────────────────────
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (narrow) _StageChip(status: lead.status),
+                    if (showId) _IdTag(id: lead.leadId),
+                    if (location.isNotEmpty)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.place_outlined,
+                              size: 15, color: context.fomraTextTertiary),
+                          const SizedBox(width: 3),
+                          // Flexible, not a fixed cap: shrinks to the card
+                          // width on phones and ends in "…".
+                          Flexible(
+                            child: Text(
+                              location,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: context.fomraTextSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    child: Text(
-                      lead.status.label,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: lead.status.color,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: context.fomraTextTertiary,
+                    if (_executive.isNotEmpty) _ExecutiveTag(name: _executive),
+                  ],
+                ),
+                if (showReview) ...[
+                  const SizedBox(height: 12),
+                  _ReviewSummary(review: review),
+                ],
+                if (hasMap || canReview) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (hasMap)
+                        OutlinedButton.icon(
+                          onPressed: () => _openMap(context),
+                          icon: const Icon(Icons.map_outlined, size: 16),
+                          label: const Text('Map'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.info,
+                            side: BorderSide(
+                                color: AppColors.info.withValues(alpha: 0.4)),
+                            visualDensity: VisualDensity.compact,
+                            textStyle: buttonText,
+                          ),
+                        ),
+                      if (canReview)
+                        FilledButton.icon(
+                          onPressed: () =>
+                              showPropertyReviewDialog(context, lead.leadId),
+                          icon: const Icon(Icons.task_alt_rounded, size: 16),
+                          label: const Text('Review'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.purple,
+                            visualDensity: VisualDensity.compact,
+                            textStyle: buttonText,
+                          ),
+                        ),
+                    ],
                   ),
                 ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -393,8 +385,94 @@ class _FilteredLeadRow extends StatelessWidget {
   }
 }
 
-/// Latest review at a glance: when and by whom, next review date (with an
-/// overdue / due-today flag), and the note.
+class _StageChip extends StatelessWidget {
+  final LeadStatus status;
+  const _StageChip({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: status.color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: status.color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        status.label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: status.color,
+        ),
+      ),
+    );
+  }
+}
+
+/// Lead number as a small neutral tag.
+class _IdTag extends StatelessWidget {
+  final String id;
+  const _IdTag({required this.id});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: context.fomraSurfaceVar,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        '#$id',
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w800,
+          color: context.fomraTextSecondary,
+        ),
+      ),
+    );
+  }
+}
+
+/// Executive name in its own coloured tag so it is easy to pick out.
+class _ExecutiveTag extends StatelessWidget {
+  final String name;
+  const _ExecutiveTag({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Executive',
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(6, 3, 9, 3),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.person_rounded, size: 14, color: AppColors.primary),
+            const SizedBox(width: 4),
+            Text(
+              name,
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Latest review at a glance, on a panel whose left edge shows its state:
+/// red overdue, amber due today, green on track, grey never reviewed.
 class _ReviewSummary extends StatelessWidget {
   final LeadReview? review;
   const _ReviewSummary({required this.review});
@@ -402,59 +480,156 @@ class _ReviewSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final r = review;
-    final secondary = TextStyle(fontSize: 12, color: context.fomraTextSecondary);
+    final Color accent = r == null
+        ? context.fomraTextTertiary
+        : r.isOverdue
+            ? AppColors.error
+            : r.isDueToday
+                ? AppColors.warning
+                : AppColors.success;
+
+    final label = TextStyle(
+      fontSize: 10,
+      fontWeight: FontWeight.w800,
+      letterSpacing: 0.6,
+      color: context.fomraTextTertiary,
+    );
+    final value = TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w800,
+      color: context.fomraTextPrimary,
+    );
+
+    Widget content;
     if (r == null) {
-      return Text('Not reviewed yet',
-          style: secondary.copyWith(fontStyle: FontStyle.italic));
-    }
-    final by = r.reviewedBy.trim();
-    final next = r.nextReviewLabel;
-    final (String? flag, Color flagColor) = r.isOverdue
-        ? ('Overdue ${-(r.daysUntilNext ?? 0)}d', AppColors.error)
-        : r.isDueToday
-            ? ('Due today', AppColors.warning)
-            : (null, AppColors.success);
-    return Container(
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-      decoration: BoxDecoration(
-        color: context.fomraSurfaceVar.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: context.fomraBorder),
-      ),
-      child: Column(
+      content = Text(
+        'Not reviewed yet',
+        style: value.copyWith(color: context.fomraTextSecondary),
+      );
+    } else {
+      final by = r.reviewedBy.trim();
+      final String? flag = r.isOverdue
+          ? 'Overdue ${-(r.daysUntilNext ?? 0)}d'
+          : r.isDueToday
+              ? 'Due today'
+              : null;
+      content = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Wrap(
-            spacing: 12,
-            runSpacing: 4,
-            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 24,
+            runSpacing: 8,
             children: [
-              Text(
-                'Last reviewed ${LeadFollowUp.formatDate(r.reviewedAt)}'
-                '${by.isEmpty ? '' : ' by $by'}',
-                style: secondary.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: context.fomraTextPrimary),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('LAST REVIEWED', style: label),
+                  const SizedBox(height: 3),
+                  Text.rich(TextSpan(children: [
+                    TextSpan(
+                        text: LeadFollowUp.formatDate(r.reviewedAt),
+                        style: value),
+                    if (by.isNotEmpty) ...[
+                      TextSpan(
+                        text: '  by ',
+                        style: TextStyle(
+                            fontSize: 12.5,
+                            color: context.fomraTextSecondary),
+                      ),
+                      TextSpan(
+                        text: by,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.purple,
+                        ),
+                      ),
+                    ],
+                  ])),
+                ],
               ),
-              Text('Next: ${next ?? 'not set'}', style: secondary),
-              if (flag != null)
-                Text(flag,
-                    style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w800,
-                        color: flagColor)),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('NEXT REVIEW', style: label),
+                  const SizedBox(height: 3),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(r.nextReviewLabel ?? 'Not set', style: value),
+                      if (flag != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: accent.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            flag,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: accent,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
             ],
           ),
           if (r.notes.trim().isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              r.notes.trim(),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: secondary,
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.format_quote_rounded,
+                    size: 16, color: context.fomraTextTertiary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    r.notes.trim(),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      height: 1.4,
+                      fontStyle: FontStyle.italic,
+                      color: context.fomraTextPrimary.withValues(alpha: 0.85),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ],
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        color: accent.withValues(alpha: 0.06),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(width: 4, color: accent),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  child: content,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
