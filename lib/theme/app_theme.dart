@@ -16,12 +16,15 @@ class AppColors {
   static const Color background   = Color(0xFFF8FAFC); // slate-50
   static const Color surface      = Color(0xFFFFFFFF);
   static const Color surfaceVar   = Color(0xFFF1F5F9); // slate-100
-  static const Color border       = Color(0xFFE5E7EB); // gray-200
+  static const Color border       = Color(0xFFE2E8F0); // slate-200
 
   // ── Text (light) ─────────────────────────────────────────────────────────────
-  static const Color textPrimary   = Color(0xFF111827);
-  static const Color textSecondary = Color(0xFF6B7280);
-  static const Color textTertiary  = Color(0xFF9CA3AF);
+  // One slate family (matching the slate surfaces), each step readable on
+  // white: secondary 7.6:1, tertiary 4.8:1 — the old gray-400 tertiary
+  // (2.5:1) used for field labels was below the 4.5:1 minimum.
+  static const Color textPrimary   = Color(0xFF0F172A); // slate-900
+  static const Color textSecondary = Color(0xFF475569); // slate-600
+  static const Color textTertiary  = Color(0xFF64748B); // slate-500
 
   // ── Dark surfaces (enterprise dashboard) ──────────────────────────────────────
   static const Color darkBackground    = Color(0xFF0B1220);
@@ -34,7 +37,8 @@ class AppColors {
   static const Color darkNavBar        = Color(0xCC0F172A); // 80% matte nav
   static const Color darkTextPrimary   = Color(0xFFF8FAFC);
   static const Color darkTextSecondary = Color(0xFF94A3B8);
-  static const Color darkTextTertiary  = Color(0xFF64748B);
+  // Lifted from slate-500 (3.2:1 on dark cards) to clear 4.5:1.
+  static const Color darkTextTertiary  = Color(0xFF7C8AA0);
 
   /// Subtle modal scrim for centered dialogs — lighter than Flutter's default black54.
   static const Color modalScrim = Color(0x40000000); // black @ 25%
@@ -77,14 +81,16 @@ class AppColors {
   static const double radiusXl = 28; // hero surfaces
 
   // ── Shadow tokens ─────────────────────────────────────────────────────────────
+  // Light cards: a soft, close shadow. The previous 28px blur pushed 10px down
+  // left a grey band under every card that read as a double border.
   static const List<BoxShadow> cardShadow = [
-    BoxShadow(color: Color(0x18000000), blurRadius: 28, offset: Offset(0, 10)),
-    BoxShadow(color: Color(0x0C000000), blurRadius: 8,  offset: Offset(0, 2)),
+    BoxShadow(color: Color(0x0F0F172A), blurRadius: 12, offset: Offset(0, 3)),
+    BoxShadow(color: Color(0x0A0F172A), blurRadius: 2,  offset: Offset(0, 1)),
   ];
 
   static const List<BoxShadow> elevatedShadow = [
-    BoxShadow(color: Color(0x28000000), blurRadius: 40, offset: Offset(0, 18)),
-    BoxShadow(color: Color(0x12000000), blurRadius: 12, offset: Offset(0, 4)),
+    BoxShadow(color: Color(0x1A0F172A), blurRadius: 24, offset: Offset(0, 10)),
+    BoxShadow(color: Color(0x0D0F172A), blurRadius: 6,  offset: Offset(0, 2)),
   ];
 
   /// Soft elevation for dark cards — no heavy glows.
@@ -160,7 +166,7 @@ TextTheme _textTheme({
       bodyLarge:     TextStyle(fontSize: 15, fontWeight: FontWeight.w400, letterSpacing: 0.0,  height: 1.55, color: primary),
       bodyMedium:    TextStyle(fontSize: 15, fontWeight: FontWeight.w400, letterSpacing: 0.0,  height: 1.55, color: secondary),
       bodySmall:     TextStyle(fontSize: 13, fontWeight: FontWeight.w400, letterSpacing: 0.0,  height: 1.5,  color: secondary),
-      labelLarge:    TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.2,  color: primary),
+      labelLarge:    TextStyle(fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: 0.1,  color: primary),
       labelMedium:   TextStyle(fontSize: 11, fontWeight: FontWeight.w500, letterSpacing: 0.4,  color: secondary),
       labelSmall:    TextStyle(fontSize: 10, fontWeight: FontWeight.w500, letterSpacing: 0.5,  color: tertiary),
     );
@@ -223,24 +229,40 @@ ThemeData appTheme() {
         shadowColor: Colors.transparent,
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppColors.radiusSm)),
-        padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
         textStyle: const TextStyle(
             fontFamily: fontFamily,
-            fontSize: 16,
+            fontSize: 14,
             fontWeight: FontWeight.w700,
-            letterSpacing: 0.2),
+            letterSpacing: 0.1),
+      ),
+    ),
+    // FilledButton had no theme, so in dark mode Material derived a dark
+    // label colour for the blue fill (grey "Create Task" text). Match the
+    // elevated button: white text, same size and shape.
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppColors.radiusSm)),
+        textStyle: const TextStyle(
+            fontFamily: fontFamily,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.1),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: AppColors.primary,
-        side: const BorderSide(color: AppColors.primary, width: 1.5),
+        side: const BorderSide(color: AppColors.primary, width: 1.2),
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppColors.radiusSm)),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 15),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
         textStyle: const TextStyle(
             fontFamily: fontFamily,
-            fontSize: 16,
+            fontSize: 14,
             fontWeight: FontWeight.w700),
       ),
     ),
@@ -250,7 +272,7 @@ ThemeData appTheme() {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         textStyle: const TextStyle(
             fontFamily: fontFamily,
-            fontSize: 16,
+            fontSize: 14,
             fontWeight: FontWeight.w600),
       ),
     ),
@@ -260,11 +282,11 @@ ThemeData appTheme() {
       isDense: true,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+        borderSide: const BorderSide(color: AppColors.border),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+        borderSide: const BorderSide(color: AppColors.border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
@@ -394,24 +416,40 @@ ThemeData appThemeDark() {
         shadowColor: Colors.transparent,
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppColors.radiusSm)),
-        padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
         textStyle: const TextStyle(
             fontFamily: fontFamily,
-            fontSize: 16,
+            fontSize: 14,
             fontWeight: FontWeight.w700,
-            letterSpacing: 0.2),
+            letterSpacing: 0.1),
+      ),
+    ),
+    // FilledButton had no theme, so in dark mode Material derived a dark
+    // label colour for the blue fill (grey "Create Task" text). Match the
+    // elevated button: white text, same size and shape.
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppColors.radiusSm)),
+        textStyle: const TextStyle(
+            fontFamily: fontFamily,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.1),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: AppColors.primary,
-        side: const BorderSide(color: AppColors.primary, width: 1.5),
+        side: const BorderSide(color: AppColors.primary, width: 1.2),
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppColors.radiusSm)),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 15),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
         textStyle: const TextStyle(
             fontFamily: fontFamily,
-            fontSize: 16,
+            fontSize: 14,
             fontWeight: FontWeight.w700),
       ),
     ),
@@ -421,7 +459,7 @@ ThemeData appThemeDark() {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         textStyle: const TextStyle(
             fontFamily: fontFamily,
-            fontSize: 16,
+            fontSize: 14,
             fontWeight: FontWeight.w600),
       ),
     ),

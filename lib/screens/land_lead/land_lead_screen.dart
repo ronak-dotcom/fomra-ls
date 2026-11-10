@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/land_lead.dart';
 import '../../models/lead_list_filter.dart';
 import '../../models/employee_profile.dart';
+import '../../services/error_log_service.dart';
 import '../../services/lead_change_approval_service.dart';
 import '../../services/lead_review_service.dart';
 import '../../services/app_store.dart';
@@ -260,8 +261,13 @@ class _LandLeadScreenState extends State<LandLeadScreen> {
     try {
       final leads = await LandLeadService.getAll();
       AppStore.instance.setLeads(leads);
-    } catch (e) {
-      if (mounted) setState(() => _loadError = 'Failed to load leads: ${_errMsg(e)}');
+    } catch (e, st) {
+      // Technical detail goes to the error log; the user gets plain words.
+      ErrorLogService.capture(e, stack: st, action: 'load_leads');
+      if (mounted) {
+        setState(() => _loadError =
+            'Please check your internet connection and tap Retry.');
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -990,7 +996,8 @@ class _LeadsLoadingSkeleton extends StatelessWidget {
             (i) => Padding(
               padding: EdgeInsets.only(bottom: i < 5 ? 8 : 0),
               child: Container(
-                height: 60,
+                // 46px of placeholder lines + 16 padding + 2 border.
+                height: 64,
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
                   color: context.fomraSurface,

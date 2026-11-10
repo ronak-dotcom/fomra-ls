@@ -1356,13 +1356,15 @@ class _EmployeeTodayTasksSection extends StatelessWidget {
                     for (final c in categories)
                       SizedBox(
                         width: cardWidth,
-                        height: mobile ? cardWidth : 100,
+                        height: mobile ? cardWidth : 110,
                         child: _TaskSummaryCard(
                           label: c.label,
                           count: c.leads.length,
                           icon: c.icon,
                           color: c.color,
                           subtitle: switch (c.label) {
+                            'Overdue Follow-ups' => 'Follow-up date has passed',
+                            'No Recent Activity' => 'Nothing logged lately',
                             'Call Pending' => 'Follow up by call',
                             'Meeting Pending' => 'Land owner meeting due',
                             'Site Visit Pending' => 'Schedule the site visit',
