@@ -1317,7 +1317,7 @@ class _EmployeeTodayTasksSection extends StatelessWidget {
 
     return PortalSectionCard(
       title: "Today's tasks",
-      subtitle: 'Compact follow-up cards',
+      subtitle: 'What needs your attention today',
       icon: Icons.today_rounded,
       child: total == 0
           ? const EmptyState(
@@ -1421,10 +1421,12 @@ class _TaskSummaryCard extends StatelessWidget {
               Text(
                 '$count',
                 style: TextStyle(
-                  fontSize: 22,
+                  fontSize: 28,
                   fontWeight: FontWeight.w800,
+                  letterSpacing: -0.8,
                   color: color,
                   height: 1,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ],

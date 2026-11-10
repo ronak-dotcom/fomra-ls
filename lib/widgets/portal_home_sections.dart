@@ -151,113 +151,298 @@ class PortalWelcomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      radius: AppColors.radiusLg,
-      interactive: false,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final phone = FomraLayout.isMobile(context);
+    // Share of all sites, drawn as the ring around each tile (Total is a
+    // full ring); guards an empty portfolio.
+    double share(int v) => totalLeads == 0 ? 0 : (v / totalLeads).clamp(0, 1);
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        gradient: AppColors.heroGradient,
+        borderRadius: BorderRadius.circular(AppColors.radiusXl),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.22)),
+        boxShadow: context.fomraElevatedShadow,
+      ),
+      child: Stack(
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AnimatedSwitcher(
-                      duration: AppMotion.slow,
-                      switchInCurve: AppMotion.curve,
-                      switchOutCurve: Curves.easeIn,
-                      transitionBuilder: (child, animation) => FadeTransition(
-                        opacity: animation,
-                        child: child,
-                      ),
-                      child: Text(
-                        greeting,
-                        key: ValueKey(greeting),
-                        // Slightly smaller greeting on phones.
-                        style: (FomraLayout.isMobile(context)
-                                ? Theme.of(context).textTheme.titleLarge
-                                : Theme.of(context).textTheme.headlineSmall)
-                            ?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: context.fomraTextPrimary,
-                          height: 1.2,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xxs),
-                    Text(
-                      dateLabel,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: context.fomraTextSecondary,
-                      ),
-                    ),
-                  ],
+          // Soft gold glow in the corner — the "premium card" sheen.
+          Positioned(
+            right: -80,
+            top: -110,
+            child: IgnorePointer(
+              child: Container(
+                width: 280,
+                height: 280,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(colors: [
+                    AppColors.gold.withValues(alpha: 0.22),
+                    AppColors.gold.withValues(alpha: 0),
+                  ]),
                 ),
               ),
-            ],
+            ),
           ),
-          const SizedBox(height: AppSpacing.md),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              // Mobile: three compact square tiles in one row (better use of the
-              // width than full-width stacked rows). Wider screens keep the roomy
-              // horizontal tiles.
-              final square = constraints.maxWidth < 640;
-              final tiles = [
-                PortalSummaryTile(
-                  label: 'Total sites',
-                  value: totalLeads,
-                  icon: Icons.location_on_outlined,
-                  accent: AppColors.primary,
-                  compact: square,
-                  onTap: onSummaryTap == null
-                      ? null
-                      : () => onSummaryTap!(LeadListFilter.totalLeads),
+          Padding(
+            padding: EdgeInsets.all(phone ? 20 : 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  dateLabel.toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.6,
+                    color: AppColors.goldLight,
+                  ),
                 ),
-                PortalSummaryTile(
-                  label: 'Active sites',
-                  value: activeLeads,
-                  icon: Icons.trending_up_rounded,
-                  accent: AppColors.success,
-                  compact: square,
-                  onTap: onSummaryTap == null
-                      ? null
-                      : () => onSummaryTap!(LeadListFilter.activeLeads),
-                ),
-                PortalSummaryTile(
-                  label: thirdLabel,
-                  value: thirdValue,
-                  icon: thirdIcon,
-                  accent: AppColors.warning,
-                  compact: square,
-                  onTap: onThirdTap,
-                ),
-              ];
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (var i = 0; i < tiles.length; i++) ...[
-                    Expanded(
-                      child: square
-                          ? AspectRatio(aspectRatio: 1, child: tiles[i])
-                          : tiles[i],
+                const SizedBox(height: 8),
+                AnimatedSwitcher(
+                  duration: AppMotion.slow,
+                  switchInCurve: AppMotion.curve,
+                  switchOutCurve: Curves.easeIn,
+                  transitionBuilder: (child, animation) =>
+                      FadeTransition(opacity: animation, child: child),
+                  child: Text(
+                    greeting,
+                    key: ValueKey(greeting),
+                    style: TextStyle(
+                      fontSize: phone ? 26 : 32,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: phone ? -0.8 : -1.1,
+                      height: 1.12,
+                      color: Colors.white,
                     ),
-                    if (i < tiles.length - 1)
-                      const SizedBox(width: AppSpacing.sm),
-                  ],
-                ],
-              );
-            },
+                  ),
+                ),
+                SizedBox(height: phone ? 18 : 24),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final square = constraints.maxWidth < 640;
+                    final tiles = [
+                      _HeroRingTile(
+                        label: 'Total sites',
+                        value: totalLeads,
+                        progress: totalLeads == 0 ? 0 : 1,
+                        icon: Icons.location_on_rounded,
+                        color: _HeroColors.blue,
+                        compact: square,
+                        onTap: onSummaryTap == null
+                            ? null
+                            : () => onSummaryTap!(LeadListFilter.totalLeads),
+                      ),
+                      _HeroRingTile(
+                        label: 'Active sites',
+                        value: activeLeads,
+                        progress: share(activeLeads),
+                        icon: Icons.trending_up_rounded,
+                        color: _HeroColors.green,
+                        compact: square,
+                        onTap: onSummaryTap == null
+                            ? null
+                            : () => onSummaryTap!(LeadListFilter.activeLeads),
+                      ),
+                      _HeroRingTile(
+                        label: thirdLabel,
+                        value: thirdValue,
+                        progress: share(thirdValue),
+                        icon: thirdIcon,
+                        color: _HeroColors.amber,
+                        compact: square,
+                        onTap: onThirdTap,
+                      ),
+                    ];
+                    return IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (var i = 0; i < tiles.length; i++) ...[
+                            Expanded(child: tiles[i]),
+                            if (i < tiles.length - 1)
+                              SizedBox(width: square ? 8 : AppSpacing.sm),
+                          ],
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
+}
+
+/// Vivid ring colours that glow on the ink hero (Apple Fitness-style).
+abstract final class _HeroColors {
+  static const blue = Color(0xFF4DA3FF);
+  static const green = Color(0xFF3DDC84);
+  static const amber = Color(0xFFFFB547);
+}
+
+/// A KPI on the hero: a progress ring (with the icon inside), a big number
+/// and its label, on a frosted tile.
+class _HeroRingTile extends StatefulWidget {
+  final String label;
+  final int value;
+  final double progress;
+  final IconData icon;
+  final Color color;
+  final bool compact;
+  final VoidCallback? onTap;
+
+  const _HeroRingTile({
+    required this.label,
+    required this.value,
+    required this.progress,
+    required this.icon,
+    required this.color,
+    required this.compact,
+    this.onTap,
+  });
+
+  @override
+  State<_HeroRingTile> createState() => _HeroRingTileState();
+}
+
+class _HeroRingTileState extends State<_HeroRingTile> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = widget.compact;
+    final ringSize = compact ? 40.0 : 52.0;
+    final ring = SizedBox(
+      width: ringSize,
+      height: ringSize,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: widget.progress),
+        duration: const Duration(milliseconds: 900),
+        curve: Curves.easeOutCubic,
+        builder: (context, p, child) => CustomPaint(
+          painter: ActivityRingPainter(
+            progress: p,
+            color: widget.color,
+            stroke: compact ? 4.5 : 5.5,
+          ),
+          child: child,
+        ),
+        child: Center(
+          child: Icon(widget.icon,
+              size: compact ? 16 : 20, color: widget.color),
+        ),
+      ),
+    );
+    final number = AnimatedCounter(
+      value: widget.value,
+      style: TextStyle(
+        fontSize: compact ? 26 : 32,
+        fontWeight: FontWeight.w800,
+        letterSpacing: -0.8,
+        height: 1.0,
+        color: Colors.white,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ),
+    );
+    final label = Text(
+      widget.label,
+      maxLines: compact ? 3 : 2,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: compact ? 10.5 : 12.5,
+        height: 1.2,
+        fontWeight: FontWeight.w600,
+        color: Colors.white.withValues(alpha: 0.68),
+      ),
+    );
+
+    final body = compact
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ring,
+              const SizedBox(height: 12),
+              number,
+              const SizedBox(height: 4),
+              label,
+            ],
+          )
+        : Row(
+            children: [
+              ring,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [number, const SizedBox(height: 4), label],
+                ),
+              ),
+            ],
+          );
+
+    final tile = MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: widget.onTap == null
+          ? MouseCursor.defer
+          : SystemMouseCursors.click,
+      child: AnimatedContainer(
+        duration: AppMotion.normal,
+        curve: AppMotion.curve,
+        padding: EdgeInsets.all(compact ? 12 : 16),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: _hovered ? 0.10 : 0.06),
+          borderRadius: BorderRadius.circular(AppColors.radiusMd),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: _hovered ? 0.18 : 0.09),
+          ),
+        ),
+        child: body,
+      ),
+    );
+    if (widget.onTap == null) return tile;
+    return GestureDetector(onTap: widget.onTap, child: tile);
+  }
+}
+
+/// An Apple Fitness-style activity ring: a dim track and a bright arc from
+/// 12 o'clock, round-capped.
+class ActivityRingPainter extends CustomPainter {
+  final double progress;
+  final Color color;
+  final double stroke;
+
+  const ActivityRingPainter({
+    required this.progress,
+    required this.color,
+    this.stroke = 5,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final r = rect.deflate(stroke / 2);
+    final track = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..color = color.withValues(alpha: 0.18);
+    canvas.drawOval(r, track);
+    if (progress <= 0) return;
+    final arc = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.round
+      ..color = color;
+    canvas.drawArc(r, -1.5707963, 6.2831853 * progress.clamp(0, 1), false, arc);
+  }
+
+  @override
+  bool shouldRepaint(ActivityRingPainter old) =>
+      old.progress != progress || old.color != color || old.stroke != stroke;
 }
 
 class PortalSummaryTile extends StatefulWidget {
@@ -506,14 +691,17 @@ class PortalQuickActionsFab extends StatelessWidget {
   Widget build(BuildContext context) {
     return FloatingActionButton.extended(
       onPressed: () => _open(context),
-      // A warm amber — clearly apart from the blue/purple primary buttons
-      // (Add Lead FAB, lead action FAB).
-      backgroundColor: const Color(0xFFF59E0B),
-      foregroundColor: Colors.white,
+      // Ink with gold, matching the header — clearly apart from the blue
+      // primary buttons (Add Lead FAB, lead action FAB).
+      backgroundColor: AppColors.ink,
+      foregroundColor: AppColors.goldLight,
+      shape: StadiumBorder(
+        side: BorderSide(color: AppColors.gold.withValues(alpha: 0.45)),
+      ),
       icon: const Icon(Icons.flash_on_rounded),
       label: const Text(
         'Quick actions',
-        style: TextStyle(fontWeight: FontWeight.w700),
+        style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 0.2),
       ),
     );
   }

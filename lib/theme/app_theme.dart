@@ -12,33 +12,43 @@ class AppColors {
   static const Color purple       = Color(0xFF8B5CF6);
   static const Color cyan         = Color(0xFF06B6D4);
 
+  // ── Premium accents ─────────────────────────────────────────────────────────
+  // Ink-black chrome with a muted gold — the header/sidebar look — and a
+  // brighter gold for highlights on dark surfaces.
+  static const Color ink          = Color(0xFF0B0B0F);
+  static const Color inkSoft      = Color(0xFF1A1A21);
+  static const Color gold         = Color(0xFFC9A45C);
+  static const Color goldLight    = Color(0xFFE7CF97);
+
   // ── Surface (light) ─────────────────────────────────────────────────────────
-  static const Color background   = Color(0xFFF8FAFC); // slate-50
+  // Soft neutral greys (Apple-style) so white cards float on the page.
+  static const Color background   = Color(0xFFF5F5F7);
   static const Color surface      = Color(0xFFFFFFFF);
-  static const Color surfaceVar   = Color(0xFFF1F5F9); // slate-100
-  static const Color border       = Color(0xFFE2E8F0); // slate-200
+  static const Color surfaceVar   = Color(0xFFF2F2F5);
+  static const Color border       = Color(0xFFE5E5EA);
 
   // ── Text (light) ─────────────────────────────────────────────────────────────
   // One slate family (matching the slate surfaces), each step readable on
   // white: secondary 7.6:1, tertiary 4.8:1 — the old gray-400 tertiary
   // (2.5:1) used for field labels was below the 4.5:1 minimum.
-  static const Color textPrimary   = Color(0xFF0F172A); // slate-900
-  static const Color textSecondary = Color(0xFF475569); // slate-600
-  static const Color textTertiary  = Color(0xFF64748B); // slate-500
+  static const Color textPrimary   = Color(0xFF1D1D1F); // 16.8:1
+  static const Color textSecondary = Color(0xFF4A4A50); // 8.9:1
+  static const Color textTertiary  = Color(0xFF6E6E73); // 5.0:1
 
   // ── Dark surfaces (enterprise dashboard) ──────────────────────────────────────
-  static const Color darkBackground    = Color(0xFF0B1220);
-  static const Color darkBackgroundEnd = Color(0xFF111827);
-  static const Color darkSurface       = Color(0xFF161B22);
-  static const Color darkSurfaceVar    = Color(0xFF1C2128);
-  static const Color darkBorder        = Color(0xFF2A3441);
-  static const Color darkDivider       = Color(0xFF263241);
-  static const Color sidebarDark       = Color(0xFF0F172A);
-  static const Color darkNavBar        = Color(0xCC0F172A); // 80% matte nav
-  static const Color darkTextPrimary   = Color(0xFFF8FAFC);
-  static const Color darkTextSecondary = Color(0xFF94A3B8);
-  // Lifted from slate-500 (3.2:1 on dark cards) to clear 4.5:1.
-  static const Color darkTextTertiary  = Color(0xFF7C8AA0);
+  // True black page with charcoal cards, as in Apple Fitness: colour pops
+  // hardest on black.
+  static const Color darkBackground    = Color(0xFF000000);
+  static const Color darkBackgroundEnd = Color(0xFF07070A);
+  static const Color darkSurface       = Color(0xFF1C1C1E);
+  static const Color darkSurfaceVar    = Color(0xFF2C2C2E);
+  static const Color darkBorder        = Color(0xFF2E2E32);
+  static const Color darkDivider       = Color(0xFF29292D);
+  static const Color sidebarDark       = Color(0xFF0A0A0C);
+  static const Color darkNavBar        = Color(0xCC0A0A0C); // 80% matte nav
+  static const Color darkTextPrimary   = Color(0xFFF5F5F7);
+  static const Color darkTextSecondary = Color(0xFFAEAEB2); // 7.9:1 on cards
+  static const Color darkTextTertiary  = Color(0xFF8E8E93); // 4.8:1 on cards
 
   /// Subtle modal scrim for centered dialogs — lighter than Flutter's default black54.
   static const Color modalScrim = Color(0x40000000); // black @ 25%
@@ -56,8 +66,13 @@ class AppColors {
     end: Alignment.bottomRight,
   );
 
-  /// Header / hero surfaces — blue gradient for light chrome.
-  static const LinearGradient heroGradient = primaryGradient;
+  /// Header / sidebar chrome — ink black (CRED-style); colour is kept for
+  /// content so it stands out against it.
+  static const LinearGradient heroGradient = LinearGradient(
+    colors: [Color(0xFF1A1A21), Color(0xFF0B0B0F)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
   /// Deep charcoal page background for dark dashboard.
   static const LinearGradient darkPageGradient = LinearGradient(
@@ -68,7 +83,7 @@ class AppColors {
 
   /// Subtle dark navbar wash (used under backdrop blur).
   static const LinearGradient darkNavGradient = LinearGradient(
-    colors: [Color(0xE60F172A), Color(0xD9111827)],
+    colors: [Color(0xF20A0A0C), Color(0xE6000000)],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   );
@@ -76,21 +91,22 @@ class AppColors {
   // ── Radius tokens ───────────────────────────────────────────────────────────
   static const double radiusXs = 12; // chips, small controls
   static const double radiusSm = 16; // buttons, inputs
-  static const double radiusMd = 20; // cards
-  static const double radiusLg = 24; // large cards, bottom sheets
-  static const double radiusXl = 28; // hero surfaces
+  static const double radiusMd = 22; // cards
+  static const double radiusLg = 26; // large cards, bottom sheets
+  static const double radiusXl = 30; // hero surfaces
 
   // ── Shadow tokens ─────────────────────────────────────────────────────────────
   // Light cards: a soft, close shadow. The previous 28px blur pushed 10px down
   // left a grey band under every card that read as a double border.
+  // Wide and faint: the card lifts off the grey page without a visible edge.
   static const List<BoxShadow> cardShadow = [
-    BoxShadow(color: Color(0x0F0F172A), blurRadius: 12, offset: Offset(0, 3)),
-    BoxShadow(color: Color(0x0A0F172A), blurRadius: 2,  offset: Offset(0, 1)),
+    BoxShadow(color: Color(0x0D000000), blurRadius: 24, offset: Offset(0, 8)),
+    BoxShadow(color: Color(0x08000000), blurRadius: 3,  offset: Offset(0, 1)),
   ];
 
   static const List<BoxShadow> elevatedShadow = [
-    BoxShadow(color: Color(0x1A0F172A), blurRadius: 24, offset: Offset(0, 10)),
-    BoxShadow(color: Color(0x0D0F172A), blurRadius: 6,  offset: Offset(0, 2)),
+    BoxShadow(color: Color(0x17000000), blurRadius: 36, offset: Offset(0, 14)),
+    BoxShadow(color: Color(0x0A000000), blurRadius: 6,  offset: Offset(0, 2)),
   ];
 
   /// Soft elevation for dark cards — no heavy glows.
@@ -149,6 +165,7 @@ class AppMotion {
 }
 
 const _fontFamily = 'Inter';
+const _tabular = [FontFeature.tabularFigures()];
 
 TextTheme _textTheme({
   required Color primary,
@@ -156,19 +173,21 @@ TextTheme _textTheme({
   required Color tertiary,
 }) =>
     TextTheme(
-      displayLarge:  TextStyle(fontSize: 42, fontWeight: FontWeight.w800, letterSpacing: -1.4, height: 1.08, color: primary),
-      displayMedium: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -0.9, height: 1.12, color: primary),
-      headlineLarge: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.6, height: 1.18, color: primary),
-      headlineMedium:TextStyle(fontSize: 23, fontWeight: FontWeight.w700, letterSpacing: -0.4, height: 1.22, color: primary),
-      titleLarge:    TextStyle(fontSize: 19, fontWeight: FontWeight.w700, letterSpacing: -0.2, height: 1.28, color: primary),
-      titleMedium:   TextStyle(fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: 0.0,  height: 1.35, color: primary),
-      titleSmall:    TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1,  height: 1.35, color: primary),
-      bodyLarge:     TextStyle(fontSize: 15, fontWeight: FontWeight.w400, letterSpacing: 0.0,  height: 1.55, color: primary),
-      bodyMedium:    TextStyle(fontSize: 15, fontWeight: FontWeight.w400, letterSpacing: 0.0,  height: 1.55, color: secondary),
-      bodySmall:     TextStyle(fontSize: 13, fontWeight: FontWeight.w400, letterSpacing: 0.0,  height: 1.5,  color: secondary),
-      labelLarge:    TextStyle(fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: 0.1,  color: primary),
-      labelMedium:   TextStyle(fontSize: 11, fontWeight: FontWeight.w500, letterSpacing: 0.4,  color: secondary),
-      labelSmall:    TextStyle(fontSize: 10, fontWeight: FontWeight.w500, letterSpacing: 0.5,  color: tertiary),
+      // Big, heavy, tightly tracked headings with tabular figures, so
+      // counts line up and read like a premium dashboard.
+      displayLarge:  TextStyle(fontSize: 46, fontWeight: FontWeight.w800, letterSpacing: -1.8, height: 1.05, color: primary, fontFeatures: _tabular),
+      displayMedium: TextStyle(fontSize: 36, fontWeight: FontWeight.w800, letterSpacing: -1.2, height: 1.1,  color: primary, fontFeatures: _tabular),
+      headlineLarge: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -0.9, height: 1.15, color: primary),
+      headlineMedium:TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.6, height: 1.2,  color: primary),
+      titleLarge:    TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.35, height: 1.25, color: primary),
+      titleMedium:   TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: -0.1, height: 1.35, color: primary),
+      titleSmall:    TextStyle(fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: 0.0,  height: 1.35, color: primary),
+      bodyLarge:     TextStyle(fontSize: 16, fontWeight: FontWeight.w400, letterSpacing: -0.1, height: 1.55, color: primary),
+      bodyMedium:    TextStyle(fontSize: 15, fontWeight: FontWeight.w400, letterSpacing: -0.05, height: 1.55, color: secondary),
+      bodySmall:     TextStyle(fontSize: 13.5, fontWeight: FontWeight.w400, letterSpacing: 0.0, height: 1.5, color: secondary),
+      labelLarge:    TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, letterSpacing: 0.0, color: primary),
+      labelMedium:   TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.3,  color: secondary),
+      labelSmall:    TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.6,  color: tertiary),
     );
 
 ThemeData appTheme() {

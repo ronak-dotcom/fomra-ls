@@ -82,7 +82,7 @@ class _SideNavTokens {
   static const sidebarGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
-    colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
+    colors: [Color(0xFF1A1A21), Color(0xFF0B0B0F)],
   );
 }
 

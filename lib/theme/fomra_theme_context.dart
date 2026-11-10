@@ -40,15 +40,15 @@ extension FomraThemeContext on BuildContext {
       isDarkMode ? AppColors.darkElevatedShadow : AppColors.elevatedShadow;
 
   Color get fomraHoverBg =>
-      isDarkMode ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC);
+      isDarkMode ? const Color(0xFF2C2C2E) : const Color(0xFFF5F5F7);
 
   Color get fomraIconChipBg =>
-      isDarkMode ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+      isDarkMode ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F5);
 
   Color get fomraSidebarBg =>
-      isDarkMode ? AppColors.sidebarDark : AppColors.primary;
+      isDarkMode ? AppColors.sidebarDark : AppColors.ink;
 
-  /// App bar / header chrome — blue gradient in light, dark wash in dark mode.
+  /// App bar / header chrome — ink black in light, dark wash in dark mode.
   LinearGradient get fomraHeroGradient =>
       isDarkMode ? AppColors.darkNavGradient : AppColors.heroGradient;
 }
