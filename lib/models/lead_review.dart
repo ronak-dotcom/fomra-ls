@@ -98,6 +98,18 @@ extension ReviewFilterX on ReviewFilter {
         ReviewFilter.notScheduled => 'Reviewed, no next date',
       };
 
+  /// Short form for filter chips.
+  String get chipLabel => switch (this) {
+        ReviewFilter.reviewed => 'Reviewed',
+        ReviewFilter.notReviewed => 'Not reviewed',
+        ReviewFilter.reviewedThisWeek => 'Reviewed this week',
+        ReviewFilter.overdue => 'Overdue',
+        ReviewFilter.dueToday => 'Due today',
+        ReviewFilter.dueThisWeek => 'Due this week',
+        ReviewFilter.upcoming => 'Upcoming',
+        ReviewFilter.notScheduled => 'No next date',
+      };
+
   /// Whether a lead whose latest review is [latest] (null = never reviewed)
   /// belongs in this filter, evaluated against [now].
   bool matches(LeadReview? latest, {DateTime? now}) {

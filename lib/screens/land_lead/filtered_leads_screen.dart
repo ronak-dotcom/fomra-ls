@@ -19,12 +19,18 @@ class FilteredLeadsScreen extends StatefulWidget {
   final String? presetTitle;
   final String? presetSubtitle;
 
+  /// Set when the list itself is a review-status list (dashboard review
+  /// boxes): the Filters panel then omits Property Review, which could only
+  /// contradict the list.
+  final bool hideReviewFilter;
+
   const FilteredLeadsScreen({
     super.key,
     this.filter,
     this.presetLeads,
     this.presetTitle,
     this.presetSubtitle,
+    this.hideReviewFilter = false,
   });
 
   static void open(BuildContext context, LeadListFilter filter) {
@@ -43,6 +49,7 @@ class FilteredLeadsScreen extends StatefulWidget {
     required String title,
     required String subtitle,
     required List<LandLead> leads,
+    bool hideReviewFilter = false,
   }) {
     Navigator.push(
       context,
@@ -51,6 +58,7 @@ class FilteredLeadsScreen extends StatefulWidget {
           presetLeads: List<LandLead>.from(leads),
           presetTitle: title,
           presetSubtitle: subtitle,
+          hideReviewFilter: hideReviewFilter,
         ),
       ),
     );
@@ -140,6 +148,7 @@ class _FilteredLeadsScreenState extends State<FilteredLeadsScreen> {
                     onSearch: (q) => setState(() => _search = q),
                     hintText: 'Search within this list — name, village, '
                         'district, survey no…',
+                    showReviewStatus: !widget.hideReviewFilter,
                   ),
                 ],
               ],

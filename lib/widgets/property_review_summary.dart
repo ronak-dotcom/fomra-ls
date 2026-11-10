@@ -113,6 +113,7 @@ class _PropertyReviewSummaryState extends State<PropertyReviewSummary> {
                             title: 'Reviews · ${_style(f).$1}',
                             subtitle: 'Active properties — ${f.label.toLowerCase()}',
                             leads: groups[f]!,
+                            hideReviewFilter: true,
                           ),
                 ),
               ),
