@@ -46,6 +46,7 @@ import '../../widgets/management_executive_dashboard.dart';
 import '../../widgets/offline_status_banner.dart';
 import '../../widgets/monthly_target_progress_card.dart';
 import '../../widgets/portal_home_sections.dart';
+import '../../widgets/property_review_summary.dart';
 import '../../widgets/ui/app_components.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -1058,6 +1059,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
+              // Reviewers (Management, Reporting Manager, Head) see what needs
+              // reviewing; each tile opens that list.
+              if (_canApprove) ...[
+                PortalFadeSection(
+                  index: 1,
+                  child: PortalSectionCard(
+                    title: 'Property Reviews',
+                    subtitle: 'Active properties by review status · '
+                        'tap a box to open the list',
+                    icon: Icons.fact_check_outlined,
+                    child: PropertyReviewSummary(leads: _homeSummaryLeads),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+              ],
               if (_isManagement) ...[
                 _quickActionsSection(quickActions),
                 const SizedBox(height: AppSpacing.lg),
