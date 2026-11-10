@@ -4,7 +4,6 @@ import '../../analytics/monthly_target_progress.dart';
 import '../../models/employee_profile.dart';
 import '../../models/land_lead.dart';
 import '../../models/land_lead_meeting.dart';
-import '../../models/land_lead_site_visit.dart';
 import '../../models/monthly_target_submission.dart';
 import '../../services/app_store.dart';
 import '../../services/employee_service.dart';
@@ -81,7 +80,6 @@ class _TargetTabState extends State<_TargetTab> {
   Map<String, MonthlyTargetSubmission> _byEmail = const {};
   List<LandLead> _leads = const [];
   List<LandLeadMeeting> _meetings = const [];
-  List<LandLeadSiteVisit> _siteVisits = const [];
   bool _loading = true;
   String _search = '';
 
@@ -99,7 +97,6 @@ class _TargetTabState extends State<_TargetTab> {
       EmployeeService.getAll(),
       MonthlyTargetSubmissionService.allForPeriod(_period),
       ManagementBiActivityService.loadMeetings(),
-      ManagementBiActivityService.loadSiteVisits(),
     ]);
     if (!mounted) return;
     final employees = (results[0] as List<EmployeeProfile>)
@@ -112,7 +109,6 @@ class _TargetTabState extends State<_TargetTab> {
       _employees = employees;
       _byEmail = {for (final s in subs) s.employeeEmail: s};
       _meetings = results[2] as List<LandLeadMeeting>;
-      _siteVisits = results[3] as List<LandLeadSiteVisit>;
       _leads = AppStore.instance.leads;
       _loading = false;
     });
@@ -137,17 +133,7 @@ class _TargetTabState extends State<_TargetTab> {
     final selfMeetings = <DateTime>[];
     final managementMeetings = <DateTime>[];
     final brokerMeetings = <DateTime>[];
-    for (final v in _siteVisits) {
-      if (v.countsForSiteVisitTarget &&
-          myLeadIds.contains(v.leadId)) {
-        siteVisits.add(v.visitedAt);
-      }
-    }
-    // A lead added with a verified live GPS fix is itself a site visit —
-    // the same rule the executive's Home card and the dashboard use.
-    for (final l in myLeads) {
-      if (l.isLiveGpsVerified) siteVisits.add(l.addedOn);
-    }
+    siteVisits.addAll(SiteVisitTarget.datesFor(myLeads, name));
     for (final m in _meetings) {
       if (!myLeadIds.contains(m.leadId)) continue;
       (m.managementPresent ? managementMeetings : selfMeetings).add(m.metAt);

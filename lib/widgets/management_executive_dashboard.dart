@@ -2269,18 +2269,8 @@ class _TeamMonthlyTargetsCardState extends State<_TeamMonthlyTargetsCard> {
     // always matches the number shown next to it.
     final visitDates = <DateTime>[];
     final visitLeadIds = <String>{};
-    for (final v in widget.siteVisits) {
-      if (v.countsForSiteVisitTarget &&
-          v.loggedByName.trim().toLowerCase() == name &&
-          inMonth(v.visitedAt)) {
-        visitDates.add(v.visitedAt);
-        visitLeadIds.add(v.leadId);
-      }
-    }
-    for (final l in widget.leads) {
-      if (l.isLiveGpsVerified &&
-          l.createdByName.trim().toLowerCase() == name &&
-          inMonth(l.addedOn)) {
+    for (final l in SiteVisitTarget.leadsVisitedBy(widget.leads, name)) {
+      if (inMonth(l.addedOn)) {
         visitDates.add(l.addedOn);
         visitLeadIds.add(l.leadId);
       }

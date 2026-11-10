@@ -1,3 +1,5 @@
+import '../models/land_lead.dart';
+
 /// An employee's progress against the common monthly target.
 ///
 /// Pure maths over dates the caller supplies — no clock, no I/O — so the card
@@ -95,5 +97,26 @@ class MonthlyTargetProgress {
       dayOfMonth: dayOfMonth,
       actualByDay: actualByDay,
     );
+  }
+}
+
+/// Site Visits target: a site visit is the first visit to a land — the one
+/// that creates its Lead ID. So it's one per lead the executive added, dated
+/// when the lead was added. Revisits and management site visits don't count.
+abstract final class SiteVisitTarget {
+  static List<LandLead> leadsVisitedBy(
+          Iterable<LandLead> leads, String executiveName) =>
+      [
+        for (final l in leads)
+          if (_same(l.createdByName, executiveName)) l,
+      ];
+
+  static List<DateTime> datesFor(
+          Iterable<LandLead> leads, String executiveName) =>
+      [for (final l in leadsVisitedBy(leads, executiveName)) l.addedOn];
+
+  static bool _same(String a, String b) {
+    final x = a.trim().toLowerCase();
+    return x.isNotEmpty && x == b.trim().toLowerCase();
   }
 }

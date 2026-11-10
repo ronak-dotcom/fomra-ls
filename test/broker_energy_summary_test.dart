@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fomra_ls/models/land_lead.dart';
-import 'package:fomra_ls/models/land_lead_site_visit.dart';
 import 'package:fomra_ls/services/land_lead_meeting_service.dart';
 import 'package:fomra_ls/widgets/broker_energy_summary.dart';
 
@@ -51,32 +50,5 @@ void main() {
     expect(find.text('met 2/2 · 100%'), findsOneWidget);
     expect(find.text('Selvam'), findsOneWidget);
     expect(find.text('met 1/4 · 25%'), findsOneWidget);
-  });
-
-  test('management site visits count toward the target; rejected never do',
-      () {
-    LandLeadSiteVisit v(LandLeadSiteVisitType type,
-            SiteVisitApprovalStatus status) =>
-        LandLeadSiteVisit(
-          id: 'v',
-          leadId: '57',
-          visitedAt: DateTime(2026, 11, 7),
-          loggedByName: 'Devaraj',
-          createdAt: DateTime(2026, 11, 7),
-          visitType: type,
-          approvalStatus: status,
-        );
-    expect(
-        v(LandLeadSiteVisitType.management, SiteVisitApprovalStatus.approved)
-            .countsForSiteVisitTarget,
-        isTrue);
-    expect(
-        v(LandLeadSiteVisitType.employee, SiteVisitApprovalStatus.pending)
-            .countsForSiteVisitTarget,
-        isTrue);
-    expect(
-        v(LandLeadSiteVisitType.management, SiteVisitApprovalStatus.rejected)
-            .countsForSiteVisitTarget,
-        isFalse);
   });
 }

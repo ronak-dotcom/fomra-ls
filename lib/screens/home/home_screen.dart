@@ -97,7 +97,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Map<String, int> _approvedTargetValues = const {};
   List<LandLeadMeeting> _targetMeetings = const [];
   List<LeadFollowUp> _overdueFollowUps = const [];
-  List<LandLeadSiteVisit> _targetSiteVisits = const [];
   List<MonthlyTargetCategoryProgress> _monthlyCategories = const [];
 
   List<LandLead> get _noFutureActivityLeads => NoFutureActivityAnalytics.select(
@@ -243,17 +242,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _recomputeMonthlyProgress();
   }
 
-  /// Loads the meeting + employee site-visit history that feeds the per-category
+  /// Loads the meeting history that feeds the per-category
   /// progress boxes/lines. Bulk reads, scoped to the executive's visible leads
   /// at compute time. Best-effort — an empty result just shows zero achieved.
   Future<void> _loadTargetActivity() async {
-    final results = await Future.wait([
-      ManagementBiActivityService.loadMeetings(),
-      ManagementBiActivityService.loadSiteVisits(),
-    ]);
+    final meetings = await ManagementBiActivityService.loadMeetings();
     if (!mounted) return;
-    _targetMeetings = results[0] as List<LandLeadMeeting>;
-    _targetSiteVisits = results[1] as List<LandLeadSiteVisit>;
+    _targetMeetings = meetings;
     _recomputeMonthlyProgress();
   }
 
@@ -287,20 +282,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (_monthlyTargetFromEmployee && tv.isNotEmpty) {
       final myName =
           (AuthService.instance.currentUser?.fullName ?? '').trim().toLowerCase();
-      final visitDates = [
-        for (final v in _targetSiteVisits)
-          if (v.countsForSiteVisitTarget &&
-              visibleIds.contains(v.leadId))
-            v.visitedAt,
-        // A lead created with a verified live GPS fix means the person was
-        // physically at the site at that moment — that's a site visit in
-        // its own right, not just a data-entry event. See
-        // LandLead.isLiveGpsVerified for what "verified" means here.
-        for (final l in visible)
-          if (l.isLiveGpsVerified &&
-              l.createdByName.trim().toLowerCase() == myName)
-            l.addedOn,
-      ];
+      final visitDates = SiteVisitTarget.datesFor(visible, myName);
       // Self vs Management Meetings is a real distinction, not a relabeling —
       // it's exactly what land_lead_meetings.management_present already
       // records (see meeting_log_dialog.dart's "Management present" toggle).
