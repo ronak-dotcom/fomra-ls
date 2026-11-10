@@ -39,6 +39,12 @@ class LandLeadSiteVisit {
   final String loggedByName;
   final LandLeadSiteVisitType visitType;
   final SiteVisitApprovalStatus approvalStatus;
+
+  /// Counts toward the visiting executive's monthly Site Visits target.
+  /// A management site visit counts too — the executive was at the site
+  /// with management — but a rejected visit never does.
+  bool get countsForSiteVisitTarget =>
+      approvalStatus != SiteVisitApprovalStatus.rejected;
   final String managementNotes;
   final DateTime? reviewedAt;
   final String reviewedByName;

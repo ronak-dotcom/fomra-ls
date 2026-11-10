@@ -138,10 +138,15 @@ class _TargetTabState extends State<_TargetTab> {
     final managementMeetings = <DateTime>[];
     final brokerMeetings = <DateTime>[];
     for (final v in _siteVisits) {
-      if (v.visitType == LandLeadSiteVisitType.employee &&
+      if (v.countsForSiteVisitTarget &&
           myLeadIds.contains(v.leadId)) {
         siteVisits.add(v.visitedAt);
       }
+    }
+    // A lead added with a verified live GPS fix is itself a site visit —
+    // the same rule the executive's Home card and the dashboard use.
+    for (final l in myLeads) {
+      if (l.isLiveGpsVerified) siteVisits.add(l.addedOn);
     }
     for (final m in _meetings) {
       if (!myLeadIds.contains(m.leadId)) continue;

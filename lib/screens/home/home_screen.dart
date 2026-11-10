@@ -46,6 +46,7 @@ import '../../widgets/management_executive_dashboard.dart';
 import '../../widgets/offline_status_banner.dart';
 import '../../widgets/monthly_target_progress_card.dart';
 import '../../widgets/portal_home_sections.dart';
+import '../../widgets/broker_energy_summary.dart';
 import '../../widgets/property_review_summary.dart';
 import '../../widgets/ui/app_components.dart';
 
@@ -288,7 +289,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           (AuthService.instance.currentUser?.fullName ?? '').trim().toLowerCase();
       final visitDates = [
         for (final v in _targetSiteVisits)
-          if (v.visitType == LandLeadSiteVisitType.employee &&
+          if (v.countsForSiteVisitTarget &&
               visibleIds.contains(v.leadId))
             v.visitedAt,
         // A lead created with a verified live GPS fix means the person was
@@ -1075,6 +1076,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const SizedBox(height: AppSpacing.lg),
               ],
               if (_isManagement) ...[
+                PortalFadeSection(
+                  index: 2,
+                  child: PortalSectionCard(
+                    title: 'Brokers · Energisers & Drainers',
+                    subtitle: 'Share of each broker\'s lands where we met the '
+                        'actual Land Owner · tap a group for the list',
+                    icon: Icons.handshake_outlined,
+                    child: BrokerEnergySummary(leads: leads),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
                 _quickActionsSection(quickActions),
                 const SizedBox(height: AppSpacing.lg),
                 PortalFadeSection(
