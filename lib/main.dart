@@ -102,7 +102,7 @@ class FomraLSApp extends StatelessWidget {
         theme: appTheme(),
         darkTheme: appThemeDark(),
         themeMode: themeMode,
-        // Slightly larger global type (~8%) without touching per-widget sizes,
+        // Larger global type (~12%) without touching per-widget sizes,
         // so existing spacing/layout is preserved. Still honours the OS
         // accessibility setting, just with a raised floor.
         builder: (context, child) {
@@ -110,7 +110,7 @@ class FomraLSApp extends StatelessWidget {
           return MediaQuery(
             data: mq.copyWith(
               textScaler: mq.textScaler.clamp(
-                minScaleFactor: 1.08,
+                minScaleFactor: 1.12,
                 maxScaleFactor: 1.3,
               ),
             ),

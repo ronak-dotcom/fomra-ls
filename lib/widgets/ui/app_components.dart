@@ -1147,7 +1147,12 @@ class _AnimatedCounterState extends State<AnimatedCounter>
     final effective = (widget.style ??
             Theme.of(context).textTheme.headlineLarge ??
             const TextStyle())
-        .copyWith(fontWeight: FontWeight.w800, color: context.fomraTextPrimary);
+        // Honour a colour the caller passes (e.g. white on a dark banner);
+        // only default it when none is given.
+        .copyWith(
+          fontWeight: FontWeight.w800,
+          color: widget.style?.color ?? context.fomraTextPrimary,
+        );
     return AnimatedBuilder(
       animation: _curve,
       builder: (context, _) {

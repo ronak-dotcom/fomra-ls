@@ -41,7 +41,7 @@ class AppDrawer extends StatelessWidget {
     return Drawer(
       // Blue rail (light) / sidebar surface (dark) — no white flash behind the
       // gradient — so the white icons read the same as the web side nav.
-      backgroundColor: isDark ? context.fomraSidebarBg : AppColors.primaryDark,
+      backgroundColor: isDark ? context.fomraSidebarBg : AppColors.ink,
       child: DecoratedBox(
         decoration: BoxDecoration(gradient: isDark ? null : _drawerGradient),
         child: Column(
