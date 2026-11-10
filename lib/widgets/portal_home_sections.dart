@@ -559,7 +559,7 @@ class PortalQuickActionsGrid extends StatelessWidget {
                   SizedBox(
                     width: cardW,
                     // Stacked icon + label needs a bit more height in a grid.
-                    height: forcedCols != null ? 100 : 112,
+                    height: forcedCols != null ? 110 : 112,
                     child: _QuickActionCard(data: action),
                   ),
               ],
@@ -693,14 +693,14 @@ class _QuickActionCardState extends State<_QuickActionCard> {
         : Row(
             children: [
               iconBox,
-              const SizedBox(width: 24),
+              const SizedBox(width: 14),
               Expanded(
                 child: Text(
                   data.label,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 14.5,
                     fontWeight: FontWeight.w600,
                     letterSpacing: -0.2,
                     height: 1.2,

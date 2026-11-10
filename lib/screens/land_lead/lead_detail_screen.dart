@@ -76,11 +76,10 @@ int _leadAgeDaysFromReceived(DateTime receivedOn) {
   return today.difference(receivedDay).inDays;
 }
 
-String _formatReceivedOn(DateTime receivedOn) {
-  final local = receivedOn.toLocal();
-  return '${local.day}/${local.month}/${local.year} '
-      '${local.hour}:${local.minute.toString().padLeft(2, '0')}';
-}
+/// "9 Nov 2026 • 2:35 PM" — the app-wide date style. The old "9/11/2026
+/// 14:35" read as either 9 Nov or 11 Sep.
+String _formatReceivedOn(DateTime receivedOn) =>
+    LeadFollowUp.formatDateTime(receivedOn);
 
 /// Realistic sample activity for the timeline, used ONLY in debug/demo builds
 /// when a lead has no real records (see the kDebugMode guard at the call site).
@@ -3542,17 +3541,12 @@ class _ActivityTimeline extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(e.title,
-                            style: const TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w700)),
+                            style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                                color: context.fomraTextPrimary)),
                         const SizedBox(height: 2),
-                        Text(
-                          e.subtitle,
-                          style: TextStyle(
-                            fontSize: 12,
-                            height: 1.35,
-                            color: context.fomraTextSecondary,
-                          ),
-                        ),
+                        _TimelineDetails(text: e.subtitle),
                       ],
                     ),
                   ),
@@ -3583,23 +3577,128 @@ class _ActivityTimeline extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(e.title,
-                            style: const TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w700)),
+                            style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                                color: context.fomraTextPrimary)),
                         const SizedBox(height: 2),
-                        Text(
-                          e.subtitle,
-                          style: TextStyle(
-                            fontSize: 12,
-                            height: 1.35,
-                            color: context.fomraTextSecondary,
-                          ),
-                        ),
+                        _TimelineDetails(text: e.subtitle),
                       ],
                     ),
                   ),
                 ],
               ),
             ),
+      ],
+    );
+  }
+}
+
+/// An activity entry's detail lines, each styled by what it is so the eye
+/// can pick them out: the date small and muted, a person's name bold in the
+/// accent colour, a short status in its outcome colour, and everything else
+/// (notes, file names, durations) as normal readable text. Lines are
+/// recognised by content rather than position, because each activity type
+/// orders its lines differently.
+class _TimelineDetails extends StatelessWidget {
+  final String text;
+  const _TimelineDetails({required this.text});
+
+  static final _date =
+      RegExp(r'^\d{1,2} [A-Z][a-z]{2} \d{4} • \d{1,2}:\d{2} [AP]M$');
+
+  static Color? _statusColor(String line) {
+    final l = line.toLowerCase();
+    if (line.length > 40) return null;
+    if (l.startsWith('not answered') ||
+        l.startsWith('rejected') ||
+        l.startsWith('missed')) {
+      return AppColors.error;
+    }
+    if (l.startsWith('answered') ||
+        l.startsWith('approved') ||
+        l.startsWith('completed') ||
+        l.startsWith('verified')) {
+      return AppColors.success;
+    }
+    if (l.startsWith('pending') ||
+        l.startsWith('scheduled') ||
+        l.startsWith('submitted')) {
+      return AppColors.warning;
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final people = {
+      'management',
+      for (final e in AppStore.instance.employees)
+        e.fullName.trim().toLowerCase(),
+    }..remove('');
+    final lines = text
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final line in lines)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: () {
+              if (_date.hasMatch(line)) {
+                return Text(
+                  line,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: context.fomraTextTertiary,
+                  ),
+                );
+              }
+              if (people.contains(line.toLowerCase())) {
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.person_rounded,
+                        size: 13, color: AppColors.primary),
+                    const SizedBox(width: 3),
+                    Flexible(
+                      child: Text(
+                        line,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }
+              final status = _statusColor(line);
+              if (status != null) {
+                return Text(
+                  line,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: status,
+                  ),
+                );
+              }
+              return Text(
+                line,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.4,
+                  color: context.fomraTextPrimary.withValues(alpha: 0.85),
+                ),
+              );
+            }(),
+          ),
       ],
     );
   }
