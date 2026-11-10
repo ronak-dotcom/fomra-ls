@@ -22,6 +22,7 @@ class LeadFilterBar extends StatefulWidget {
   final String hintText;
   final bool showLeadSource;
   final bool showPendingStatus;
+  final bool showReviewStatus;
 
   const LeadFilterBar({
     super.key,
@@ -31,6 +32,7 @@ class LeadFilterBar extends StatefulWidget {
     this.hintText = 'Search by owner, survey number, location...',
     this.showLeadSource = true,
     this.showPendingStatus = true,
+    this.showReviewStatus = true,
   });
 
   @override
@@ -69,6 +71,7 @@ class _LeadFilterBarState extends State<LeadFilterBar> {
       employeeNames: employeeNames,
       showLeadSource: widget.showLeadSource,
       showPendingStatus: widget.showPendingStatus,
+      showReviewStatus: widget.showReviewStatus,
     );
     if (applied == null || !mounted) return;
     widget.filters.assignFrom(applied);

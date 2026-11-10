@@ -843,6 +843,7 @@ Future<LandWorkspaceFilters?> showLandWorkspaceFilterPanel({
   List<String> employeeNames = const [],
   bool showLeadSource = true,
   bool showPendingStatus = true,
+  bool showReviewStatus = true,
   bool brokerMultiSelect = false,
 }) {
   return showGeneralDialog<LandWorkspaceFilters>(
@@ -859,6 +860,7 @@ Future<LandWorkspaceFilters?> showLandWorkspaceFilterPanel({
           employeeNames: employeeNames,
           showLeadSource: showLeadSource,
           showPendingStatus: showPendingStatus,
+          showReviewStatus: showReviewStatus,
           brokerMultiSelect: brokerMultiSelect,
         ),
       );
@@ -884,6 +886,7 @@ class _LandWorkspaceFilterPanel extends StatefulWidget {
   final List<String> employeeNames;
   final bool showLeadSource;
   final bool showPendingStatus;
+  final bool showReviewStatus;
   final bool brokerMultiSelect;
 
   const _LandWorkspaceFilterPanel({
@@ -891,6 +894,7 @@ class _LandWorkspaceFilterPanel extends StatefulWidget {
     required this.employeeNames,
     this.showLeadSource = true,
     this.showPendingStatus = true,
+    this.showReviewStatus = true,
     this.brokerMultiSelect = false,
   });
 
@@ -960,337 +964,340 @@ class _LandWorkspaceFilterPanelState extends State<_LandWorkspaceFilterPanel> {
               boxShadow: AppColors.elevatedShadow,
             ),
             clipBehavior: Clip.antiAlias,
-            child: Column(
-              children: [
-                // Sticky header
-                Container(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 8, 12),
-                  decoration: BoxDecoration(
-                    color: context.fomraSurface,
-                    border: Border(
-                      bottom: BorderSide(color: context.fomraBorder),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Filters',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: context.fomraTextPrimary,
+            // A Material surface under the rows so the checkbox tiles' ink
+            // splashes show (the coloured box would otherwise hide them).
+            child: Material(
+              type: MaterialType.transparency,
+              child: Column(
+                  children: [
+                    // Sticky header
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 8, 12),
+                      decoration: BoxDecoration(
+                        color: context.fomraSurface,
+                        border: Border(
+                          bottom: BorderSide(color: context.fomraBorder),
                         ),
                       ),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: () => setState(_draft.clear),
-                        child: const Text('Clear All'),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Filters',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: context.fomraTextPrimary,
+                            ),
+                          ),
+                          const Spacer(),
+                          TextButton(
+                            onPressed: () => setState(_draft.clear),
+                            child: const Text('Clear All'),
+                          ),
+                          IconButton(
+                            tooltip: 'Close',
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                        ],
                       ),
-                      IconButton(
-                        tooltip: 'Close',
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                    children: [
-                      _sectionTitle('Lead Status'),
-                      const SizedBox(height: 8),
-                      MultiSelectField<LeadStatus>(
-                        label: 'Stage',
-                        options: LandWorkspaceFilters.statusOptions,
-                        selected: _draft.statuses,
-                        labelOf: (s) => s.label,
-                        onChanged: (v) => setState(() {
-                          _draft.statuses
-                            ..clear()
-                            ..addAll(v);
-                        }),
-                      ),
-                      const SizedBox(height: 8),
-                      const Divider(height: 28),
-                      _sectionTitle('Property Type'),
-                      const SizedBox(height: 4),
-                      ...LandWorkspaceFilters.propertyTypeOptions.map((t) {
-                        final checked = _draft.landTypes.contains(t);
-                        return _checkTile(
-                          label: t.label,
-                          checked: checked,
-                          onChanged: (v) => setState(() {
-                            if (v) {
-                              _draft.landTypes.add(t);
-                            } else {
-                              _draft.landTypes.remove(t);
-                            }
-                          }),
-                        );
-                      }),
-                      if (widget.showLeadSource) ...[
-                        const Divider(height: 28),
-                        _sectionTitle('Lead Source'),
-                        const SizedBox(height: 4),
-                        ...LandWorkspaceFilters.sourceOptions.map((s) {
-                          final checked = _draft.sources.contains(s);
-                          return _checkTile(
-                            label: s.label,
-                            checked: checked,
+                    ),
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                        children: [
+                          _sectionTitle('Lead Status'),
+                          const SizedBox(height: 8),
+                          MultiSelectField<LeadStatus>(
+                            label: 'Stage',
+                            options: LandWorkspaceFilters.statusOptions,
+                            selected: _draft.statuses,
+                            labelOf: (s) => s.label,
                             onChanged: (v) => setState(() {
-                              if (v) {
-                                _draft.sources.add(s);
-                              } else {
-                                _draft.sources.remove(s);
-                              }
+                              _draft.statuses
+                                ..clear()
+                                ..addAll(v);
                             }),
-                          );
-                        }),
-                      ],
-                      const Divider(height: 28),
-                      _sectionTitle('Priority'),
-                      const SizedBox(height: 4),
-                      _checkTile(
-                        label: 'High',
-                        checked: _draft.highPriority,
-                        onChanged: (v) =>
-                            setState(() => _draft.highPriority = v),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 12, bottom: 4),
-                        child: Text(
-                          'New and Negotiation leads',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: context.fomraTextSecondary,
                           ),
-                        ),
-                      ),
-                      const Divider(height: 28),
-                      _sectionTitle('Location'),
-                      const SizedBox(height: 8),
-                      MultiSelectField<String>(
-                        label: 'District',
-                        options: _distinctField((l) => l.district),
-                        selected: _draft.districts,
-                        labelOf: (s) => s,
-                        onChanged: (v) => setState(() {
-                          _draft.districts
-                            ..clear()
-                            ..addAll(v);
-                        }),
-                      ),
-                      const SizedBox(height: 10),
-                      MultiSelectField<String>(
-                        label: 'Taluk',
-                        options: _distinctField((l) => l.taluk),
-                        selected: _draft.taluks,
-                        labelOf: (s) => s,
-                        onChanged: (v) => setState(() {
-                          _draft.taluks
-                            ..clear()
-                            ..addAll(v);
-                        }),
-                      ),
-                      const SizedBox(height: 10),
-                      MultiSelectField<String>(
-                        label: 'Village',
-                        options: _distinctField((l) => l.village),
-                        selected: _draft.villages,
-                        labelOf: (s) => s,
-                        onChanged: (v) => setState(() {
-                          _draft.villages
-                            ..clear()
-                            ..addAll(v);
-                        }),
-                      ),
-                      const Divider(height: 28),
-                      _sectionTitle('Broker'),
-                      const SizedBox(height: 8),
-                      MultiSelectField<String>(
-                        label: 'Broker',
-                        options: _distinctField((l) => l.brokerName),
-                        selected: _draft.brokers,
-                        labelOf: (s) => s,
-                        onChanged: (v) => setState(() {
-                          _draft.brokers
-                            ..clear()
-                            ..addAll(v);
-                        }),
-                      ),
-                      if (widget.employeeNames.isNotEmpty) ...[
-                        const Divider(height: 28),
-                        _sectionTitle('Executive'),
-                        const SizedBox(height: 8),
-                        MultiSelectField<String>(
-                          label: 'Executive',
-                          options: widget.employeeNames,
-                          selected: _draft.assignedEmployees,
-                          labelOf: (s) => s,
-                          onChanged: (v) => setState(() {
-                            _draft.assignedEmployees
-                              ..clear()
-                              ..addAll(v);
+                          const SizedBox(height: 8),
+                          const Divider(height: 28),
+                          _sectionTitle('Property Type'),
+                          const SizedBox(height: 4),
+                          ...LandWorkspaceFilters.propertyTypeOptions.map((t) {
+                            final checked = _draft.landTypes.contains(t);
+                            return _checkTile(
+                              label: t.label,
+                              checked: checked,
+                              onChanged: (v) => setState(() {
+                                if (v) {
+                                  _draft.landTypes.add(t);
+                                } else {
+                                  _draft.landTypes.remove(t);
+                                }
+                              }),
+                            );
                           }),
-                        ),
-                      ],
-                      const Divider(height: 28),
-                      _sectionTitle('Acres'),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              initialValue: _draft.acresMin?.toString() ?? '',
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                      decimal: true),
-                              decoration: InputDecoration(
-                                labelText: 'Min',
-                                filled: true,
-                                fillColor: context.fomraSurfaceVar,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide.none,
-                                ),
+                          if (widget.showLeadSource) ...[
+                            const Divider(height: 28),
+                            _sectionTitle('Lead Source'),
+                            const SizedBox(height: 4),
+                            ...LandWorkspaceFilters.sourceOptions.map((s) {
+                              final checked = _draft.sources.contains(s);
+                              return _checkTile(
+                                label: s.label,
+                                checked: checked,
+                                onChanged: (v) => setState(() {
+                                  if (v) {
+                                    _draft.sources.add(s);
+                                  } else {
+                                    _draft.sources.remove(s);
+                                  }
+                                }),
+                              );
+                            }),
+                          ],
+                          const Divider(height: 28),
+                          _sectionTitle('Priority'),
+                          const SizedBox(height: 4),
+                          _checkTile(
+                            label: 'High',
+                            checked: _draft.highPriority,
+                            onChanged: (v) =>
+                                setState(() => _draft.highPriority = v),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 12, bottom: 4),
+                            child: Text(
+                              'New and Negotiation leads',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: context.fomraTextSecondary,
                               ),
-                              onChanged: (v) => setState(() {
-                                _draft.acresMin = double.tryParse(v.trim());
-                              }),
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: TextFormField(
-                              initialValue: _draft.acresMax?.toString() ?? '',
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                      decimal: true),
-                              decoration: InputDecoration(
-                                labelText: 'Max',
-                                filled: true,
-                                fillColor: context.fomraSurfaceVar,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide.none,
-                                ),
-                              ),
+                          const Divider(height: 28),
+                          _sectionTitle('Location'),
+                          const SizedBox(height: 8),
+                          MultiSelectField<String>(
+                            label: 'District',
+                            options: _distinctField((l) => l.district),
+                            selected: _draft.districts,
+                            labelOf: (s) => s,
+                            onChanged: (v) => setState(() {
+                              _draft.districts
+                                ..clear()
+                                ..addAll(v);
+                            }),
+                          ),
+                          const SizedBox(height: 10),
+                          MultiSelectField<String>(
+                            label: 'Taluk',
+                            options: _distinctField((l) => l.taluk),
+                            selected: _draft.taluks,
+                            labelOf: (s) => s,
+                            onChanged: (v) => setState(() {
+                              _draft.taluks
+                                ..clear()
+                                ..addAll(v);
+                            }),
+                          ),
+                          const SizedBox(height: 10),
+                          MultiSelectField<String>(
+                            label: 'Village',
+                            options: _distinctField((l) => l.village),
+                            selected: _draft.villages,
+                            labelOf: (s) => s,
+                            onChanged: (v) => setState(() {
+                              _draft.villages
+                                ..clear()
+                                ..addAll(v);
+                            }),
+                          ),
+                          const Divider(height: 28),
+                          _sectionTitle('Broker'),
+                          const SizedBox(height: 8),
+                          MultiSelectField<String>(
+                            label: 'Broker',
+                            options: _distinctField((l) => l.brokerName),
+                            selected: _draft.brokers,
+                            labelOf: (s) => s,
+                            onChanged: (v) => setState(() {
+                              _draft.brokers
+                                ..clear()
+                                ..addAll(v);
+                            }),
+                          ),
+                          if (widget.employeeNames.isNotEmpty) ...[
+                            const Divider(height: 28),
+                            _sectionTitle('Executive'),
+                            const SizedBox(height: 8),
+                            MultiSelectField<String>(
+                              label: 'Executive',
+                              options: widget.employeeNames,
+                              selected: _draft.assignedEmployees,
+                              labelOf: (s) => s,
                               onChanged: (v) => setState(() {
-                                _draft.acresMax = double.tryParse(v.trim());
+                                _draft.assignedEmployees
+                                  ..clear()
+                                  ..addAll(v);
                               }),
                             ),
+                          ],
+                          const Divider(height: 28),
+                          _sectionTitle('Acres'),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  initialValue: _draft.acresMin?.toString() ?? '',
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                          decimal: true),
+                                  decoration: InputDecoration(
+                                    labelText: 'Min',
+                                    filled: true,
+                                    fillColor: context.fomraSurfaceVar,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                  ),
+                                  onChanged: (v) => setState(() {
+                                    _draft.acresMin = double.tryParse(v.trim());
+                                  }),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: TextFormField(
+                                  initialValue: _draft.acresMax?.toString() ?? '',
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                          decimal: true),
+                                  decoration: InputDecoration(
+                                    labelText: 'Max',
+                                    filled: true,
+                                    fillColor: context.fomraSurfaceVar,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                  ),
+                                  onChanged: (v) => setState(() {
+                                    _draft.acresMax = double.tryParse(v.trim());
+                                  }),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (widget.showPendingStatus) ...[
+                            const Divider(height: 28),
+                            _sectionTitle('Pending Status'),
+                            const SizedBox(height: 8),
+                            _choiceChips<String>(
+                              options: [
+                                for (final o
+                                    in LandWorkspaceFilters.pendingStatusOptions)
+                                  (value: o.value, label: o.label),
+                              ],
+                              selected: _draft.pendingStatus,
+                              onSelected: (v) =>
+                                  setState(() => _draft.pendingStatus = v),
+                            ),
+                          ],
+                          // Hidden on lists already defined by review status (the
+                          // dashboard's review boxes) — there it could only
+                          // contradict the list and empty it.
+                          if (widget.showReviewStatus) ...[
+                            const Divider(height: 28),
+                            _sectionTitle('Property Review'),
+                            const SizedBox(height: 8),
+                            _choiceChips<ReviewFilter>(
+                              options: [
+                                for (final r in ReviewFilter.values)
+                                  (value: r, label: r.chipLabel),
+                              ],
+                              selected: _draft.reviewStatus,
+                              onSelected: (v) =>
+                                  setState(() => _draft.reviewStatus = v),
+                            ),
+                          ],
+                          const Divider(height: 28),
+                          _sectionTitle('Created Date Range'),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _dateButton(
+                                  label: 'From',
+                                  value: _dateLabel(_draft.createdFrom),
+                                  onTap: () => _pickDate(isFrom: true),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: _dateButton(
+                                  label: 'To',
+                                  value: _dateLabel(_draft.createdTo),
+                                  onTap: () => _pickDate(isFrom: false),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                      if (widget.showPendingStatus) ...[
-                        const Divider(height: 28),
-                        _sectionTitle('Pending Status'),
-                        const SizedBox(height: 8),
-                        _radioTile(
-                          label: 'Any',
-                          selected: _draft.pendingStatus == null,
-                          onTap: () =>
-                              setState(() => _draft.pendingStatus = null),
-                        ),
-                        ...LandWorkspaceFilters.pendingStatusOptions.map((o) {
-                          return _radioTile(
-                            label: o.label,
-                            selected: _draft.pendingStatus == o.value,
-                            onTap: () =>
-                                setState(() => _draft.pendingStatus = o.value),
-                          );
-                        }),
-                      ],
-                      const Divider(height: 28),
-                      _sectionTitle('Property Review'),
-                      const SizedBox(height: 8),
-                      _radioTile(
-                        label: 'Any',
-                        selected: _draft.reviewStatus == null,
-                        onTap: () =>
-                            setState(() => _draft.reviewStatus = null),
-                      ),
-                      for (final r in ReviewFilter.values)
-                        _radioTile(
-                          label: r.label,
-                          selected: _draft.reviewStatus == r,
-                          onTap: () => setState(() => _draft.reviewStatus = r),
-                        ),
-                      const Divider(height: 28),
-                      _sectionTitle('Created Date Range'),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _dateButton(
-                              label: 'From',
-                              value: _dateLabel(_draft.createdFrom),
-                              onTap: () => _pickDate(isFrom: true),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _dateButton(
-                              label: 'To',
-                              value: _dateLabel(_draft.createdTo),
-                              onTap: () => _pickDate(isFrom: false),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                // Sticky footer
-                Container(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                  decoration: BoxDecoration(
-                    color: context.fomraSurface,
-                    border: Border(
-                      top: BorderSide(color: context.fomraBorder),
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => setState(_draft.clear),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                          child: const Text(
-                            'Reset',
-                            style: TextStyle(fontWeight: FontWeight.w700),
-                          ),
+                    // Sticky footer
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                      decoration: BoxDecoration(
+                        color: context.fomraSurface,
+                        border: Border(
+                          top: BorderSide(color: context.fomraBorder),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        flex: 2,
-                        child: FilledButton(
-                          onPressed: () =>
-                              Navigator.pop(context, _draft.copy()),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => setState(_draft.clear),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: const Text(
+                                'Reset',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
                             ),
                           ),
-                          child: const Text(
-                            'Apply Filters',
-                            style: TextStyle(fontWeight: FontWeight.w700),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: FilledButton(
+                              onPressed: () =>
+                                  Navigator.pop(context, _draft.copy()),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: const Text(
+                                'Apply Filters',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
             ),
           ),
         ),
@@ -1310,48 +1317,41 @@ class _LandWorkspaceFilterPanelState extends State<_LandWorkspaceFilterPanel> {
     );
   }
 
-  Widget _radioTile({
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-    Widget? leading,
+  /// Single-select chips with an "Any" chip — compact replacement for a long
+  /// column of radio rows.
+  Widget _choiceChips<T>({
+    required List<({T value, String label})> options,
+    required T? selected,
+    required ValueChanged<T?> onSelected,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-        child: Row(
-          children: [
-            Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: selected ? AppColors.primary : context.fomraBorder,
-                  width: selected ? 6 : 1.5,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            if (leading != null) ...[
-              leading,
-              const SizedBox(width: 10),
-            ],
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: context.fomraTextPrimary,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    Widget chip(String label, bool isSelected, VoidCallback onTap) =>
+        ChoiceChip(
+          label: Text(label),
+          selected: isSelected,
+          onSelected: (_) => onTap(),
+          showCheckmark: false,
+          visualDensity: VisualDensity.compact,
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          labelStyle: TextStyle(
+            fontSize: 12.5,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected ? AppColors.primary : context.fomraTextPrimary,
+          ),
+          selectedColor: AppColors.primary.withValues(alpha: 0.12),
+          side: BorderSide(
+            color: isSelected
+                ? AppColors.primary.withValues(alpha: 0.5)
+                : context.fomraBorder,
+          ),
+        );
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        chip('Any', selected == null, () => onSelected(null)),
+        for (final o in options)
+          chip(o.label, selected == o.value, () => onSelected(o.value)),
+      ],
     );
   }
 
