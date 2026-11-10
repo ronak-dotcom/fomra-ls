@@ -5,19 +5,26 @@ import '../theme/app_theme.dart';
 
 /// How much a broker's lands turn into real land owner meetings.
 ///
-/// - **Energy Giver** — meetings with the actual Land Owner on more than 60%
+/// - **Energiser** (Energy Giver) — meetings with the actual Land Owner on more than 60%
 ///   of the lands they gave.
 /// - **Average** — 40% to 60%.
-/// - **Energy Drainer** — under 40%: gives lands but mostly no owner meeting.
+/// - **Drainer** (Energy Drainer) — under 40%: gives lands but mostly no owner meeting.
 ///
 /// No minimum number of lands: a broker with one land is rated on that one.
 enum BrokerEnergy { giver, average, drainer }
 
 extension BrokerEnergyX on BrokerEnergy {
   String get label => switch (this) {
-        BrokerEnergy.giver => 'Energy Giver',
+        BrokerEnergy.giver => 'Energiser',
         BrokerEnergy.average => 'Average',
-        BrokerEnergy.drainer => 'Energy Drainer',
+        BrokerEnergy.drainer => 'Drainer',
+      };
+
+  /// Group heading ("Energisers").
+  String get plural => switch (this) {
+        BrokerEnergy.giver => 'Energisers',
+        BrokerEnergy.average => 'Average',
+        BrokerEnergy.drainer => 'Drainers',
       };
 
   String get rule => switch (this) {

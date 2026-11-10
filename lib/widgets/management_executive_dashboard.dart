@@ -2270,7 +2270,7 @@ class _TeamMonthlyTargetsCardState extends State<_TeamMonthlyTargetsCard> {
     final visitDates = <DateTime>[];
     final visitLeadIds = <String>{};
     for (final v in widget.siteVisits) {
-      if (v.visitType == LandLeadSiteVisitType.employee &&
+      if (v.countsForSiteVisitTarget &&
           v.loggedByName.trim().toLowerCase() == name &&
           inMonth(v.visitedAt)) {
         visitDates.add(v.visitedAt);

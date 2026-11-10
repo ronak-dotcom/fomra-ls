@@ -75,7 +75,10 @@ extension BrokerSortX on BrokerSort {
 
 /// Broker performance: leads, conversions, success rate.
 class BrokerManagementScreen extends StatefulWidget {
-  const BrokerManagementScreen({super.key});
+  /// Opens with this Energiser / Average / Drainer group selected.
+  final BrokerEnergy? initialEnergy;
+
+  const BrokerManagementScreen({super.key, this.initialEnergy});
 
   @override
   State<BrokerManagementScreen> createState() => _BrokerManagementScreenState();
@@ -90,7 +93,7 @@ class _BrokerManagementScreenState extends State<BrokerManagementScreen> {
   /// aggregated from.
   final LandWorkspaceFilters _filters = LandWorkspaceFilters();
   BrokerStatus? _status;
-  BrokerEnergy? _energy;
+  late BrokerEnergy? _energy = widget.initialEnergy;
   BrokerSort _sort = BrokerSort.ranking;
 
   /// Leads that had a meeting with the actual Land Owner; null while loading.
@@ -617,7 +620,7 @@ class _EnergyTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      energy.label,
+                      energy.plural,
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
