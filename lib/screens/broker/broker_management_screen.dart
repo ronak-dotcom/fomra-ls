@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../analytics/broker_energy.dart';
 import '../../analytics/business_module_metrics.dart';
 import '../../models/employee_profile.dart';
 import '../../models/land_lead.dart';
@@ -49,17 +50,21 @@ BrokerStatus brokerStatusOf(BrokerPerformanceRow row) {
   return BrokerStatus.dormant;
 }
 
-enum BrokerSort { leads, conversions, successRate, name }
+enum BrokerSort { ranking, leads, conversions, successRate, name }
 
 extension BrokerSortX on BrokerSort {
   String get label => switch (this) {
+        BrokerSort.ranking => 'Ranking',
         BrokerSort.leads => 'Most leads',
         BrokerSort.conversions => 'Most conversions',
         BrokerSort.successRate => 'Success rate',
         BrokerSort.name => 'Name (A–Z)',
       };
 
+  /// [ranking] is ordered by the screen from the energy rows; here it keeps
+  /// the incoming order.
   int compare(BrokerPerformanceRow a, BrokerPerformanceRow b) => switch (this) {
+        BrokerSort.ranking => 0,
         BrokerSort.leads => b.leads.compareTo(a.leads),
         BrokerSort.conversions => b.conversions.compareTo(a.conversions),
         BrokerSort.successRate => b.successRate.compareTo(a.successRate),
@@ -85,11 +90,16 @@ class _BrokerManagementScreenState extends State<BrokerManagementScreen> {
   /// aggregated from.
   final LandWorkspaceFilters _filters = LandWorkspaceFilters();
   BrokerStatus? _status;
-  BrokerSort _sort = BrokerSort.leads;
+  BrokerEnergy? _energy;
+  BrokerSort _sort = BrokerSort.ranking;
+
+  /// Leads that had a meeting with the actual Land Owner; null while loading.
+  Set<String>? _ownerMetIds;
 
   @override
   void initState() {
     super.initState();
+    _loadOwnerMeetings();
     AppStore.instance.addListener(_rebuild);
     // Review status is a filter here; load it and refilter when it changes.
     LeadReviewIndex.instance.addListener(_rebuild);
@@ -104,6 +114,15 @@ class _BrokerManagementScreenState extends State<BrokerManagementScreen> {
   }
 
   void _rebuild() => setState(() {});
+
+  Future<void> _loadOwnerMeetings() async {
+    try {
+      final ids = await LandLeadMeetingService.leadIdsWithLandOwnerMeeting();
+      if (mounted) setState(() => _ownerMetIds = ids);
+    } catch (_) {
+      if (mounted) setState(() => _ownerMetIds = <String>{});
+    }
+  }
 
   bool get _isManagement => AuthService.instance.isManagement;
 
@@ -122,7 +141,10 @@ class _BrokerManagementScreenState extends State<BrokerManagementScreen> {
 
   /// Broker Status and Sort live on this screen; the rest are the shared
   /// panel's, so the count in the Filter button reflects everything applied.
-  int get _activeFilterCount => _filters.activeCount + (_status == null ? 0 : 1);
+  int get _activeFilterCount =>
+      _filters.activeCount +
+      (_status == null ? 0 : 1) +
+      (_energy == null ? 0 : 1);
 
   Future<void> _openFilterPanel() async {
     final applied = await showLandWorkspaceFilterPanel(
@@ -144,6 +166,7 @@ class _BrokerManagementScreenState extends State<BrokerManagementScreen> {
   void _clearAllFilters() => setState(() {
         _filters.clear();
         _status = null;
+        _energy = null;
       });
 
   /// Leads feeding the broker rows, narrowed by the shared filter panel.
@@ -153,14 +176,43 @@ class _BrokerManagementScreenState extends State<BrokerManagementScreen> {
   @override
   Widget build(BuildContext context) {
     final q = _query.trim().toLowerCase();
-    final rows = BrokerPerformanceAnalytics.compute(_filteredLeads)
+    final metIds = _ownerMetIds;
+    final energyRows = metIds == null
+        ? const <BrokerEnergyRow>[]
+        : BrokerEnergyAnalytics.compute(_filteredLeads, metIds);
+    final energyOf = {
+      for (final e in energyRows) e.name.toLowerCase(): e,
+    };
+    final rankOf = {
+      for (var i = 0; i < energyRows.length; i++)
+        energyRows[i].name.toLowerCase(): i + 1,
+    };
+    final searched = BrokerPerformanceAnalytics.compute(_filteredLeads)
         .where((r) =>
             q.isEmpty ||
             r.name.toLowerCase().contains(q) ||
             r.contact.toLowerCase().contains(q))
         .where((r) => _status == null || brokerStatusOf(r) == _status)
-        .toList()
-      ..sort(_sort.compare);
+        .toList();
+    // Tile counts follow search + filters, but not the energy pick itself,
+    // so tapping one tile doesn't zero the other two.
+    final energyCounts = {
+      for (final e in BrokerEnergy.values)
+        e: searched
+            .where((r) => energyOf[r.name.toLowerCase()]?.energy == e)
+            .length,
+    };
+    final rows = searched
+        .where((r) =>
+            _energy == null ||
+            energyOf[r.name.toLowerCase()]?.energy == _energy)
+        .toList();
+    if (_sort == BrokerSort.ranking) {
+      rows.sort((a, b) => (rankOf[a.name.toLowerCase()] ?? 1 << 30)
+          .compareTo(rankOf[b.name.toLowerCase()] ?? 1 << 30));
+    } else {
+      rows.sort(_sort.compare);
+    }
     final totalLeads = rows.fold<int>(0, (s, r) => s + r.leads);
     final totalConv = rows.fold<int>(0, (s, r) => s + r.conversions);
     final rate = totalLeads == 0 ? 0.0 : (totalConv / totalLeads) * 100;
@@ -205,6 +257,13 @@ class _BrokerManagementScreenState extends State<BrokerManagementScreen> {
               _kpi('Success rate', '${pct.format(rate)}%', AppColors.warning),
               if (topBroker != null) _topBrokerKpi(context, topBroker, pct),
             ],
+          ),
+          const SizedBox(height: 16),
+          _BrokerRankingCard(
+            counts: metIds == null ? null : energyCounts,
+            selected: _energy,
+            onSelect: (e) =>
+                setState(() => _energy = _energy == e ? null : e),
           ),
           const SizedBox(height: 16),
           LandWorkspaceSearchBar(
@@ -260,6 +319,18 @@ class _BrokerManagementScreenState extends State<BrokerManagementScreen> {
                     children: [
                       Row(
                         children: [
+                          if (rankOf[r.name.toLowerCase()] case final rank?)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: Text(
+                                '#$rank',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: context.fomraTextTertiary,
+                                ),
+                              ),
+                            ),
                           Expanded(
                             child: Text(
                               r.name,
@@ -308,6 +379,10 @@ class _BrokerManagementScreenState extends State<BrokerManagementScreen> {
                           ),
                         ],
                       ),
+                      if (energyOf[r.name.toLowerCase()] case final e?) ...[
+                        const SizedBox(height: 10),
+                        _OwnerMeetingLine(row: e),
+                      ],
                       const SizedBox(height: 8),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(6),
@@ -434,6 +509,223 @@ class _BrokerManagementScreenState extends State<BrokerManagementScreen> {
         ),
         child: Text(text, style: const TextStyle(fontSize: 11)),
       );
+}
+
+/// Energy Giver / Average / Energy Drainer counts; a tile filters the list.
+class _BrokerRankingCard extends StatelessWidget {
+  /// Null while the owner-meeting data loads.
+  final Map<BrokerEnergy, int>? counts;
+  final BrokerEnergy? selected;
+  final ValueChanged<BrokerEnergy> onSelect;
+
+  const _BrokerRankingCard({
+    required this.counts,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            const Icon(Icons.leaderboard_outlined,
+                size: 18, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Text(
+              'Broker Ranking',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: context.fomraTextPrimary,
+              ),
+            ),
+          ]),
+          const SizedBox(height: 4),
+          Text(
+            'By the share of lands where we met the actual Land Owner '
+            '(a converted land counts). Tap a group to see those brokers.',
+            style: TextStyle(fontSize: 12, color: context.fomraTextSecondary),
+          ),
+          const SizedBox(height: 12),
+          LayoutBuilder(builder: (context, c) {
+            const gap = 10.0;
+            final perRow = c.maxWidth >= 480 ? 3 : 1;
+            final w = (c.maxWidth - gap * (perRow - 1)) / perRow;
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: [
+                for (final e in BrokerEnergy.values)
+                  SizedBox(
+                    width: w,
+                    child: _EnergyTile(
+                      energy: e,
+                      count: counts?[e],
+                      selected: selected == e,
+                      onTap: counts == null ? null : () => onSelect(e),
+                    ),
+                  ),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class _EnergyTile extends StatelessWidget {
+  final BrokerEnergy energy;
+  final int? count;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  const _EnergyTile({
+    required this.energy,
+    required this.count,
+    required this.selected,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = energy.color;
+    return Material(
+      color: c.withValues(alpha: selected ? 0.16 : 0.07),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: c.withValues(alpha: selected ? 0.8 : 0.25),
+              width: selected ? 1.6 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(energy.icon, size: 22, color: c),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      energy.label,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: c,
+                      ),
+                    ),
+                    Text(
+                      energy.rule,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: context.fomraTextSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                count == null ? '–' : '$count',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: c,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Pill showing a broker's Energy Giver / Average / Energy Drainer rating.
+class BrokerEnergyBadge extends StatelessWidget {
+  final BrokerEnergy energy;
+  const BrokerEnergyBadge({super.key, required this.energy});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = energy.color;
+    return Tooltip(
+      message: energy.rule,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(6, 3, 8, 3),
+        decoration: BoxDecoration(
+          color: c.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: c.withValues(alpha: 0.35)),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(energy.icon, size: 12, color: c),
+          const SizedBox(width: 3),
+          Text(
+            energy.label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: c,
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// "Owner met on 3 of 5 lands · 60% · 2 without meeting · last land 9 Nov".
+class _OwnerMeetingLine extends StatelessWidget {
+  final BrokerEnergyRow row;
+  const _OwnerMeetingLine({required this.row});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = row.energy.color;
+    final last = row.lastLandOn;
+    return Wrap(
+      spacing: 10,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        BrokerEnergyBadge(energy: row.energy),
+        Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.handshake_outlined, size: 15, color: c),
+          const SizedBox(width: 4),
+          Text(
+            'Owner met on ${row.ownerMeetings} of ${row.lands} '
+            '${row.lands == 1 ? 'land' : 'lands'} · '
+            '${row.meetingRate.round()}%',
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: c,
+            ),
+          ),
+        ]),
+        if (row.withoutMeeting > 0)
+          Text(
+            '${row.withoutMeeting} without owner meeting',
+            style: TextStyle(fontSize: 12, color: context.fomraTextSecondary),
+          ),
+        if (last != null)
+          Text(
+            'Last land ${DateFormat('d MMM yyyy').format(last)}',
+            style: TextStyle(fontSize: 12, color: context.fomraTextSecondary),
+          ),
+      ],
+    );
+  }
 }
 
 /// Broker Status + Sort — the two filters that are specific to this page and so

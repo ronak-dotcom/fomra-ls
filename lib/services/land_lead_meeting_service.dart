@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/land_lead_meeting.dart';
@@ -24,6 +25,7 @@ class LandLeadMeetingService {
     String notes = '',
     List<String> attendeeTypes = const [],
     bool managementPresent = false,
+    List<PersonMet> peopleMet = const [],
   }) async {
     final userId = _db.auth.currentUser?.id;
     final loggedByName = AuthService.instance.currentUser?.fullName ?? '';
@@ -37,6 +39,10 @@ class LandLeadMeetingService {
           'notes': notes.trim(),
           'attendee_types': attendeeTypes,
           'management_present': managementPresent,
+          'people_met': peopleMet
+              .where((p) => !p.isEmpty)
+              .map((p) => p.toJson())
+              .toList(),
           if (loggedByName.isNotEmpty) 'logged_by_name': loggedByName,
           if (userId != null) 'logged_by': userId,
         })
@@ -55,8 +61,11 @@ class LandLeadMeetingService {
     // only updating when the new meeting is actually earlier — or there's
     // no value yet — keeps this correct regardless of entry order.
     final qualifies = attendeeTypes.any(
-      (t) => MeetingAttendeeTypes.countsAsLandownerMeeting.contains(t),
-    );
+          (t) => MeetingAttendeeTypes.countsAsLandownerMeeting.contains(t),
+        ) ||
+        peopleMet.any((p) =>
+            p.relation == 'Land Owner' ||
+            p.relation == 'Agreement Holder / PoA');
     if (qualifies) {
       final metAtIso = metAt.toUtc().toIso8601String();
       await _db
@@ -68,5 +77,36 @@ class LandLeadMeetingService {
     }
 
     return LandLeadMeeting.fromJson(row);
+  }
+
+  /// Tests: answer [leadIdsWithLandOwnerMeeting] without a database.
+  @visibleForTesting
+  static Set<String>? debugOwnerMetIds;
+
+  /// Lead ids (among those the viewer can see) that have had a meeting with
+  /// the actual Land Owner — for the broker ranking. One light query for all
+  /// leads rather than one per lead.
+  static Future<Set<String>> leadIdsWithLandOwnerMeeting() async {
+    if (debugOwnerMetIds case final ids?) return ids;
+    final rows = await _db
+        .from('land_lead_meetings')
+        .select('lead_id, attendee_types, people_met');
+    final ids = <String>{};
+    for (final r in rows as List) {
+      final m = Map<String, dynamic>.from(r as Map);
+      final types = (m['attendee_types'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const <String>[];
+      final people = (m['people_met'] as List?)
+              ?.whereType<Map>()
+              .map((e) => PersonMet.fromJson(Map<String, dynamic>.from(e)))
+              .toList() ??
+          const <PersonMet>[];
+      final met = types.contains(MeetingAttendeeTypes.landOwner) ||
+          people.any((p) => p.relation == 'Land Owner');
+      if (met) ids.add(m['lead_id'].toString());
+    }
+    return ids;
   }
 }

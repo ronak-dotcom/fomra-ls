@@ -332,6 +332,8 @@ class OfflineSyncService extends ChangeNotifier {
         'land_extent': lead.landExtent,
         'owner_name': lead.ownerName,
         'contact_details': lead.contactDetails,
+        'contact_type': lead.contactType,
+        'contact_relation': lead.contactRelation,
         'additional_owners':
             lead.additionalOwners.map((o) => o.toJson()).toList(),
         'broker_name': lead.brokerName,
@@ -380,6 +382,8 @@ class OfflineSyncService extends ChangeNotifier {
       landExtent: m['land_extent'] as String? ?? '',
       ownerName: m['owner_name'] as String? ?? '',
       contactDetails: m['contact_details'] as String? ?? '',
+      contactType: m['contact_type'] as String? ?? '',
+      contactRelation: m['contact_relation'] as String? ?? '',
       additionalOwners: (m['additional_owners'] as List?)
               ?.whereType<Map>()
               .map((e) => OwnerContact.fromJson(Map<String, dynamic>.from(e)))

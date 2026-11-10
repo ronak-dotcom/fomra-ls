@@ -311,10 +311,13 @@ ThemeData appTheme() {
           fontSize: 14),
     ),
     chipTheme: ChipThemeData(
+      // Colour is required: without it a chip whose label sets no colour
+      // paints white, invisible on light surfaces.
       labelStyle: const TextStyle(
           fontFamily: fontFamily,
           fontSize: 12,
-          fontWeight: FontWeight.w500),
+          fontWeight: FontWeight.w500,
+          color: AppColors.textPrimary),
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppColors.radiusXs)),
       side: const BorderSide(color: AppColors.border),
@@ -501,7 +504,8 @@ ThemeData appThemeDark() {
       labelStyle: const TextStyle(
           fontFamily: fontFamily,
           fontSize: 12,
-          fontWeight: FontWeight.w500),
+          fontWeight: FontWeight.w500,
+          color: AppColors.darkTextPrimary),
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppColors.radiusXs)),
       side: const BorderSide(color: AppColors.darkBorder),
