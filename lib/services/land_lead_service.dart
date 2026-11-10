@@ -78,6 +78,8 @@ class LandLeadService {
         'land_extent': lead.landExtent,
         'owner_name': lead.ownerName,
         'contact_details': lead.contactDetails,
+        'contact_type': lead.contactType,
+        'contact_relation': lead.contactRelation,
         'broker_name': lead.brokerName,
         'broker_contact': lead.brokerContact,
         'source_contact_name': lead.sourceContactName,
@@ -631,6 +633,12 @@ class LandLeadService {
         'status': lead.status.name,
         'source_contact_name': lead.sourceContactName,
         'source_contact_number': lead.sourceContactNumber,
+        // Only once chosen: an edit queued offline before this field existed
+        // carries '' and must not wipe a contact type set since.
+        if (lead.contactType.isNotEmpty) ...{
+          'contact_type': lead.contactType,
+          'contact_relation': lead.contactRelation,
+        },
         'site_photo_url': sitePhotoUrl,
         'site_photo_urls': sitePhotoUrls,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
@@ -1229,6 +1237,8 @@ class LandLeadService {
       brokerKnowsOwner: r['broker_knows_owner'] as bool?,
       managementMetOwner: r['management_met_owner'] as bool?,
       ownerMeetingLocation: r['owner_meeting_location'] as String? ?? '',
+      contactType: r['contact_type'] as String? ?? '',
+      contactRelation: r['contact_relation'] as String? ?? '',
     );
   }
 }

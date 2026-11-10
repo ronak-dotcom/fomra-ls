@@ -142,6 +142,11 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
   static const _kMaxOwners = 4;
   final List<_OwnerEntry> _owners = [_OwnerEntry()];
 
+  /// Who the main contact above is (LeadContactTypes) and, for a relative,
+  /// their relation to the owner.
+  String? _contactType;
+  String? _contactRelation;
+
   static const _kMaxSurveyEntries = 6;
   final List<_SurveyEntry> _extraSurveys = [];
 
@@ -324,6 +329,12 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
     _extentUnit = parsedExtent.$2;
     _owners[0].nameCtrl.text = existing.ownerName;
     _owners[0].contactCtrl.text = existing.contactDetails;
+    if (LeadContactTypes.all.contains(existing.contactType)) {
+      _contactType = existing.contactType;
+    }
+    if (LeadContactTypes.relations.contains(existing.contactRelation)) {
+      _contactRelation = existing.contactRelation;
+    }
     for (final extra in existing.additionalOwners.take(_kMaxOwners - 1)) {
       _owners.add(_OwnerEntry(name: extra.name, contact: extra.contact));
     }
@@ -1230,6 +1241,10 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
           ? _leadNameCtrl.text.trim().isNotEmpty
           : existing.leadNameLocked,
       contactDetails: _owners[0].contactCtrl.text.trim(),
+      contactType: _contactType ?? '',
+      contactRelation: _contactType == LeadContactTypes.relative
+          ? (_contactRelation ?? '')
+          : '',
       additionalOwners: additionalOwners,
       brokerName: _isBrokerSource ? _brokerNameCtrl.text.trim() : '',
       brokerContact: _isBrokerSource ? _brokerContactCtrl.text.trim() : '',
@@ -1774,11 +1789,25 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
                           subtitle: 'Land owner name and contact number',
                           icon: Icons.person_pin_circle_outlined,
                           compact: true,
-                          child: _OwnerContactSection(
-                            owners: _owners,
-                            maxOwners: _kMaxOwners,
-                            onAdd: _addOwner,
-                            onRemove: _removeOwner,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _OwnerContactSection(
+                                owners: _owners,
+                                maxOwners: _kMaxOwners,
+                                onAdd: _addOwner,
+                                onRemove: _removeOwner,
+                              ),
+                              const SizedBox(height: AddLeadUi.fieldGap),
+                              _ContactTypeFields(
+                                type: _contactType,
+                                relation: _contactRelation,
+                                onTypeChanged: (v) =>
+                                    setState(() => _contactType = v),
+                                onRelationChanged: (v) =>
+                                    setState(() => _contactRelation = v),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -2246,6 +2275,69 @@ class _OwnerContactSection extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// "Main contact is" — Land Owner / Agreement Holder / Relative / Other — and,
+/// for a relative, the relation to the owner.
+class _ContactTypeFields extends StatelessWidget {
+  final String? type;
+  final String? relation;
+  final ValueChanged<String?> onTypeChanged;
+  final ValueChanged<String?> onRelationChanged;
+
+  const _ContactTypeFields({
+    required this.type,
+    required this.relation,
+    required this.onTypeChanged,
+    required this.onRelationChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    DropdownButtonFormField<String> dropdown({
+      required String label,
+      required IconData icon,
+      required String? value,
+      required List<String> options,
+      required ValueChanged<String?> onChanged,
+    }) =>
+        DropdownButtonFormField<String>(
+          isExpanded: true,
+          initialValue: value,
+          onChanged: onChanged,
+          borderRadius: BorderRadius.circular(AddLeadUi.fieldRadius),
+          decoration: addLeadInputDecoration(context, label: label, icon: icon),
+          items: [
+            for (final o in options)
+              DropdownMenuItem(
+                value: o,
+                child: Text(o,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 14)),
+              ),
+          ],
+        );
+
+    final typeField = dropdown(
+      label: 'Main contact is',
+      icon: Icons.badge_outlined,
+      value: type,
+      options: LeadContactTypes.all,
+      onChanged: onTypeChanged,
+    );
+    if (type != LeadContactTypes.relative) return typeField;
+    return addLeadFormRow(
+      context,
+      typeField,
+      dropdown(
+        label: 'Relation to owner',
+        icon: Icons.family_restroom_outlined,
+        value: relation,
+        options: LeadContactTypes.relations,
+        onChanged: onRelationChanged,
+      ),
     );
   }
 }

@@ -36,6 +36,10 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
   final _durationCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
   final Set<String> _attendeeTypes = {};
+
+  /// People met, each a name + relation to the owner. Starts with one row.
+  final List<_PersonRow> _people = [_PersonRow()];
+  static const _maxPeople = 6;
   bool _managementPresent = false;
   bool _saving = false;
   String? _formError;
@@ -53,6 +57,9 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
   void dispose() {
     _durationCtrl.dispose();
     _notesCtrl.dispose();
+    for (final p in _people) {
+      p.nameCtrl.dispose();
+    }
     super.dispose();
   }
 
@@ -103,10 +110,25 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
       setState(() => _formError = 'Enter meeting duration');
       return;
     }
-    if (_attendeeTypes.isEmpty) {
-      setState(() => _formError = 'Select who was met');
+    final people = [
+      for (final p in _people)
+        PersonMet(name: p.nameCtrl.text.trim(), relation: p.relation ?? ''),
+    ].where((p) => !p.isEmpty).toList();
+    if (people.isEmpty) {
+      setState(() => _formError =
+          'Add the person met — their name and relation to the owner');
       return;
     }
+    if (people.any((p) => p.relation.isEmpty)) {
+      setState(() => _formError = 'Select the relation for each person met');
+      return;
+    }
+    // Ticked chips plus whatever the people's relations imply, so the two
+    // can never disagree (e.g. a "Son" row always counts as a Relative).
+    final attendeeTypes = {
+      ..._attendeeTypes,
+      for (final p in people) PersonMet.attendeeTypeFor(p.relation),
+    };
     if (_saving) return;
 
     setState(() {
@@ -119,8 +141,9 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
         metAt: _metAt,
         duration: duration,
         notes: _notesCtrl.text.trim(),
-        attendeeTypes: _attendeeTypes.toList(),
+        attendeeTypes: attendeeTypes.toList(),
         managementPresent: _managementPresent,
+        peopleMet: people,
       );
       if (!mounted) return;
       widget.onMeetingSaved?.call();
@@ -288,8 +311,10 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
           onEditTime: _editTime,
         ),
         const SizedBox(height: 12),
+        _buildPeopleMet(context),
+        const SizedBox(height: 12),
         Text(
-          'Who was met',
+          'Also present (optional)',
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
@@ -303,7 +328,8 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
           children: [
             for (final type in MeetingAttendeeTypes.all)
               FilterChip(
-                label: Text(type, style: const TextStyle(fontSize: 12)),
+                label: Text(MeetingAttendeeTypes.short(type),
+                    style: const TextStyle(fontSize: 12)),
                 selected: _attendeeTypes.contains(type),
                 selectedColor: AppColors.purple.withValues(alpha: 0.18),
                 checkmarkColor: AppColors.purple,
@@ -357,6 +383,82 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
     );
   }
 
+  Widget _buildPeopleMet(BuildContext context) {
+    final label = TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.w700,
+      color: context.fomraTextSecondary,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Who was met — name and relation to the owner', style: label),
+        const SizedBox(height: 6),
+        for (var i = 0; i < _people.length; i++) ...[
+          if (i > 0) const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 5,
+                child: TextField(
+                  key: ValueKey('person-name-$i'),
+                  controller: _people[i].nameCtrl,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: _fieldDecoration(context, 'Name',
+                          hint: 'e.g. Ravi')
+                      .copyWith(isDense: true),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 5,
+                child: DropdownButtonFormField<String>(
+                  key: ValueKey('person-relation-$i'),
+                  isExpanded: true,
+                  initialValue: _people[i].relation,
+                  menuMaxHeight: 320,
+                  decoration: _fieldDecoration(context, 'Relation')
+                      .copyWith(isDense: true),
+                  items: [
+                    for (final r in PersonMet.relations)
+                      DropdownMenuItem(
+                        value: r,
+                        child: Text(r,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 13)),
+                      ),
+                  ],
+                  onChanged: (v) => setState(() => _people[i].relation = v),
+                ),
+              ),
+              if (_people.length > 1)
+                IconButton(
+                  tooltip: 'Remove',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => setState(() {
+                    _people.removeAt(i).nameCtrl.dispose();
+                  }),
+                  icon: const Icon(Icons.close_rounded,
+                      size: 18, color: AppColors.error),
+                ),
+            ],
+          ),
+        ],
+        if (_people.length < _maxPeople)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => setState(() => _people.add(_PersonRow())),
+              icon: const Icon(Icons.person_add_alt_1_outlined, size: 18),
+              label: const Text('Add person'),
+              style: TextButton.styleFrom(foregroundColor: AppColors.purple),
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildHistory(BuildContext context) {
     if (_loading) {
       return const Center(
@@ -377,6 +479,11 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
           _PreviousMeetingTile(meeting: _meetings[index]),
     );
   }
+}
+
+class _PersonRow {
+  final nameCtrl = TextEditingController();
+  String? relation;
 }
 
 class _MiniTag extends StatelessWidget {
@@ -461,11 +568,37 @@ class _PreviousMeetingTile extends StatelessWidget {
               runSpacing: 4,
               children: [
                 for (final type in meeting.attendeeTypes)
-                  _MiniTag(label: type, color: AppColors.purple),
+                  _MiniTag(
+                    label: MeetingAttendeeTypes.short(type),
+                    color: meetingAttendeeColor(type),
+                  ),
                 if (meeting.managementPresent)
                   _MiniTag(label: 'Management present', color: AppColors.info),
               ],
             ),
+          ],
+          if (meeting.peopleMet.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            for (final p in meeting.peopleMet)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Row(children: [
+                  Icon(Icons.person_outline_rounded,
+                      size: 14, color: meetingAttendeeColor(
+                          PersonMet.attendeeTypeFor(p.relation))),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      p.label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: context.fomraTextPrimary,
+                      ),
+                    ),
+                  ),
+                ]),
+              ),
           ],
           if (meeting.notes.isNotEmpty) ...[
             const SizedBox(height: 6),
@@ -495,3 +628,15 @@ class _PreviousMeetingTile extends StatelessWidget {
     );
   }
 }
+
+/// One colour per kind of person met, used wherever meetings are shown: the
+/// owner green, agreement holder blue, relatives amber, others neutral.
+Color meetingAttendeeColor(String type) => switch (type) {
+      MeetingAttendeeTypes.landOwner => AppColors.success,
+      MeetingAttendeeTypes.agreementHolder => AppColors.info,
+      MeetingAttendeeTypes.relative ||
+      MeetingAttendeeTypes.familyOrFriend =>
+        AppColors.warning,
+      MeetingAttendeeTypes.broker => AppColors.cyan,
+      _ => AppColors.purple,
+    };

@@ -32,6 +32,37 @@ LeadStatus parseLeadStatus(String? raw) {
   };
 }
 
+/// Who a lead's main contact is, relative to the land.
+class LeadContactTypes {
+  static const landOwner = 'Land Owner';
+  static const agreementHolder = 'Agreement Holder / PoA';
+  static const relative = 'Relative of Owner';
+  static const other = 'Other';
+
+  static const all = [landOwner, agreementHolder, relative, other];
+
+  /// Relations offered for a relative of the owner.
+  static const relations = [
+    'Son',
+    'Daughter',
+    'Spouse',
+    'Brother',
+    'Sister',
+    'Father',
+    'Mother',
+    'Son-in-law',
+    'Other relative',
+  ];
+
+  /// "Relative of Owner (Son)" style label; '' when not recorded.
+  static String label(String type, String relation) {
+    final t = type.trim();
+    if (t.isEmpty) return '';
+    final r = relation.trim();
+    return t == relative && r.isNotEmpty ? '$t ($r)' : t;
+  }
+}
+
 /// Extra owner (beyond the primary owner captured in [LandLead.ownerName] /
 /// [LandLead.contactDetails]) for sites with multiple land owners.
 class OwnerContact {
@@ -173,6 +204,14 @@ class LandLead {
   final bool? managementMetOwner;
   final String ownerMeetingLocation;
 
+  /// Who the lead's main contact ([ownerName] / [contactDetails]) is — one of
+  /// [LeadContactTypes.all], or '' when not recorded.
+  final String contactType;
+
+  /// When [contactType] is [LeadContactTypes.relative]: their relation to the
+  /// owner (Son, Daughter, ...).
+  final String contactRelation;
+
   LandLead({
     required this.leadId,
     required this.inputSource,
@@ -243,6 +282,8 @@ class LandLead {
     this.brokerKnowsOwner,
     this.managementMetOwner,
     this.ownerMeetingLocation = '',
+    this.contactType = '',
+    this.contactRelation = '',
   });
 
   /// Chip / summary label: employee-posted leads use "Posted by".
@@ -317,6 +358,8 @@ class LandLead {
     bool? brokerKnowsOwner,
     bool? managementMetOwner,
     String? ownerMeetingLocation,
+    String? contactType,
+    String? contactRelation,
   }) =>
       LandLead(
         leadId: leadId,
@@ -393,6 +436,8 @@ class LandLead {
         brokerKnowsOwner: brokerKnowsOwner ?? this.brokerKnowsOwner,
         managementMetOwner: managementMetOwner ?? this.managementMetOwner,
         ownerMeetingLocation: ownerMeetingLocation ?? this.ownerMeetingLocation,
+        contactType: contactType ?? this.contactType,
+        contactRelation: contactRelation ?? this.contactRelation,
       );
 }
 

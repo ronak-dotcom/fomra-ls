@@ -3322,6 +3322,7 @@ class _ActivityTimeline extends StatelessWidget {
         title: 'Meeting',
         subtitle: [
           _formatReceivedOn(meeting.metAt),
+          if (_meetingWhoLine(meeting) case final who?) who,
           if (meeting.duration.isNotEmpty) '${meeting.duration} min',
           if (meeting.notes.isNotEmpty) meeting.notes,
           if (meeting.loggedByName.isNotEmpty) meeting.loggedByName,
@@ -3600,12 +3601,33 @@ class _ActivityTimeline extends StatelessWidget {
 /// (notes, file names, durations) as normal readable text. Lines are
 /// recognised by content rather than position, because each activity type
 /// orders its lines differently.
+/// "Met: Ravi — Son · Kumar — Land Owner" (or the ticked attendee types for
+/// meetings logged before names were recorded); null when nothing recorded.
+/// [_TimelineDetails] colours the line by who was met.
+String? _meetingWhoLine(LandLeadMeeting m) {
+  final parts = m.peopleMet.isNotEmpty
+      ? [for (final p in m.peopleMet) p.label]
+      : [for (final t in m.attendeeTypes) MeetingAttendeeTypes.short(t)];
+  if (parts.isEmpty) return null;
+  return '${_TimelineDetails.metPrefix}${parts.join(' · ')}';
+}
+
 class _TimelineDetails extends StatelessWidget {
   final String text;
   const _TimelineDetails({required this.text});
 
   static final _date =
       RegExp(r'^\d{1,2} [A-Z][a-z]{2} \d{4} • \d{1,2}:\d{2} [AP]M$');
+
+  static const metPrefix = 'Met: ';
+
+  /// Owner met → green, agreement holder → blue, only relatives / others →
+  /// amber: the same colours as the meeting history.
+  static Color _metColor(String line) {
+    if (line.contains('Land Owner')) return AppColors.success;
+    if (line.contains('Agreement Holder')) return AppColors.info;
+    return AppColors.warning;
+  }
 
   static Color? _statusColor(String line) {
     final l = line.toLowerCase();
@@ -3656,6 +3678,30 @@ class _TimelineDetails extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     color: context.fomraTextTertiary,
                   ),
+                );
+              }
+              if (line.startsWith(metPrefix)) {
+                final c = _metColor(line);
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 1),
+                      child: Icon(Icons.handshake_outlined, size: 14, color: c),
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        line,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: c,
+                        ),
+                      ),
+                    ),
+                  ],
                 );
               }
               if (people.contains(line.toLowerCase())) {
@@ -4041,6 +4087,19 @@ class _LeadInfoCards extends StatelessWidget {
         fields: [
           _Field('Owner', _v(lead.ownerName)),
           _Field('Owner Number', _v(lead.contactDetails)),
+          _Field(
+            'Main Contact Is',
+            _v(LeadContactTypes.label(lead.contactType, lead.contactRelation)),
+            style: lead.contactType.isEmpty
+                ? _FieldStyle.plain
+                : _FieldStyle.badge,
+            color: switch (lead.contactType) {
+              LeadContactTypes.landOwner => AppColors.success,
+              LeadContactTypes.agreementHolder => AppColors.info,
+              LeadContactTypes.relative => AppColors.warning,
+              _ => AppColors.purple,
+            },
+          ),
           _Field('Executive', _v(lead.createdByName),
               style: _FieldStyle.badge, color: AppColors.purple),
           _Field('Broker', _v(lead.brokerName)),
