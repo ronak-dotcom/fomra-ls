@@ -471,8 +471,11 @@ class PropertyReviewCard extends StatelessWidget {
                 style: TextButton.styleFrom(
                   visualDensity: VisualDensity.compact,
                   foregroundColor: AppColors.purple,
-                  textStyle: const TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w700),
+                  // From the theme so it keeps the app font (Inter).
+                  textStyle: Theme.of(context)
+                      .textTheme
+                      .labelLarge
+                      ?.copyWith(fontSize: 12, fontWeight: FontWeight.w700),
                 ),
                 icon: Icon(
                     canRecord ? Icons.task_alt_rounded : Icons.history_rounded,

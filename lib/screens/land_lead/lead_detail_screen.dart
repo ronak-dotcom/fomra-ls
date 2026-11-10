@@ -2642,12 +2642,47 @@ class _ActionToolbar extends StatelessWidget {
       );
     }
 
-    // One equal-width wrapping grid at every size: 2 columns on phones, more as
-    // width allows. Tiles wrap automatically and share a consistent size.
+    void run(String label) =>
+        label == 'Follow-up' ? onFollowUp() : onAction(label);
+
+    // Wider screens: one equal-width wrapping grid of every action. Phones: the
+    // four everyday actions as big icon buttons plus "More", which opens the
+    // rest grouped in a bottom sheet — instead of a 13-tile, 7-row grid.
     const gap = 8.0;
     return LayoutBuilder(
       builder: (context, c) {
         final maxW = c.maxWidth.isFinite ? c.maxWidth : 360.0;
+        if (maxW < 520) {
+          (IconData, String, Color) find(String label) =>
+              actions.firstWhere((a) => a.$2 == label);
+          return Row(
+            children: [
+              for (final label in _primaryOnPhone)
+                Expanded(
+                  child: _PhoneActionButton(
+                    icon: find(label).$1,
+                    label: label,
+                    onTap: () => run(label),
+                  ),
+                ),
+              Expanded(
+                child: _PhoneActionButton(
+                  icon: Icons.more_horiz_rounded,
+                  label: 'More',
+                  onTap: () async {
+                    final picked = await _showMoreActionsSheet(
+                      context,
+                      [for (final a in actions) (a.$1, a.$2)],
+                    );
+                    // Run after the sheet has closed, so the action's own
+                    // dialog opens over the lead page, not the sheet.
+                    if (picked != null) run(picked);
+                  },
+                ),
+              ),
+            ],
+          );
+        }
         // Aim for ~150px tiles, clamped to 2–4 columns.
         final cols = (maxW / 158).floor().clamp(2, 4);
         final cellW = (maxW - gap * (cols - 1)) / cols;
@@ -2662,6 +2697,128 @@ class _ActionToolbar extends StatelessWidget {
       },
     );
   }
+}
+
+/// Shown directly on phones; everything else sits under "More".
+const _primaryOnPhone = ['Calls', 'Site visit', 'Meeting', 'Notes'];
+
+/// The "More" sheet's groups, in order. Labels match _ActionToolbar's.
+const _moreActionGroups = <(String, List<String>)>[
+  ('Log activity', ['Management site visit', 'Follow-up']),
+  ('Deal progress', ['Legal', 'Deal & Risk', 'Signed', 'On Hold']),
+  ('Manage lead', ['Split Lead', 'Merge Lead', 'Reassign']),
+];
+
+/// Big icon-over-label button for the phone action row.
+class _PhoneActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final int maxLines;
+
+  const _PhoneActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.maxLines = 1,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: AppColors.purple.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, size: 22, color: AppColors.purple),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              maxLines: maxLines,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11.5,
+                height: 1.2,
+                fontWeight: FontWeight.w700,
+                color: context.fomraTextPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet with the less-frequent lead actions in labelled groups.
+/// Resolves to the chosen action's label, or null when dismissed.
+Future<String?> _showMoreActionsSheet(
+  BuildContext context,
+  List<(IconData, String)> all,
+) {
+  IconData iconFor(String label) =>
+      all.firstWhere((a) => a.$2 == label, orElse: () => (Icons.circle, label)).$1;
+  return showModalBottomSheet<String>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    backgroundColor: context.fomraSurface,
+    builder: (ctx) => SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final (title, labels) in _moreActionGroups) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 6, 4, 8),
+                child: Text(
+                  title.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                    color: ctx.fomraTextSecondary,
+                  ),
+                ),
+              ),
+              GridView.count(
+                // Four across keeps every group (max four) on one row.
+                crossAxisCount: 4,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 4,
+                crossAxisSpacing: 4,
+                childAspectRatio: 0.82,
+                children: [
+                  for (final label in labels)
+                    _PhoneActionButton(
+                      icon: iconFor(label),
+                      label: label,
+                      maxLines: 2,
+                      onTap: () => Navigator.pop(ctx, label),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _LeadActionDialog extends StatelessWidget {
