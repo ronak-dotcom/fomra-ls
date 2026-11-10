@@ -119,6 +119,15 @@ class LeadReviewIndex extends ChangeNotifier {
     }
   }
 
+  /// Replaces the index contents directly — tests only.
+  @visibleForTesting
+  void debugSeed(Iterable<LeadReview> reviews) {
+    _latest = {for (final r in reviews) r.leadId: r};
+    _loaded = true;
+    _loadedAt = DateTime.now();
+    notifyListeners();
+  }
+
   /// Applies a review just saved on this device without a reload.
   void record(LeadReview review) {
     final current = _latest[review.leadId];
