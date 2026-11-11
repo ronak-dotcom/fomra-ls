@@ -52,6 +52,8 @@ import '../../widgets/lead_map_controls.dart';
 import '../../widgets/offline_status_banner.dart';
 import '../../widgets/portal_page_layout.dart';
 import '../../widgets/ui/app_components.dart';
+import '../../widgets/who_we_met_card.dart';
+import '../../utils/phone_validation.dart';
 import '../market_intelligence/market_intelligence_screen.dart';
 import '../task_management/task_management_screen.dart';
 import 'add_lead_screen.dart';
@@ -1510,6 +1512,20 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
       showStatusTimeline: true,
     );
 
+    // Who we have met on this land, right under the lead's summary: owner
+    // met / only agreement holder / only relatives / none. Tap for history.
+    final whoWeMet = WhoWeMetCard(
+      meetings: _meetings,
+      onOpen: () => showFomraDialog<void>(
+        context: context,
+        builder: (_) => MeetingLogDialog(
+          leadId: lead.leadId,
+          ownerName: lead.ownerName,
+          readOnly: true,
+        ),
+      ),
+    );
+
     final reviewCard = PropertyReviewCard(
       latest: _reviews.isEmpty ? null : _reviews.first,
       reviewCount: _reviews.length,
@@ -1589,6 +1605,8 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
                                             CrossAxisAlignment.stretch,
                                         children: [
                                           summary,
+                                          const SizedBox(height: 12),
+                                          whoWeMet,
                                           if (renameBanner != null) ...[
                                             const SizedBox(height: 12),
                                             renameBanner,
@@ -1639,6 +1657,8 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
                                 controller: _scrollController,
                                 children: [
                                   summary,
+                                  const SizedBox(height: 12),
+                                  whoWeMet,
                                   if (renameBanner != null) ...[
                                     const SizedBox(height: 12),
                                     renameBanner,
@@ -4055,6 +4075,15 @@ class _LeadInfoCards extends StatelessWidget {
 
   String _v(String raw) => raw.trim().isEmpty ? '—' : raw.trim();
 
+  /// A saved number that isn't a valid mobile (e.g. "0917662544": a leading 0
+  /// typed and a digit lost) shows in red with a warning, so someone edits
+  /// the lead and enters the right one.
+  _Field _phoneField(String label, String raw) =>
+      PhoneValidation.looksWrong(raw)
+          ? _Field(label, '${raw.trim()} · Number looks wrong — edit to fix',
+              style: _FieldStyle.badge, color: AppColors.error)
+          : _Field(label, _v(raw));
+
   String _capitalize(String raw) =>
       raw.isEmpty ? raw : raw[0].toUpperCase() + raw.substring(1);
 
@@ -4087,7 +4116,7 @@ class _LeadInfoCards extends StatelessWidget {
         icon: Icons.contacts_outlined,
         fields: [
           _Field('Owner', _v(lead.ownerName)),
-          _Field('Owner Number', _v(lead.contactDetails)),
+          _phoneField('Owner Number', lead.contactDetails),
           _Field(
             'Main Contact Is',
             _v(LeadContactTypes.label(lead.contactType, lead.contactRelation)),
@@ -4104,7 +4133,7 @@ class _LeadInfoCards extends StatelessWidget {
           _Field('Executive', _v(lead.createdByName),
               style: _FieldStyle.badge, color: AppColors.purple),
           _Field('Broker', _v(lead.brokerDisplayName)),
-          _Field('Broker Number', _v(lead.brokerContact)),
+          _phoneField('Broker Number', lead.brokerContact),
           _Field('Input Source', lead.inputSource.label),
         ],
       ),

@@ -153,3 +153,32 @@ class LandLeadMeeting {
             const [],
       );
 }
+
+/// What a land's meetings add up to, for the lead page's "Who we met" box
+/// and the broker property list: the actual Land Owner met; else only an
+/// Agreement Holder / PoA; else only relatives / others; else no meeting.
+enum LandMeetingStatus { ownerMet, agreementHolderMet, othersMet, none }
+
+extension LandMeetingStatusX on LandMeetingStatus {
+  static LandMeetingStatus of(Iterable<LandLeadMeeting> meetings) {
+    if (meetings.isEmpty) return LandMeetingStatus.none;
+    if (meetings.any((m) => m.metLandOwner)) return LandMeetingStatus.ownerMet;
+    final agreementHolder = meetings.any((m) =>
+        m.attendeeTypes.contains(MeetingAttendeeTypes.agreementHolder) ||
+        m.peopleMet.any((p) => p.relation == 'Agreement Holder / PoA'));
+    return agreementHolder
+        ? LandMeetingStatus.agreementHolderMet
+        : LandMeetingStatus.othersMet;
+  }
+
+  /// Short badge text.
+  String get badge => switch (this) {
+        LandMeetingStatus.ownerMet => 'Owner met',
+        LandMeetingStatus.agreementHolderMet => 'Agreement Holder met',
+        LandMeetingStatus.othersMet => 'Relative / others met',
+        LandMeetingStatus.none => 'No meeting',
+      };
+
+  /// Owner met first, then agreement holder, relatives, none.
+  int get rank => index;
+}

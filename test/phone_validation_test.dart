@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:fomra_ls/utils/phone_validation.dart';
@@ -72,10 +73,44 @@ void main() {
     });
   });
 
-  group('input formatters block bad characters as typed', () {
-    test('two formatters: digits-only then a 10-char cap', () {
-      // The exact formatter instances the fields use.
-      expect(PhoneValidation.inputFormatters, hasLength(2));
+  group('mobile numbers start with 6-9 (no leading 0)', () {
+    test('a leading 0 is not a valid mobile', () {
+      expect(PhoneValidation.isValid('0917662544'), isFalse);
+      expect(PhoneValidation.isValid('1234567890'), isFalse);
+    });
+
+    test('the message says why', () {
+      expect(
+        PhoneValidation.validator('Broker Number', required: true)('0917662544'),
+        'Broker Number must start with 6, 7, 8 or 9 (no leading 0)',
+      );
+    });
+
+    test('saved numbers that look wrong are flagged', () {
+      expect(PhoneValidation.looksWrong('0917662544'), isTrue);
+      expect(PhoneValidation.looksWrong('98413 09113'), isFalse);
+      expect(PhoneValidation.looksWrong(''), isFalse);
+    });
+  });
+
+  group('input formatter cleans as typed / pasted', () {
+    String fmt(String typed) => PhoneValidation.inputFormatters.fold(
+          TextEditingValue(text: typed),
+          (v, f) => f.formatEditUpdate(TextEditingValue.empty, v),
+        ).text;
+
+    test('drops a leading 0', () {
+      expect(fmt('0917662544'), '917662544');
+      expect(fmt('09841309113'), '9841309113');
+    });
+
+    test('drops +91 from a pasted number', () {
+      expect(fmt('+91 98413 09113'), '9841309113');
+      expect(fmt('919841309113'), '9841309113');
+    });
+
+    test('blocks letters and symbols, caps at 10', () {
+      expect(fmt('98a41-30 911399'), '9841309113');
     });
   });
 }
