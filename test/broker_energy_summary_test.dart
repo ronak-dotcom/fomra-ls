@@ -28,7 +28,7 @@ LandLead _lead(String id, String broker) => LandLead(
 void main() {
   tearDown(() => LandLeadMeetingService.debugOwnerMetIds = null);
 
-  testWidgets('home card lists Energisers and Drainers under headings',
+  testWidgets('home card lists Energisers and Low Yield under headings',
       (t) async {
     LandLeadMeetingService.debugOwnerMetIds = {'1', '2', '3'};
     await t.pumpWidget(MaterialApp(
@@ -45,7 +45,7 @@ void main() {
     await t.pump();
 
     expect(find.text('Energisers'), findsOneWidget);
-    expect(find.text('Drainers'), findsOneWidget);
+    expect(find.text('Low Yield'), findsOneWidget);
     expect(find.text('Kalaiselvakumar'), findsOneWidget);
     expect(find.text('met 2/2 · 100%'), findsOneWidget);
     expect(find.text('Selvam'), findsOneWidget);

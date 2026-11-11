@@ -8,7 +8,7 @@ import '../theme/app_theme.dart';
 /// - **Energiser** (Energy Giver) — meetings with the actual Land Owner on more than 60%
 ///   of the lands they gave.
 /// - **Average** — 40% to 60%.
-/// - **Drainer** (Energy Drainer) — under 40%: gives lands but mostly no owner meeting.
+/// - **Low Yield** (was Energy Drainer) — under 40%: gives lands but mostly no owner meeting.
 ///
 /// No minimum number of lands: a broker with one land is rated on that one.
 enum BrokerEnergy { giver, average, drainer }
@@ -17,14 +17,14 @@ extension BrokerEnergyX on BrokerEnergy {
   String get label => switch (this) {
         BrokerEnergy.giver => 'Energiser',
         BrokerEnergy.average => 'Average',
-        BrokerEnergy.drainer => 'Drainer',
+        BrokerEnergy.drainer => 'Low Yield',
       };
 
   /// Group heading ("Energisers").
   String get plural => switch (this) {
         BrokerEnergy.giver => 'Energisers',
         BrokerEnergy.average => 'Average',
-        BrokerEnergy.drainer => 'Drainers',
+        BrokerEnergy.drainer => 'Low Yield',
       };
 
   String get rule => switch (this) {

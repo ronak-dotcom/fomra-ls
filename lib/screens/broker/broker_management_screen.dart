@@ -75,7 +75,7 @@ extension BrokerSortX on BrokerSort {
 
 /// Broker performance: leads, conversions, success rate.
 class BrokerManagementScreen extends StatefulWidget {
-  /// Opens with this Energiser / Average / Drainer group selected.
+  /// Opens with this Energiser / Average / Low Yield group selected.
   final BrokerEnergy? initialEnergy;
 
   const BrokerManagementScreen({super.key, this.initialEnergy});
@@ -514,7 +514,7 @@ class _BrokerManagementScreenState extends State<BrokerManagementScreen> {
       );
 }
 
-/// Energy Giver / Average / Energy Drainer counts; a tile filters the list.
+/// Energiser / Average / Low Yield counts; a tile filters the list.
 class _BrokerRankingCard extends StatelessWidget {
   /// Null while the owner-meeting data loads.
   final Map<BrokerEnergy, int>? counts;
@@ -653,7 +653,7 @@ class _EnergyTile extends StatelessWidget {
   }
 }
 
-/// Pill showing a broker's Energy Giver / Average / Energy Drainer rating.
+/// Pill showing a broker's Energiser / Average / Low Yield rating.
 class BrokerEnergyBadge extends StatelessWidget {
   final BrokerEnergy energy;
   const BrokerEnergyBadge({super.key, required this.energy});

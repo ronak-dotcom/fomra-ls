@@ -6,7 +6,7 @@ import '../screens/broker/broker_management_screen.dart';
 import '../services/land_lead_meeting_service.dart';
 import '../theme/fomra_theme_context.dart';
 
-/// Management Home card: who the Energisers and Drainers are among brokers,
+/// Management Home card: who the Energisers and Low Yield brokers are among brokers,
 /// by the share of their lands where we met the actual Land Owner. Each
 /// heading opens the Broker page filtered to that group.
 class BrokerEnergySummary extends StatefulWidget {
@@ -118,7 +118,7 @@ class _BrokerEnergySummaryState extends State<BrokerEnergySummary> {
               child: Text(
                 average == 0
                     ? 'Rated on owner meetings: Energiser above 60%, '
-                        'Drainer under 40%.'
+                        'Low Yield under 40%.'
                     : '$average average broker${average == 1 ? '' : 's'} '
                         '(40–60% owner meetings).',
                 style: TextStyle(
