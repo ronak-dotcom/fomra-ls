@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/land_lead.dart';
+import '../services/broker_directory.dart';
 import '../models/lead_review.dart';
 import '../services/app_store.dart';
 import '../services/lead_review_service.dart';
@@ -431,11 +432,11 @@ class LandWorkspaceFilters {
       final v = lead.village.trim().toLowerCase();
       if (!villages.any((x) => x.trim().toLowerCase() == v)) return false;
     }
-    if (!matchesText(broker, lead.brokerName)) return false;
+    if (!matchesText(broker, lead.brokerDisplayName)) return false;
     // Multi-select brokers: keep the lead if its broker is ANY of the selected
     // (OR). Empty set means "no broker filter".
     if (brokers.isNotEmpty) {
-      final name = lead.brokerName.trim().toLowerCase();
+      final name = lead.brokerDisplayName.trim().toLowerCase();
       final anyMatch =
           brokers.any((b) => b.trim().toLowerCase() == name);
       if (!anyMatch) return false;
@@ -1118,7 +1119,7 @@ class _LandWorkspaceFilterPanelState extends State<_LandWorkspaceFilterPanel> {
                           const SizedBox(height: 8),
                           MultiSelectField<String>(
                             label: 'Broker',
-                            options: _distinctField((l) => l.brokerName),
+                            options: _distinctField((l) => l.brokerDisplayName),
                             selected: _draft.brokers,
                             labelOf: (s) => s,
                             onChanged: (v) => setState(() {

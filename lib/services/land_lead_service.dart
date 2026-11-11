@@ -8,6 +8,7 @@ import '../utils/image_compressor.dart';
 import 'app_store.dart';
 import 'audit_log_service.dart';
 import 'auth_service.dart';
+import 'broker_directory.dart';
 import 'lead_change_approval_service.dart';
 import 'role_access.dart';
 
@@ -31,10 +32,14 @@ class LandLeadService {
   }
 
   static Future<List<LandLead>> getAll() async {
+    // The Broker Directory loads alongside, so broker names show correctly
+    // the moment the leads do (it never fails the lead load).
+    final directory = BrokerDirectory.instance.ensureLoaded();
     final rows = await _db
         .from('land_leads')
         .select()
         .order('added_on', ascending: false);
+    await directory;
     return (rows as List).map((r) => _fromRow(r as Map<String, dynamic>)).toList();
   }
 

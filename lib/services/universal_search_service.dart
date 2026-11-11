@@ -1,5 +1,6 @@
 import '../models/employee_profile.dart';
 import '../models/land_lead.dart';
+import 'broker_directory.dart';
 import '../models/land_lead_legal_document.dart';
 import '../utils/contact_directory.dart';
 import '../utils/legal_document_catalog.dart';
@@ -75,6 +76,7 @@ abstract final class UniversalSearchService {
     return _contains(lead.ownerName, q) ||
         _contains(lead.contactDetails, q) ||
         _contains(lead.brokerName, q) ||
+        _contains(lead.brokerDisplayName, q) ||
         _contains(lead.brokerContact, q) ||
         lead.additionalOwners
             .any((o) => _contains(o.name, q) || _contains(o.contact, q)) ||

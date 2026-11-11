@@ -1,5 +1,6 @@
 import '../models/land_lead.dart';
 import '../models/land_lead_meeting.dart';
+import '../services/broker_directory.dart';
 import '../utils/lead_location_parser.dart';
 import '../widgets/terms_deal_selector.dart';
 
@@ -43,6 +44,9 @@ abstract final class NoFutureActivityAnalytics {
 }
 
 class BrokerPerformanceRow {
+  /// What the broker is grouped by — their mobile number (see
+  /// BrokerDirectory.keyFor). Use this, not [name], to find their leads.
+  final String key;
   final String name;
   final String contact;
   final int leads;
@@ -51,6 +55,7 @@ class BrokerPerformanceRow {
   final double successRate;
 
   const BrokerPerformanceRow({
+    this.key = '',
     required this.name,
     required this.contact,
     required this.leads,
@@ -62,12 +67,13 @@ class BrokerPerformanceRow {
 
 abstract final class BrokerPerformanceAnalytics {
   static List<BrokerPerformanceRow> compute(List<LandLead> leads) {
+    // Grouped by mobile number, shown under the directory's name, so one
+    // broker typed two ways still counts as one.
+    final dir = BrokerDirectory.instance;
     final map = <String, List<LandLead>>{};
     for (final l in leads) {
-      final name = l.brokerName.trim();
-      if (name.isEmpty) continue;
-      final key = name.toLowerCase();
-      (map[key] ??= []).add(l);
+      if (l.brokerName.trim().isEmpty) continue;
+      (map[BrokerDirectory.keyFor(l)] ??= []).add(l);
     }
     final rows = map.entries.map((e) {
       final list = e.value;
@@ -77,7 +83,8 @@ abstract final class BrokerPerformanceAnalytics {
           .map((l) => l.brokerContact.trim())
           .firstWhere((c) => c.isNotEmpty, orElse: () => '');
       return BrokerPerformanceRow(
-        name: list.first.brokerName.trim(),
+        key: e.key,
+        name: dir.nameFor(list.first),
         contact: contact,
         leads: list.length,
         conversions: conversions,

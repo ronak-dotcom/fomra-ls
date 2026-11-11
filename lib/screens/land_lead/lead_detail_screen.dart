@@ -20,6 +20,7 @@ import 'filtered_leads_screen.dart';
 import '../../services/employee_service.dart';
 import '../../services/error_log_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/broker_directory.dart';
 import '../../services/role_access.dart';
 import '../../services/lead_drop_approval_service.dart';
 import '../../services/lead_drop_reason_catalog_service.dart';
@@ -4102,7 +4103,7 @@ class _LeadInfoCards extends StatelessWidget {
           ),
           _Field('Executive', _v(lead.createdByName),
               style: _FieldStyle.badge, color: AppColors.purple),
-          _Field('Broker', _v(lead.brokerName)),
+          _Field('Broker', _v(lead.brokerDisplayName)),
           _Field('Broker Number', _v(lead.brokerContact)),
           _Field('Input Source', lead.inputSource.label),
         ],

@@ -13,6 +13,7 @@ import '../../theme/app_theme.dart';
 import '../../theme/fomra_layout.dart';
 import '../../theme/fomra_theme_context.dart';
 import '../../services/auth_service.dart';
+import '../../services/broker_directory.dart';
 import '../../widgets/contact_call_whatsapp.dart';
 import '../../widgets/fomra_app_bar.dart';
 import '../../widgets/fomra_app_shell.dart';
@@ -20,6 +21,7 @@ import '../../widgets/land_workspace_ui.dart';
 import '../../widgets/lead_portfolio_breakdown.dart';
 import '../../widgets/ui/app_components.dart';
 import '../land_lead/lead_detail_screen.dart';
+import 'broker_directory_screen.dart';
 
 /// Derived from a broker's own leads — brokers have no stored status.
 enum BrokerStatus { active, converted, dormant }
@@ -106,6 +108,8 @@ class _BrokerManagementScreenState extends State<BrokerManagementScreen> {
     AppStore.instance.addListener(_rebuild);
     // Review status is a filter here; load it and refilter when it changes.
     LeadReviewIndex.instance.addListener(_rebuild);
+    BrokerDirectory.instance.addListener(_rebuild);
+    BrokerDirectory.instance.ensureLoaded();
     LeadReviewIndex.instance.ensureLoaded();
   }
 
@@ -113,6 +117,7 @@ class _BrokerManagementScreenState extends State<BrokerManagementScreen> {
   void dispose() {
     AppStore.instance.removeListener(_rebuild);
     LeadReviewIndex.instance.removeListener(_rebuild);
+    BrokerDirectory.instance.removeListener(_rebuild);
     super.dispose();
   }
 
@@ -182,13 +187,15 @@ class _BrokerManagementScreenState extends State<BrokerManagementScreen> {
     final metIds = _ownerMetIds;
     final energyRows = metIds == null
         ? const <BrokerEnergyRow>[]
-        : BrokerEnergyAnalytics.compute(_filteredLeads, metIds);
+        // Rated on recent form: lands given in the last 120 days.
+        : BrokerEnergyAnalytics.compute(
+            BrokerEnergyAnalytics.recent(_filteredLeads), metIds);
     final energyOf = {
-      for (final e in energyRows) e.name.toLowerCase(): e,
+      for (final e in energyRows) e.key: e,
     };
     final rankOf = {
       for (var i = 0; i < energyRows.length; i++)
-        energyRows[i].name.toLowerCase(): i + 1,
+        energyRows[i].key: i + 1,
     };
     final searched = BrokerPerformanceAnalytics.compute(_filteredLeads)
         .where((r) =>
@@ -202,17 +209,17 @@ class _BrokerManagementScreenState extends State<BrokerManagementScreen> {
     final energyCounts = {
       for (final e in BrokerEnergy.values)
         e: searched
-            .where((r) => energyOf[r.name.toLowerCase()]?.energy == e)
+            .where((r) => energyOf[r.key]?.energy == e)
             .length,
     };
     final rows = searched
         .where((r) =>
             _energy == null ||
-            energyOf[r.name.toLowerCase()]?.energy == _energy)
+            energyOf[r.key]?.energy == _energy)
         .toList();
     if (_sort == BrokerSort.ranking) {
-      rows.sort((a, b) => (rankOf[a.name.toLowerCase()] ?? 1 << 30)
-          .compareTo(rankOf[b.name.toLowerCase()] ?? 1 << 30));
+      rows.sort((a, b) => (rankOf[a.key] ?? 1 << 30)
+          .compareTo(rankOf[b.key] ?? 1 << 30));
     } else {
       rows.sort(_sort.compare);
     }
@@ -249,6 +256,19 @@ class _BrokerManagementScreenState extends State<BrokerManagementScreen> {
             'Performance, leads, conversions, and success rate by broker.',
             style: TextStyle(fontSize: 13, color: context.fomraTextSecondary),
           ),
+          if (_isManagement) ...[
+            const SizedBox(height: 12),
+            _DirectoryLink(
+              reviewCount: BrokerDirectory.instance.all
+                  .where((b) => b.needsReview)
+                  .length,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const BrokerDirectoryScreen()),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           Wrap(
             spacing: 10,
@@ -304,25 +324,26 @@ class _BrokerManagementScreenState extends State<BrokerManagementScreen> {
             )
           else
             ...rows.map((r) {
-              final expanded = _expandedBroker == r.name.toLowerCase();
+              final expanded = _expandedBroker == r.key;
               // Same filtered set the row's counts came from, so the expanded
               // portfolio can't disagree with the numbers above it.
               final brokerLeads = _filteredLeads
                   .where((l) =>
-                      l.brokerName.trim().toLowerCase() == r.name.toLowerCase())
+                      l.brokerName.trim().isNotEmpty &&
+                      BrokerDirectory.keyFor(l) == r.key)
                   .toList();
               return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: AppCard(
                   onTap: () => setState(() {
-                    _expandedBroker = expanded ? null : r.name.toLowerCase();
+                    _expandedBroker = expanded ? null : r.key;
                   }),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          if (rankOf[r.name.toLowerCase()] case final rank?)
+                          if (rankOf[r.key] case final rank?)
                             Padding(
                               padding: const EdgeInsets.only(right: 8),
                               child: Text(
@@ -382,7 +403,7 @@ class _BrokerManagementScreenState extends State<BrokerManagementScreen> {
                           ),
                         ],
                       ),
-                      if (energyOf[r.name.toLowerCase()] case final e?) ...[
+                      if (energyOf[r.key] case final e?) ...[
                         const SizedBox(height: 10),
                         _OwnerMeetingLine(row: e),
                       ],
@@ -514,6 +535,52 @@ class _BrokerManagementScreenState extends State<BrokerManagementScreen> {
       );
 }
 
+/// Management: opens the Broker Directory, showing how many numbers still
+/// need a name picked.
+class _DirectoryLink extends StatelessWidget {
+  final int reviewCount;
+  final VoidCallback onTap;
+  const _DirectoryLink({required this.reviewCount, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = reviewCount > 0 ? AppColors.warning : AppColors.primary;
+    return Material(
+      color: c.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: c.withValues(alpha: 0.3)),
+          ),
+          child: Row(children: [
+            Icon(Icons.contacts_outlined, color: c, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                reviewCount > 0
+                    ? 'Broker Directory · $reviewCount number'
+                        '${reviewCount == 1 ? '' : 's'} need a name picked'
+                    : 'Broker Directory · names and numbers',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: context.fomraTextPrimary,
+                ),
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: c),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
 /// Energiser / Average / Low Yield counts; a tile filters the list.
 class _BrokerRankingCard extends StatelessWidget {
   /// Null while the owner-meeting data loads.
@@ -538,7 +605,7 @@ class _BrokerRankingCard extends StatelessWidget {
                 size: 18, color: AppColors.primary),
             const SizedBox(width: 8),
             Text(
-              'Broker Ranking',
+              'Broker Ranking · Last 120 days',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
@@ -548,8 +615,9 @@ class _BrokerRankingCard extends StatelessWidget {
           ]),
           const SizedBox(height: 4),
           Text(
-            'By the share of lands where we met the actual Land Owner '
-            '(a converted land counts). Tap a group to see those brokers.',
+            'By the share of lands given in the last 120 days where we met '
+            'the actual Land Owner (a converted land counts). Lifetime is in '
+            'Reports. Tap a group to see those brokers.',
             style: TextStyle(fontSize: 12, color: context.fomraTextSecondary),
           ),
           const SizedBox(height: 12),

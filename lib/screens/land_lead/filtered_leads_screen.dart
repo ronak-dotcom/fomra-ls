@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/land_lead.dart';
+import '../../services/broker_directory.dart';
 import '../../models/lead_follow_up.dart';
 import '../../models/lead_review.dart';
 import '../../services/lead_review_service.dart';
@@ -109,7 +110,8 @@ class _FilteredLeadsScreenState extends State<FilteredLeadsScreen> {
         l.taluk.toLowerCase().contains(q) ||
         l.district.toLowerCase().contains(q) ||
         l.surveyNumber.toLowerCase().contains(q) ||
-        l.brokerName.toLowerCase().contains(q);
+        l.brokerName.toLowerCase().contains(q) ||
+        l.brokerDisplayName.toLowerCase().contains(q);
   }
 
   @override

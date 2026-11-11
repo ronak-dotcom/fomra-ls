@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../analytics/broker_energy.dart';
 import '../models/land_lead.dart';
 import '../screens/broker/broker_management_screen.dart';
+import '../services/broker_directory.dart';
 import '../services/land_lead_meeting_service.dart';
 import '../theme/fomra_theme_context.dart';
 
@@ -27,7 +28,19 @@ class _BrokerEnergySummaryState extends State<BrokerEnergySummary> {
   @override
   void initState() {
     super.initState();
+    BrokerDirectory.instance.addListener(_rebuild);
+    BrokerDirectory.instance.ensureLoaded();
     _load();
+  }
+
+  @override
+  void dispose() {
+    BrokerDirectory.instance.removeListener(_rebuild);
+    super.dispose();
+  }
+
+  void _rebuild() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _load() async {
@@ -61,12 +74,14 @@ class _BrokerEnergySummaryState extends State<BrokerEnergySummary> {
         ),
       );
     }
-    final rows = BrokerEnergyAnalytics.compute(widget.leads, ids);
+    // Recent form: lands given in the last 120 days.
+    final rows = BrokerEnergyAnalytics.compute(
+        BrokerEnergyAnalytics.recent(widget.leads), ids);
     if (rows.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Text(
-          'No broker leads yet.',
+          'No broker lands in the last 120 days.',
           style: TextStyle(fontSize: 13, color: context.fomraTextSecondary),
         ),
       );
