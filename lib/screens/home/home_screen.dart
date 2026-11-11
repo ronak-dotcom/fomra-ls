@@ -1062,7 +1062,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 PortalFadeSection(
                   index: 2,
                   child: PortalSectionCard(
-                    title: 'Brokers · Energisers & Drainers',
+                    title: 'Brokers · Energisers & Low Yield',
                     subtitle: 'Share of each broker\'s lands where we met the '
                         'actual Land Owner · tap a group for the list',
                     icon: Icons.handshake_outlined,
