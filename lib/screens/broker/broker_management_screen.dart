@@ -951,6 +951,7 @@ class _BrokerPortfolioSectionState extends State<_BrokerPortfolioSection> {
   bool _loading = true;
   int _ownerMet = 0;
   int _withMeeting = 0;
+  Map<String, LandMeetingStatus>? _statuses;
   bool _failed = false;
 
   @override
@@ -975,16 +976,21 @@ class _BrokerPortfolioSectionState extends State<_BrokerPortfolioSection> {
       // one land. Same "owner met" rule as the ranking (a converted land
       // counts — it can't be signed without the owner).
       var ownerMet = 0, withMeeting = 0;
+      final statuses = <String, LandMeetingStatus>{};
       for (var i = 0; i < widget.leads.length; i++) {
         final meetings = lists[i];
+        final lead = widget.leads[i];
         if (meetings.isNotEmpty) withMeeting++;
-        if (widget.leads[i].status.isAcquired ||
-            meetings.any((m) => m.metLandOwner)) {
-          ownerMet++;
-        }
+        // A converted land counts as owner met (as in the ranking).
+        final status = lead.status.isAcquired
+            ? LandMeetingStatus.ownerMet
+            : LandMeetingStatusX.of(meetings);
+        statuses[lead.leadId] = status;
+        if (status == LandMeetingStatus.ownerMet) ownerMet++;
       }
       if (!mounted) return;
       setState(() {
+        _statuses = statuses;
         _ownerMet = ownerMet;
         _withMeeting = withMeeting;
         _loading = false;
@@ -1003,6 +1009,7 @@ class _BrokerPortfolioSectionState extends State<_BrokerPortfolioSection> {
       landMeetings: _loading || _failed
           ? null
           : (ownerMet: _ownerMet, withMeeting: _withMeeting),
+      meetingStatus: _loading || _failed ? null : _statuses,
       useLeadAgeColumn: true,
       onOpenLead: (lead) => Navigator.push(
         context,

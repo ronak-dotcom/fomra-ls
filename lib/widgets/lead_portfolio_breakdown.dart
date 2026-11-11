@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 
 import '../analytics/management_bi_metrics.dart';
 import '../models/land_lead.dart';
+import '../models/land_lead_meeting.dart';
+import 'who_we_met_card.dart';
 import '../theme/app_theme.dart';
 import '../theme/fomra_theme_context.dart';
 import '../utils/lead_location_parser.dart';
@@ -44,6 +46,12 @@ class LeadPortfolioBreakdown extends StatelessWidget {
   /// status cards. Null while loading or when not a broker view.
   final ({int ownerMet, int withMeeting})? landMeetings;
 
+  /// Broker view: who was met on each land (by lead id). When given, the
+  /// table gets a Meeting column, rows are tinted by it (green owner ·
+  /// blue agreement holder · amber relatives/others) and owner-met lands are
+  /// listed first.
+  final Map<String, LandMeetingStatus>? meetingStatus;
+
   const LeadPortfolioBreakdown({
     super.key,
     required this.leads,
@@ -53,11 +61,21 @@ class LeadPortfolioBreakdown extends StatelessWidget {
     this.meetingsBesideDropped,
     this.hideEmptyStatusCards = false,
     this.landMeetings,
+    this.meetingStatus,
   });
 
   @override
   Widget build(BuildContext context) {
-    final sorted = [...leads]..sort((a, b) => b.addedOn.compareTo(a.addedOn));
+    final ms = meetingStatus;
+    LandMeetingStatus statusOf(LandLead l) =>
+        ms?[l.leadId] ?? LandMeetingStatus.none;
+    final sorted = [...leads]..sort((a, b) {
+        if (ms != null) {
+          final byMeeting = statusOf(a).rank.compareTo(statusOf(b).rank);
+          if (byMeeting != 0) return byMeeting;
+        }
+        return b.addedOn.compareTo(a.addedOn);
+      });
     final total = sorted.length;
     final totalAcres =
         sorted.fold<double>(0, (s, l) => s + leadPortfolioAcres(l));
@@ -107,7 +125,7 @@ class LeadPortfolioBreakdown extends StatelessWidget {
                 color: AppColors.success,
               ),
               _SummaryCard(
-                label: 'Lands with Meetings',
+                label: 'Any Meeting (incl. Agreement Holder / relatives)',
                 value: '${lm.withMeeting}',
                 icon: Icons.groups_outlined,
                 color: AppColors.secondary,
@@ -159,6 +177,7 @@ class LeadPortfolioBreakdown extends StatelessWidget {
               const DataColumn(label: Text('Lead ID')),
               const DataColumn(label: Text('Property')),
               const DataColumn(label: Text('Village')),
+              if (ms != null) const DataColumn(label: Text('Meeting')),
               const DataColumn(label: Text('Survey No.')),
               const DataColumn(label: Text('Acres')),
               const DataColumn(label: Text('Current Stage')),
@@ -169,19 +188,39 @@ class LeadPortfolioBreakdown extends StatelessWidget {
             rows: [
               for (final l in sorted)
                 DataRow(
+                  // Tinted by who was met, so met lands stand out.
+                  color: ms == null
+                      ? null
+                      : WidgetStatePropertyAll(
+                          landMeetingStatusColor(statusOf(l))
+                              ?.withValues(alpha: 0.07)),
                   cells: [
                     DataCell(
-                      InkWell(
-                        onTap: () => onOpenLead(l),
-                        child: Text(
-                          '#${l.leadId}',
-                          style: const TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w800,
-                            decoration: TextDecoration.underline,
+                      Row(mainAxisSize: MainAxisSize.min, children: [
+                        if (ms != null) ...[
+                          Container(
+                            width: 4,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              color: landMeetingStatusColor(statusOf(l)) ??
+                                  Colors.transparent,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                        ],
+                        InkWell(
+                          onTap: () => onOpenLead(l),
+                          child: Text(
+                            '#${l.leadId}',
+                            style: const TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w800,
+                              decoration: TextDecoration.underline,
+                            ),
                           ),
                         ),
-                      ),
+                      ]),
                     ),
                     DataCell(
                       ConstrainedBox(
@@ -194,6 +233,8 @@ class LeadPortfolioBreakdown extends StatelessWidget {
                       ),
                     ),
                     DataCell(Text(_value(l.village))),
+                    if (ms != null)
+                      DataCell(_MeetingPill(status: statusOf(l))),
                     DataCell(Text(_value(l.surveyNumber))),
                     DataCell(Text(leadPortfolioAcres(l).toStringAsFixed(2))),
                     DataCell(Text(l.status.label)),
@@ -270,6 +311,39 @@ class _SummaryCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _MeetingPill extends StatelessWidget {
+  final LandMeetingStatus status;
+  const _MeetingPill({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = landMeetingStatusColor(status) ?? context.fomraTextTertiary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: status == LandMeetingStatus.none
+            ? context.fomraSurfaceVar
+            : color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        if (status == LandMeetingStatus.ownerMet) ...[
+          Icon(Icons.check_circle_rounded, size: 13, color: color),
+          const SizedBox(width: 4),
+        ],
+        Text(
+          status.badge,
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w800,
+            color: color,
+          ),
+        ),
+      ]),
     );
   }
 }

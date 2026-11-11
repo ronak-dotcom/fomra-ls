@@ -4,6 +4,7 @@ import '../../models/land_lead.dart';
 import '../../services/app_store.dart';
 import '../../services/broker_directory.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/phone_validation.dart';
 import '../../theme/fomra_layout.dart';
 import '../../theme/fomra_theme_context.dart';
 import '../../widgets/ui/app_components.dart';
@@ -259,6 +260,26 @@ class _BrokerCard extends StatelessWidget {
                 const _Pill(label: 'Confirmed', color: AppColors.success),
             ],
           ),
+          if (PhoneValidation.looksWrong(entry.phone)) ...[
+            const SizedBox(height: 10),
+            const Row(children: [
+              Icon(Icons.error_outline_rounded,
+                  size: 16, color: AppColors.error),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Number looks wrong — a mobile starts with 6–9. Edit the '
+                  'lead(s) with the right number, or merge it into the right '
+                  'broker.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.error,
+                  ),
+                ),
+              ),
+            ]),
+          ],
           if (otherSpellings.isNotEmpty) ...[
             const SizedBox(height: 10),
             Text(
