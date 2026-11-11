@@ -286,13 +286,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // Self vs Management Meetings is a real distinction, not a relabeling —
       // it's exactly what land_lead_meetings.management_present already
       // records (see meeting_log_dialog.dart's "Management present" toggle).
+      // Each land counts once per kind — its first Self / Management /
+      // Broker meeting — so a repeat meeting on the same land doesn't add.
+      final firsts = FirstMeetings.of(_targetMeetings);
       final selfMeetingDates = [
-        for (final m in _targetMeetings)
-          if (visibleIds.contains(m.leadId) && !m.managementPresent) m.metAt,
+        for (final m in firsts.self)
+          if (visibleIds.contains(m.leadId)) m.metAt,
       ];
       final managementMeetingDates = [
-        for (final m in _targetMeetings)
-          if (visibleIds.contains(m.leadId) && m.managementPresent) m.metAt,
+        for (final m in firsts.management)
+          if (visibleIds.contains(m.leadId)) m.metAt,
       ];
       categories = [
         MonthlyTargetCategoryProgress(
@@ -327,10 +330,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               target: tv[TargetCategory.brokerMeetings.key] ?? 0,
               now: now,
               completedOn: [
-                for (final m in _targetMeetings)
-                  if (visibleIds.contains(m.leadId) &&
-                      m.attendeeTypes.contains(MeetingAttendeeTypes.broker))
-                    m.metAt,
+                for (final m in firsts.broker)
+                  if (visibleIds.contains(m.leadId)) m.metAt,
               ],
             ),
           ),

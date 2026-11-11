@@ -866,7 +866,8 @@ class _BrokerFilterDropdown<T> extends StatelessWidget {
   }
 }
 
-/// Loads the meetings-conducted count for a broker's leads, then renders the
+/// Loads, per land, how many of a broker's leads had an owner meeting / any
+/// meeting, then renders the
 /// shared portfolio breakdown with a Lead Age column instead of Status.
 class _BrokerPortfolioSection extends StatefulWidget {
   final List<LandLead> leads;
@@ -880,7 +881,9 @@ class _BrokerPortfolioSection extends StatefulWidget {
 
 class _BrokerPortfolioSectionState extends State<_BrokerPortfolioSection> {
   bool _loading = true;
-  int _meetingsConducted = 0;
+  int _ownerMet = 0;
+  int _withMeeting = 0;
+  bool _failed = false;
 
   @override
   void initState() {
@@ -895,19 +898,33 @@ class _BrokerPortfolioSectionState extends State<_BrokerPortfolioSection> {
   }
 
   Future<void> _load() async {
+    _failed = false;
     try {
       final lists = await Future.wait<List<LandLeadMeeting>>(
         widget.leads.map((l) => LandLeadMeetingService.getForLead(l.leadId)),
       );
-      final total = lists.fold<int>(0, (s, meetings) => s + meetings.length);
+      // Per land, not per meeting: meeting the same owner 5 times is still
+      // one land. Same "owner met" rule as the ranking (a converted land
+      // counts — it can't be signed without the owner).
+      var ownerMet = 0, withMeeting = 0;
+      for (var i = 0; i < widget.leads.length; i++) {
+        final meetings = lists[i];
+        if (meetings.isNotEmpty) withMeeting++;
+        if (widget.leads[i].status.isAcquired ||
+            meetings.any((m) => m.metLandOwner)) {
+          ownerMet++;
+        }
+      }
       if (!mounted) return;
       setState(() {
-        _meetingsConducted = total;
+        _ownerMet = ownerMet;
+        _withMeeting = withMeeting;
         _loading = false;
       });
     } catch (_) {
+      // Leave the counts hidden rather than show a misleading "0 of N".
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() => _failed = true);
     }
   }
 
@@ -915,7 +932,9 @@ class _BrokerPortfolioSectionState extends State<_BrokerPortfolioSection> {
   Widget build(BuildContext context) {
     return LeadPortfolioBreakdown(
       leads: widget.leads,
-      meetingsConducted: _loading ? null : _meetingsConducted,
+      landMeetings: _loading || _failed
+          ? null
+          : (ownerMet: _ownerMet, withMeeting: _withMeeting),
       useLeadAgeColumn: true,
       onOpenLead: (lead) => Navigator.push(
         context,
