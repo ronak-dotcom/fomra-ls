@@ -2279,17 +2279,18 @@ class _TeamMonthlyTargetsCardState extends State<_TeamMonthlyTargetsCard> {
     final selfMeetingLeadIds = <String>{};
     final managementMeetingDates = <DateTime>[];
     final managementMeetingLeadIds = <String>{};
-    for (final m in widget.meetings) {
-      if (m.loggedByName.trim().toLowerCase() != name || !inMonth(m.metAt)) {
-        continue;
-      }
-      if (m.managementPresent) {
-        managementMeetingDates.add(m.metAt);
-        managementMeetingLeadIds.add(m.leadId);
-      } else {
-        selfMeetingDates.add(m.metAt);
-        selfMeetingLeadIds.add(m.leadId);
-      }
+    // Each land counts once per kind — its first Self / Management meeting
+    // — so a repeat meeting on the same land doesn't add.
+    final firsts = FirstMeetings.of(widget.meetings);
+    bool mine(LandLeadMeeting m) =>
+        m.loggedByName.trim().toLowerCase() == name && inMonth(m.metAt);
+    for (final m in firsts.management.where(mine)) {
+      managementMeetingDates.add(m.metAt);
+      managementMeetingLeadIds.add(m.leadId);
+    }
+    for (final m in firsts.self.where(mine)) {
+      selfMeetingDates.add(m.metAt);
+      selfMeetingLeadIds.add(m.leadId);
     }
     final datesByCategory = {
       TargetCategory.siteVisits: visitDates,

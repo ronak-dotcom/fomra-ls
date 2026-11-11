@@ -38,6 +38,12 @@ class LeadPortfolioBreakdown extends StatelessWidget {
   /// whenever provided.
   final int? meetingsBesideDropped;
 
+  /// Broker view, counted per land (repeat meetings on one land count once):
+  /// lands where we met the actual Land Owner, and lands with any meeting.
+  /// Shown as "Owner Met: X of Y lands" and "Lands with Meetings" beside the
+  /// status cards. Null while loading or when not a broker view.
+  final ({int ownerMet, int withMeeting})? landMeetings;
+
   const LeadPortfolioBreakdown({
     super.key,
     required this.leads,
@@ -46,6 +52,7 @@ class LeadPortfolioBreakdown extends StatelessWidget {
     this.useLeadAgeColumn = false,
     this.meetingsBesideDropped,
     this.hideEmptyStatusCards = false,
+    this.landMeetings,
   });
 
   @override
@@ -92,6 +99,20 @@ class LeadPortfolioBreakdown extends StatelessWidget {
                 icon: Icons.verified_outlined,
                 color: AppColors.success,
               ),
+            if (landMeetings case final lm?) ...[
+              _SummaryCard(
+                label: 'Owner Met',
+                value: '${lm.ownerMet} of $total',
+                icon: Icons.handshake_outlined,
+                color: AppColors.success,
+              ),
+              _SummaryCard(
+                label: 'Lands with Meetings',
+                value: '${lm.withMeeting}',
+                icon: Icons.groups_outlined,
+                color: AppColors.secondary,
+              ),
+            ],
             if (meetingsConducted != null)
               _SummaryCard(
                 label: 'Meetings Conducted',

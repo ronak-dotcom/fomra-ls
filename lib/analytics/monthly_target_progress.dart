@@ -1,4 +1,5 @@
 import '../models/land_lead.dart';
+import '../models/land_lead_meeting.dart';
 
 /// An employee's progress against the common monthly target.
 ///
@@ -118,5 +119,42 @@ abstract final class SiteVisitTarget {
   static bool _same(String a, String b) {
     final x = a.trim().toLowerCase();
     return x.isNotEmpty && x == b.trim().toLowerCase();
+  }
+}
+
+/// Meeting targets count each land once per kind: the first Self meeting
+/// (management not present), the first Management meeting and the first
+/// meeting with the Broker present on that land, ever. A repeat meeting on
+/// the same land (e.g. met in Oct, met again in Nov) never counts again.
+///
+/// Pass ALL meetings (not just this month's), so "first" is judged against
+/// the land's whole history; callers then filter by month and person.
+class FirstMeetings {
+  final List<LandLeadMeeting> self;
+  final List<LandLeadMeeting> management;
+  final List<LandLeadMeeting> broker;
+
+  const FirstMeetings._(this.self, this.management, this.broker);
+
+  factory FirstMeetings.of(Iterable<LandLeadMeeting> all) {
+    final self = <String, LandLeadMeeting>{};
+    final mgmt = <String, LandLeadMeeting>{};
+    final broker = <String, LandLeadMeeting>{};
+    void keepEarliest(Map<String, LandLeadMeeting> map, LandLeadMeeting m) {
+      final cur = map[m.leadId];
+      if (cur == null || m.metAt.isBefore(cur.metAt)) map[m.leadId] = m;
+    }
+
+    for (final m in all) {
+      keepEarliest(m.managementPresent ? mgmt : self, m);
+      if (m.attendeeTypes.contains(MeetingAttendeeTypes.broker)) {
+        keepEarliest(broker, m);
+      }
+    }
+    return FirstMeetings._(
+      self.values.toList(),
+      mgmt.values.toList(),
+      broker.values.toList(),
+    );
   }
 }

@@ -134,12 +134,17 @@ class _TargetTabState extends State<_TargetTab> {
     final managementMeetings = <DateTime>[];
     final brokerMeetings = <DateTime>[];
     siteVisits.addAll(SiteVisitTarget.datesFor(myLeads, name));
-    for (final m in _meetings) {
-      if (!myLeadIds.contains(m.leadId)) continue;
-      (m.managementPresent ? managementMeetings : selfMeetings).add(m.metAt);
-      if (m.attendeeTypes.contains(MeetingAttendeeTypes.broker)) {
-        brokerMeetings.add(m.metAt);
-      }
+    // Each land counts once per kind — its first Self / Management / Broker
+    // meeting — so a repeat meeting on the same land doesn't add.
+    final firsts = FirstMeetings.of(_meetings);
+    for (final m in firsts.self) {
+      if (myLeadIds.contains(m.leadId)) selfMeetings.add(m.metAt);
+    }
+    for (final m in firsts.management) {
+      if (myLeadIds.contains(m.leadId)) managementMeetings.add(m.metAt);
+    }
+    for (final m in firsts.broker) {
+      if (myLeadIds.contains(m.leadId)) brokerMeetings.add(m.metAt);
     }
     // A broker counts as "new" the first time their name appears on any of
     // this employee's leads — same rule as the employee's own Home card.
