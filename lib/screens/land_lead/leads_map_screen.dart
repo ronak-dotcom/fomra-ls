@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../config/maptiler_tiles.dart';
 import '../../models/land_lead.dart';
+import '../../services/broker_directory.dart';
 import '../../models/lead_review.dart';
 import '../../services/lead_review_service.dart';
 import '../../services/lead_visibility.dart';
@@ -131,7 +132,7 @@ class _LeadsMapScreenState extends State<LeadsMapScreen> {
           !_executive.contains(l.createdByName.trim())) {
         return false;
       }
-      if (_broker.isNotEmpty && !_broker.contains(l.brokerName.trim())) {
+      if (_broker.isNotEmpty && !_broker.contains(l.brokerDisplayName.trim())) {
         return false;
       }
       if (_dateFilter != null) {
@@ -149,6 +150,7 @@ class _LeadsMapScreenState extends State<LeadsMapScreen> {
           l.surveyNumber,
           l.village,
           l.brokerName,
+          l.brokerDisplayName,
           l.createdByName,
         ].any((f) => f.toLowerCase().contains(q));
         if (!match) return false;
@@ -674,7 +676,7 @@ class _LeadsMapScreenState extends State<LeadsMapScreen> {
         MultiSelectField<String>(
           label: 'Broker',
           icon: Icons.handshake_outlined,
-          options: _distinct((l) => l.brokerName),
+          options: _distinct((l) => l.brokerDisplayName),
           selected: _broker,
           labelOf: (s) => s,
           onChanged: (v) => apply(() => _broker = v),
@@ -1003,7 +1005,7 @@ class _PropertyPopup extends StatelessWidget {
       if (villageDistrict.isNotEmpty)
         (Icons.location_city_outlined, 'Village', villageDistrict),
       if (lead.brokerName.trim().isNotEmpty)
-        (Icons.handshake_outlined, 'Broker', lead.brokerName.trim()),
+        (Icons.handshake_outlined, 'Broker', lead.brokerDisplayName.trim()),
       if (lead.createdByName.trim().isNotEmpty)
         (Icons.badge_outlined, 'Executive', lead.createdByName.trim()),
       (

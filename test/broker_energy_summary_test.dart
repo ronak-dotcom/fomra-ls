@@ -21,7 +21,7 @@ LandLead _lead(String id, String broker) => LandLead(
       roadWidth: '',
       accessDetails: '',
       notes: '',
-      addedOn: DateTime(2026, 10, 1),
+      addedOn: DateTime.now().subtract(const Duration(days: 10)),
       brokerName: broker,
     );
 

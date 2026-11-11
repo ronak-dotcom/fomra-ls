@@ -8,6 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import '../../models/gps_fix.dart';
 import '../../models/land_lead.dart';
+import '../../services/broker_directory.dart';
 import '../../analytics/management_intelligence.dart';
 import '../../services/app_store.dart';
 import '../../theme/app_theme.dart';
@@ -1418,7 +1419,17 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
                                 value: _inputSource,
                                 onChanged: _onInputSourceChanged,
                               ),
-                              if (_needsSourceContact) ...[
+                              if (_isBrokerSource) ...[
+                                const SizedBox(height: AddLeadUi.fieldGap),
+                                // Brokers are tracked by mobile number: a known
+                                // number fills the name from the Broker
+                                // Directory; typing a name suggests known
+                                // brokers, near-spellings included.
+                                BrokerSourceFields(
+                                  nameCtrl: _brokerNameCtrl,
+                                  numberCtrl: _brokerContactCtrl,
+                                ),
+                              ] else if (_needsSourceContact) ...[
                                 const SizedBox(height: AddLeadUi.fieldGap),
                                 addLeadFormRow(
                                   context,
@@ -1901,6 +1912,209 @@ class _InputSourceDropdown extends StatelessWidget {
 }
 
 // ── Text field ──────────────────────────────────────────────────────────────
+
+/// Broker Name + Broker Mobile, linked to the Broker Directory.
+class BrokerSourceFields extends StatefulWidget {
+  final TextEditingController nameCtrl;
+  final TextEditingController numberCtrl;
+
+  const BrokerSourceFields(
+      {super.key, required this.nameCtrl, required this.numberCtrl});
+
+  @override
+  State<BrokerSourceFields> createState() => BrokerSourceFieldsState();
+}
+
+class BrokerSourceFieldsState extends State<BrokerSourceFields> {
+  /// The broker the number belongs to, once the user typed or picked a
+  /// known number — the name then comes from the directory and is locked.
+  BrokerEntry? _known;
+  String _lastNumber = '';
+  final _nameFocus = FocusNode();
+  bool _nameFocused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _lastNumber = widget.numberCtrl.text;
+    widget.numberCtrl.addListener(_onNumberChanged);
+    widget.nameCtrl.addListener(_rebuild);
+    _nameFocus.addListener(() {
+      if (mounted) setState(() => _nameFocused = _nameFocus.hasFocus);
+    });
+    BrokerDirectory.instance.addListener(_rebuild);
+    BrokerDirectory.instance.ensureLoaded();
+  }
+
+  @override
+  void dispose() {
+    widget.numberCtrl.removeListener(_onNumberChanged);
+    widget.nameCtrl.removeListener(_rebuild);
+    BrokerDirectory.instance.removeListener(_rebuild);
+    _nameFocus.dispose();
+    super.dispose();
+  }
+
+  void _rebuild() {
+    if (mounted) setState(() {});
+  }
+
+  // Only reacts when the number actually changes (not on load of an existing
+  // lead), so opening an old lead never rewrites its broker name.
+  void _onNumberChanged() {
+    final text = widget.numberCtrl.text;
+    if (text == _lastNumber) return;
+    _lastNumber = text;
+    final match = BrokerDirectory.instance.byPhone(text);
+    setState(() => _known = match);
+    if (match != null && widget.nameCtrl.text.trim() != match.displayName) {
+      widget.nameCtrl.text = match.displayName;
+    }
+  }
+
+  void _pick(BrokerEntry b) {
+    widget.numberCtrl.text = b.phone;
+    widget.nameCtrl.text = b.displayName;
+    setState(() => _known = b);
+    _nameFocus.unfocus();
+  }
+
+  void _unlock() {
+    widget.numberCtrl.clear();
+    widget.nameCtrl.clear();
+    setState(() => _known = null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final known = _known;
+    final query = widget.nameCtrl.text;
+    final suggestions = known != null || !_nameFocused
+        ? const <BrokerEntry>[]
+        : BrokerDirectory.instance.suggest(query, limit: 5);
+    // A known number typed in the number field also offers its broker.
+    final numberMatch = known == null
+        ? BrokerDirectory.instance.suggest(widget.numberCtrl.text, limit: 3)
+            .where((b) => widget.numberCtrl.text.replaceAll(RegExp(r'\D'), '').length < 10)
+            .toList()
+        : const <BrokerEntry>[];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        addLeadFormRow(
+          context,
+          TextFormField(
+            key: const ValueKey('broker-name'),
+            controller: widget.nameCtrl,
+            focusNode: _nameFocus,
+            readOnly: known != null,
+            textCapitalization: TextCapitalization.words,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: context.fomraTextPrimary,
+            ),
+            validator: (v) => (v == null || v.trim().isEmpty)
+                ? 'Broker Name is required'
+                : null,
+            decoration: addLeadInputDecoration(
+              context,
+              label: 'Broker Name',
+              hint: 'Type to find a known broker',
+              icon: Icons.person_outline_rounded,
+              required: true,
+            ),
+          ),
+          TextFormField(
+            key: const ValueKey('broker-number'),
+            controller: widget.numberCtrl,
+            keyboardType: TextInputType.phone,
+            inputFormatters: PhoneValidation.inputFormatters,
+            validator: PhoneValidation.validator('Broker Mobile Number',
+                required: true),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: context.fomraTextPrimary,
+            ),
+            decoration: addLeadInputDecoration(
+              context,
+              label: 'Broker Mobile Number',
+              hint: '10-digit phone number',
+              icon: Icons.phone_outlined,
+              required: true,
+            ),
+          ),
+        ),
+        if (known != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(children: [
+              const Icon(Icons.verified_rounded,
+                  size: 16, color: AppColors.success),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Known broker · ${known.displayName} (${known.phoneLabel}). '
+                  'Name comes from the Broker Directory.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: context.fomraTextSecondary,
+                  ),
+                ),
+              ),
+              TextButton(onPressed: _unlock, child: const Text('Change')),
+            ]),
+          ),
+        if (suggestions.isNotEmpty || numberMatch.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: context.fomraCardShadow,
+            ),
+            child: Material(
+              color: context.fomraSurface,
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: context.fomraBorder),
+              ),
+              child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                  child: Text(
+                    'Known brokers — tap to fill',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: context.fomraTextTertiary,
+                    ),
+                  ),
+                ),
+                for (final b in {...suggestions, ...numberMatch})
+                  ListTile(
+                    key: ValueKey('broker-suggestion-${b.phone}'),
+                    dense: true,
+                    leading: const Icon(Icons.handshake_outlined,
+                        size: 20, color: AppColors.primary),
+                    title: Text(b.displayName,
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                    subtitle: Text(b.phoneLabel),
+                    onTap: () => _pick(b),
+                  ),
+              ],
+            ),
+            ),
+          ),
+      ],
+    );
+  }
+}
 
 class _Field extends StatelessWidget {
   final TextEditingController ctrl;

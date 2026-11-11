@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/land_lead.dart';
+import '../../services/broker_directory.dart';
 import '../../models/lead_list_filter.dart';
 import '../../models/employee_profile.dart';
 import '../../services/error_log_service.dart';
@@ -291,6 +292,7 @@ class _LandLeadScreenState extends State<LandLeadScreen> {
         l.taluk.toLowerCase().contains(q) ||
         l.district.toLowerCase().contains(q) ||
         l.brokerName.toLowerCase().contains(q) ||
+        l.brokerDisplayName.toLowerCase().contains(q) ||
         l.brokerContact.toLowerCase().contains(q) ||
         _docNumberMatches(l.leadId, q);
   }

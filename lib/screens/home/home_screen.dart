@@ -16,6 +16,7 @@ import '../land_lead/leads_map_screen.dart';
 import '../land_lead/management_visit_review_dialog.dart';
 import '../../services/approval_chain.dart';
 import '../../services/auth_service.dart';
+import '../../services/broker_directory.dart';
 import '../../services/app_store.dart';
 import '../../models/employee_profile.dart';
 import '../../services/employee_service.dart';
@@ -365,8 +366,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<DateTime> _newBrokerDatesThisMonth(List<LandLead> leads, DateTime now) {
     final firstSeen = <String, DateTime>{};
     for (final l in leads) {
-      final broker = l.brokerName.trim().toLowerCase();
-      if (broker.isEmpty) continue;
+      // By mobile number: one broker typed two ways is still one broker.
+      if (l.brokerName.trim().isEmpty) continue;
+      final broker = BrokerDirectory.keyFor(l);
       final existing = firstSeen[broker];
       if (existing == null || l.addedOn.isBefore(existing)) {
         firstSeen[broker] = l.addedOn;
@@ -1063,8 +1065,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   index: 2,
                   child: PortalSectionCard(
                     title: 'Brokers · Energisers & Low Yield',
-                    subtitle: 'Share of each broker\'s lands where we met the '
-                        'actual Land Owner · tap a group for the list',
+                    subtitle: 'Last 120 days · share of each broker\'s lands '
+                        'where we met the actual Land Owner · tap a group',
                     icon: Icons.handshake_outlined,
                     child: BrokerEnergySummary(leads: leads),
                   ),

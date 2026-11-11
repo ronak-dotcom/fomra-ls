@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../analytics/broker_energy.dart';
 import '../analytics/management_bi_metrics.dart';
 import '../models/employee_profile.dart';
 import '../models/land_lead.dart';
@@ -14,7 +15,9 @@ import '../utils/contact_directory.dart';
 import 'csv_saver_stub.dart'
     if (dart.library.html) 'csv_saver_web.dart'
     if (dart.library.io) 'csv_saver_io.dart';
+import 'broker_directory.dart';
 import 'land_lead_legal_service.dart';
+import 'land_lead_meeting_service.dart';
 import 'management_bi_activity_service.dart';
 import 'pdf_saver_stub.dart'
     if (dart.library.html) 'pdf_saver_web.dart'
@@ -107,7 +110,7 @@ extension ReportKindX on ReportKind {
         ReportKind.employee => 'Performance by executive',
         ReportKind.district => 'Sites grouped by district',
         ReportKind.village => 'Sites grouped by village',
-        ReportKind.broker => 'Broker directory and linked sites',
+        ReportKind.broker => 'Lifetime broker performance · owner meetings',
         ReportKind.owner => 'Owner directory and linked sites',
         ReportKind.conversion => 'Acquisition and conversion rates',
         ReportKind.siteAgeing => 'Age buckets across the pipeline',
@@ -185,6 +188,37 @@ class ReportCatalogService {
     await savePdf(bytes, fileName);
   }
 
+  /// Downloads a report the user has already viewed, from that same data, so
+  /// the file matches what was on screen. PDF is capped at [kReportPdfRowCap]
+  /// rows (Excel has every row).
+  static Future<void> exportViewed({
+    required ReportKind kind,
+    required ReportPreviewData data,
+    required ReportFormat format,
+  }) async {
+    final fileName =
+        'FomraLandIQ_${kind.fileStem}_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}'
+        '.${format == ReportFormat.pdf ? 'pdf' : 'csv'}';
+    if (format == ReportFormat.excel || format == ReportFormat.csv) {
+      await saveCsv(_excelFromPreview(data), fileName);
+      return;
+    }
+    final capped = ReportPreviewData(
+      generatedAt: data.generatedAt,
+      summary: data.summary,
+      sections: [
+        for (final sec in data.sections)
+          ReportPreviewSection(
+            title: sec.title,
+            headers: sec.headers,
+            rows: _maybeCap(sec.rows, true),
+            emptyMessage: sec.emptyMessage,
+          ),
+      ],
+    );
+    await savePdf(await _buildPdf(capped, kind.label), fileName);
+  }
+
   /// Builds a preview, loading site-visit activity / legal documents when
   /// the report needs them.
   static Future<ReportPreviewData> buildLivePreview({
@@ -196,6 +230,13 @@ class ReportCatalogService {
   }) async {
     final activity = await _loadActivityIfNeeded(kind);
     final legalDocs = await _loadLegalDocsIfNeeded(kind);
+    Set<String> ownerMet = const {};
+    if (kind == ReportKind.broker) {
+      await BrokerDirectory.instance.ensureLoaded();
+      try {
+        ownerMet = await LandLeadMeetingService.leadIdsWithLandOwnerMeeting();
+      } catch (_) {}
+    }
     return buildPreview(
       kind: kind,
       leads: leads,
@@ -203,6 +244,7 @@ class ReportCatalogService {
       employeeName: employeeName,
       siteVisits: activity.siteVisits,
       legalDocs: legalDocs,
+      ownerMetLeadIds: ownerMet,
       capForPdf: capForPdf,
     );
   }
@@ -236,6 +278,7 @@ class ReportCatalogService {
     String? employeeName,
     List<LandLeadSiteVisit> siteVisits = const [],
     List<LandLeadLegalDocument> legalDocs = const [],
+    Set<String> ownerMetLeadIds = const {},
     bool capForPdf = true,
   }) {
     final scoped = _periodFilter(leads, kind);
@@ -249,8 +292,7 @@ class ReportCatalogService {
         _employeePreview(scoped, employees, employeeName, cap: cap),
       ReportKind.district => _districtPreview(scoped, cap: cap),
       ReportKind.village => _villagePreview(scoped, cap: cap),
-      ReportKind.broker =>
-        _directoryPreview(scoped, ContactDirectoryKind.broker, cap: cap),
+      ReportKind.broker => _brokerPreview(scoped, ownerMetLeadIds, cap: cap),
       ReportKind.owner =>
         _directoryPreview(scoped, ContactDirectoryKind.owner, cap: cap),
       ReportKind.conversion => _conversionPreview(scoped),
@@ -532,6 +574,74 @@ class ReportCatalogService {
           rowLeads:
               _maybeCapLeads(entries.map((e) => e.leads).toList(), cap),
           emptyMessage: isOwner ? 'No owners found.' : 'No brokers found.',
+        ),
+      ],
+    );
+  }
+
+  /// Lifetime broker performance, one row per broker (by mobile number, so
+  /// one broker typed two ways is one row), best owner-meeting share first.
+  /// Each row opens that broker's lands.
+  static ReportPreviewData _brokerPreview(
+    List<LandLead> leads,
+    Set<String> ownerMet, {
+    required bool cap,
+  }) {
+    final rows = BrokerEnergyAnalytics.compute(leads, ownerMet);
+    final byKey = <String, List<LandLead>>{};
+    for (final l in leads) {
+      if (l.brokerName.trim().isEmpty) continue;
+      (byKey[BrokerDirectory.keyFor(l)] ??= []).add(l);
+    }
+    String phoneOf(String key) =>
+        key.startsWith('name:') ? '-' : BrokerDirectory.formatPhone(key);
+    final lands = rows.fold<int>(0, (s, r) => s + r.lands);
+    final met = rows.fold<int>(0, (s, r) => s + r.ownerMeetings);
+    int count(BrokerEnergy e) => rows.where((r) => r.energy == e).length;
+    return ReportPreviewData(
+      generatedAt: DateTime.now(),
+      summary: [
+        (label: 'Brokers', value: '${rows.length}'),
+        (label: 'Lands given', value: '$lands'),
+        (
+          label: 'Owner met',
+          value: lands == 0 ? '0' : '$met (${(met / lands * 100).round()}%)',
+        ),
+        (label: 'Energisers', value: '${count(BrokerEnergy.giver)}'),
+        (label: 'Average', value: '${count(BrokerEnergy.average)}'),
+        (label: 'Low Yield', value: '${count(BrokerEnergy.drainer)}'),
+      ],
+      sections: [
+        ReportPreviewSection(
+          title: 'Broker Performance · Lifetime',
+          headers: const [
+            'Broker',
+            'Mobile',
+            'Lands',
+            'Owner met',
+            'Owner met %',
+            'Rating',
+            'Converted',
+            'Dropped',
+            'Last land',
+          ],
+          rows: _maybeCap([
+            for (final r in rows)
+              [
+                r.name,
+                phoneOf(r.key),
+                '${r.lands}',
+                '${r.ownerMeetings}',
+                '${r.meetingRate.round()}%',
+                r.energy.label,
+                '${r.converted}',
+                '${r.dropped}',
+                r.lastLandOn == null ? '-' : _date.format(r.lastLandOn!),
+              ],
+          ], cap),
+          rowLeads: _maybeCapLeads(
+              [for (final r in rows) byKey[r.key] ?? const <LandLead>[]], cap),
+          emptyMessage: 'No broker lands.',
         ),
       ],
     );

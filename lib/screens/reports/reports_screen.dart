@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/land_lead.dart';
+import '../../services/broker_directory.dart';
 import '../../services/app_store.dart';
 import '../../services/auth_service.dart';
 import '../../services/report_catalog_service.dart';
@@ -14,11 +15,9 @@ import '../../theme/fomra_theme_context.dart';
 import '../../widgets/fomra_app_bar.dart';
 import '../../widgets/fomra_app_shell.dart';
 import '../../widgets/ui/app_components.dart';
-import '../../widgets/ui/app_feedback.dart';
-import '../../widgets/ui/app_table.dart';
 import '../../widgets/ui/multi_select_field.dart';
 import '../land_lead/filtered_leads_screen.dart';
-import '../land_lead/lead_detail_screen.dart';
+import 'report_viewer_screen.dart';
 
 /// Management + admins can export reports, and executives can export their own
 /// (report data is already scoped to their leads via [AppStore.visibleLeads]).
@@ -96,13 +95,8 @@ class ReportsScreen extends StatefulWidget {
 }
 
 class _ReportsScreenState extends State<ReportsScreen> {
-  ReportFormat _format = ReportFormat.pdf;
   final Set<ReportKind> _selectedKinds = {};
-  bool _exporting = false;
 
-  bool _previewLoading = false;
-  ReportKind? _previewKind;
-  ReportPreviewData? _previewData;
 
   DateTimeRange? _dateRange;
   Set<String> _executive = {};
@@ -174,7 +168,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       if (_executive.isNotEmpty && !_executive.contains(l.createdByName)) return false;
       if (_district.isNotEmpty && !_district.contains(l.district)) return false;
       if (_village.isNotEmpty && !_village.contains(l.village)) return false;
-      if (_broker.isNotEmpty && !_broker.contains(l.brokerName)) return false;
+      if (_broker.isNotEmpty && !_broker.contains(l.brokerDisplayName)) return false;
       if (_owner.isNotEmpty && !_owner.contains(l.ownerName)) return false;
       if (_stages.isNotEmpty && !_stages.contains(l.status)) return false;
       if (_status != null && !_status!.matches(l.status)) return false;
@@ -196,104 +190,36 @@ class _ReportsScreenState extends State<ReportsScreen> {
     if (picked != null) setState(() => _dateRange = picked);
   }
 
-  void _toggleKind(ReportKind kind) {
-    // Only one report type may be selected at a time — selecting another
-    // automatically deselects the previous one.
-    setState(() {
-      if (_selectedKinds.contains(kind)) {
-        _selectedKinds.clear();
-      } else {
-        _selectedKinds
-          ..clear()
-          ..add(kind);
-      }
-    });
-  }
+  /// "Filtered: 2 filters" style note for the viewer, or null.
+  String? get _filterSummary => _hasActiveFilters
+      ? 'Filtered ($_activeFilterCount filter${_activeFilterCount == 1 ? '' : 's'})'
+      : null;
 
-  void _selectQuickReport(ReportKind kind) {
+  /// Reports open to view first — full screen, every row. Downloading is a
+  /// separate, deliberate step from inside the viewer.
+  void _openReport(ReportKind kind) {
     setState(() {
       _selectedKinds
         ..clear()
         ..add(kind);
     });
-    _loadPreview();
-  }
-
-  Future<void> _loadPreview() async {
-    if (_selectedKinds.isEmpty) {
-      AppFeedback.warning(context, 'Select a report to preview.');
-      return;
-    }
-    final kind = _selectedKinds.first;
-    setState(() {
-      _previewLoading = true;
-      _previewKind = kind;
-    });
-    try {
-      final data = await ReportCatalogService.buildLivePreview(
-        kind: kind,
-        leads: _filteredLeads,
-        employees: AppStore.instance.employees,
-      );
-      if (!mounted) return;
-      setState(() {
-        _previewData = data;
-        _previewLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _previewLoading = false);
-      AppFeedback.error(context, 'Preview failed: $e');
-    }
-  }
-
-  Future<void> _generate() async {
-    if (_selectedKinds.isEmpty) {
-      AppFeedback.warning(context, 'Select at least one report type.');
-      return;
-    }
-    if (!_reportsCanExport) {
-      AppFeedback.error(context, RoleAccess.deniedMessage('export reports'));
-      return;
-    }
-    setState(() => _exporting = true);
-    final leads = _filteredLeads;
-    final employees = AppStore.instance.employees;
-    var succeeded = 0;
-    var failed = 0;
-    for (final kind in _selectedKinds) {
-      try {
-        await ReportCatalogService.exportOneClick(
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReportViewerScreen(
           kind: kind,
-          leads: leads,
-          employees: employees,
-          format: _format,
-        );
-        succeeded++;
-      } catch (_) {
-        failed++;
-      }
-    }
-    if (!mounted) return;
-    setState(() => _exporting = false);
-    final fmt = _formatLabel(_format);
-    if (failed == 0) {
-      AppFeedback.success(
-        context,
-        succeeded == 1
-            ? 'Exported 1 report as $fmt.'
-            : 'Exported $succeeded reports as $fmt.',
-      );
-    } else {
-      AppFeedback.error(context, '$succeeded exported, $failed failed.');
-    }
+          leads: _filteredLeads,
+          employees: AppStore.instance.employees,
+          filterSummary: _filterSummary,
+          canDownload: _reportsCanExport,
+        ),
+      ),
+    );
   }
 
-  static String _formatLabel(ReportFormat f) => switch (f) {
-        ReportFormat.pdf => 'PDF',
-        ReportFormat.excel => 'Excel',
-        ReportFormat.csv => 'CSV',
-      };
+  void _toggleKind(ReportKind kind) => _openReport(kind);
+
+  void _selectQuickReport(ReportKind kind) => _openReport(kind);
 
   IconData _icon(ReportKind kind) => switch (kind) {
         ReportKind.daily => Icons.today_outlined,
@@ -450,7 +376,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               MultiSelectField<String>(
                 label: 'Broker',
                 icon: Icons.handshake_outlined,
-                options: _distinct((l) => l.brokerName),
+                options: _distinct((l) => l.brokerDisplayName),
                 selected: _broker,
                 labelOf: (s) => s,
                 onChanged: (v) => apply(() => _broker = v),
@@ -561,10 +487,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
             _lostDealAnalysisSection(context),
             const SizedBox(height: 20),
             _brokerPerformanceSection(context),
-            const SizedBox(height: 20),
-            _previewSection(context),
-            const SizedBox(height: 20),
-            _exportSection(context),
           ],
         ],
       ),
@@ -590,7 +512,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ),
               const SizedBox(height: 2),
               Text(
-                'Build enterprise reports, preview, and export as PDF or Excel.',
+                'Open any report to view it in full. Download as PDF or Excel '
+                'from inside the report when you need a file.',
                 style:
                     TextStyle(fontSize: 13, color: context.fomraTextSecondary),
               ),
@@ -685,7 +608,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _sectionLabel(context, 'Report types', Icons.grid_view_outlined,
-            trailing: '${_selectedKinds.length} selected'),
+            trailing: 'Tap a report to open it'),
         const SizedBox(height: 10),
         for (final cat in _reportCategories) ...[
           Padding(
@@ -1093,10 +1016,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
         .where((l) => l.brokerName.trim().isNotEmpty)
         .toList();
 
+    // By mobile number (one broker typed two ways is one row), shown under
+    // the Broker Directory's name.
     final byBroker = <String, List<LandLead>>{};
     for (final lead in leads) {
-      final key = lead.brokerName.trim();
-      (byBroker[key] ??= []).add(lead);
+      (byBroker[BrokerDirectory.keyFor(lead)] ??= []).add(lead);
     }
 
     final rows = byBroker.entries.map((e) {
@@ -1105,7 +1029,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
       final dropped = all.where((l) => l.status == LeadStatus.dropped).length;
       final conversion = all.isEmpty ? 0.0 : signed / all.length * 100;
       return (
-        broker: e.key,
+        key: e.key,
+        broker: all.first.brokerDisplayName,
         total: all.length,
         signed: signed,
         dropped: dropped,
@@ -1119,8 +1044,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionLabel(context, 'Broker Performance', Icons.handshake_outlined,
+          _sectionLabel(context, 'Broker Performance · Lifetime',
+              Icons.handshake_outlined,
               trailing: '${rows.length} brokers'),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => _openReport(ReportKind.broker),
+              icon: const Icon(Icons.open_in_full_rounded, size: 16),
+              label: const Text(
+                  'Open full Broker report (owner meetings, rating)'),
+            ),
+          ),
           const SizedBox(height: 12),
           if (rows.isEmpty)
             Text(
@@ -1144,7 +1080,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   context,
                   title: r.broker,
                   subtitle: 'Broker Performance',
-                  leads: byBroker[r.broker] ?? const [],
+                  leads: byBroker[r.key] ?? const [],
                 ),
                 child: Row(
                   children: [
@@ -1192,219 +1128,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
         ),
       );
-
-  Widget _previewSection(BuildContext context) {
-    return AppCard(
-      interactive: false,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _sectionLabel(context, 'Report preview', Icons.visibility_outlined),
-          const SizedBox(height: 12),
-          if (_previewLoading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            )
-          else if (_previewData == null || _previewKind == null)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Text(
-                'Select a report and tap "Preview Report" to see sample tables, '
-                'KPIs and summaries before exporting.',
-                style:
-                    TextStyle(fontSize: 13, color: context.fomraTextSecondary),
-              ),
-            )
-          else
-            _previewContent(context, _previewKind!, _previewData!),
-        ],
-      ),
-    );
-  }
-
-  Widget _previewContent(
-    BuildContext context,
-    ReportKind kind,
-    ReportPreviewData data,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          kind.label,
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-            color: context.fomraTextPrimary,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final s in data.summary)
-              Chip(
-                label: Text('${s.label}: ${s.value}'),
-                visualDensity: VisualDensity.compact,
-              ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        for (final section in data.sections.take(2)) ...[
-          Text(
-            '${section.title} (${section.count})',
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          if (section.rows.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(
-                section.emptyMessage,
-                style: TextStyle(color: context.fomraTextSecondary),
-              ),
-            )
-          else
-            AppDataTable(
-              minWidth: 520,
-              columns: [for (final h in section.headers) AppTableColumn(h)],
-              rows: [
-                for (var i = 0; i < section.rows.take(8).length; i++)
-                  AppTableRow(
-                    cells: [for (final c in section.rows[i]) Text(c)],
-                    onTap: i >= section.rowLeads.length ||
-                            section.rowLeads[i].isEmpty
-                        ? null
-                        : () {
-                            final rowLeads = section.rowLeads[i];
-                            if (rowLeads.length == 1) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => LeadDetailScreen(
-                                      lead: rowLeads.first),
-                                ),
-                              );
-                            } else {
-                              FilteredLeadsScreen.openList(
-                                context,
-                                title: section.title,
-                                subtitle: section.rows[i].first,
-                                leads: rowLeads,
-                              );
-                            }
-                          },
-                  ),
-              ],
-            ),
-          if (section.rows.length > 8)
-            Padding(
-              padding: const EdgeInsets.only(top: 6, bottom: 12),
-              child: Text(
-                'Showing first 8 of ${section.rows.length} rows. Export for full data.',
-                style:
-                    TextStyle(fontSize: 12, color: context.fomraTextSecondary),
-              ),
-            ),
-          const SizedBox(height: 8),
-        ],
-      ],
-    );
-  }
-
-  Widget _exportSection(BuildContext context) {
-    return AppCard(
-      interactive: false,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _sectionLabel(context, 'Export', Icons.download_outlined),
-          const SizedBox(height: 12),
-          SegmentedButton<ReportFormat>(
-            segments: const [
-              ButtonSegment(
-                value: ReportFormat.pdf,
-                label: Text('PDF'),
-                icon: Icon(Icons.picture_as_pdf_outlined, size: 16),
-              ),
-              ButtonSegment(
-                value: ReportFormat.excel,
-                label: Text('Excel'),
-                icon: Icon(Icons.table_chart_outlined, size: 16),
-              ),
-            ],
-            selected: {_format},
-            onSelectionChanged: (s) => setState(() => _format = s.first),
-          ),
-          const SizedBox(height: 14),
-          LayoutBuilder(
-            builder: (context, c) {
-              final preview = OutlinedButton.icon(
-                onPressed: _previewLoading ? null : _loadPreview,
-                icon: const Icon(Icons.visibility_outlined, size: 18),
-                label: const Text('Preview Report'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-              );
-              final generate = FilledButton.icon(
-                onPressed:
-                    _exporting || !_reportsCanExport ? null : _generate,
-                icon: _exporting
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.download_rounded, size: 18),
-                label: Text(_exporting
-                    ? 'Generating…'
-                    : 'Generate Report${_selectedKinds.isEmpty ? '' : ' (${_selectedKinds.length})'}'),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-              );
-              if (c.maxWidth < 460) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    preview,
-                    const SizedBox(height: 10),
-                    generate,
-                  ],
-                );
-              }
-              return Row(
-                children: [
-                  Expanded(child: preview),
-                  const SizedBox(width: 12),
-                  Expanded(flex: 2, child: generate),
-                ],
-              );
-            },
-          ),
-          if (!_reportsCanExport) ...[
-            const SizedBox(height: 8),
-            Text(
-              RoleAccess.deniedMessage('export reports'),
-              style: TextStyle(fontSize: 12, color: context.fomraTextSecondary),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
 
   Widget _sectionLabel(BuildContext context, String text, IconData icon,
       {String? trailing}) {

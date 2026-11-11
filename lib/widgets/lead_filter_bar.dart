@@ -4,6 +4,7 @@ import '../models/employee_profile.dart';
 import '../models/land_lead.dart';
 import '../services/app_store.dart';
 import '../services/auth_service.dart';
+import '../services/broker_directory.dart';
 import '../services/lead_review_service.dart';
 import 'land_workspace_ui.dart';
 
@@ -114,7 +115,7 @@ bool leadMatchesSearch(LandLead l, String query) {
   if (q.isEmpty) return true;
   return '${l.leadId} ${l.displayName} ${l.ownerName} ${l.location} '
           '${l.village} ${l.taluk} ${l.district} ${l.surveyNumber} '
-          '${l.brokerName} ${l.createdByName}'
+          '${l.brokerName} ${l.brokerDisplayName} ${l.createdByName}'
       .toLowerCase()
       .contains(q);
 }

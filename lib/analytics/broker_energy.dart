@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/land_lead.dart';
+import '../services/broker_directory.dart';
 import '../theme/app_theme.dart';
 
 /// How much a broker's lands turn into real land owner meetings.
@@ -53,6 +54,8 @@ extension BrokerEnergyX on BrokerEnergy {
 }
 
 class BrokerEnergyRow {
+  /// Mobile number the broker is grouped by (BrokerDirectory.keyFor).
+  final String key;
   final String name;
   final int lands;
 
@@ -64,6 +67,7 @@ class BrokerEnergyRow {
   final DateTime? lastLandOn;
 
   const BrokerEnergyRow({
+    this.key = '',
     required this.name,
     required this.lands,
     required this.ownerMeetings,
@@ -82,6 +86,17 @@ class BrokerEnergyRow {
 }
 
 abstract final class BrokerEnergyAnalytics {
+  /// The Energiser / Low Yield rating is on recent form: lands given in the
+  /// last 120 days. Lifetime figures are in Reports > Broker Report.
+  static const windowDays = 120;
+
+  /// Leads added within the last [windowDays] days of [now].
+  static List<LandLead> recent(List<LandLead> leads, {DateTime? now}) {
+    final from = (now ?? DateTime.now())
+        .subtract(const Duration(days: windowDays));
+    return [for (final l in leads) if (l.addedOn.isAfter(from)) l];
+  }
+
   /// One row per broker (by [LandLead.brokerName], case-insensitive), ranked
   /// best first: meeting rate, then owner meetings, then lands given.
   /// [leadIdsWithOwnerMeeting] are the leads that had a Land Owner meeting.
@@ -89,25 +104,27 @@ abstract final class BrokerEnergyAnalytics {
     List<LandLead> leads,
     Set<String> leadIdsWithOwnerMeeting,
   ) {
+    // By mobile number, shown under the directory's name.
+    final dir = BrokerDirectory.instance;
     final byBroker = <String, List<LandLead>>{};
     for (final l in leads) {
-      final name = l.brokerName.trim();
-      if (name.isEmpty) continue;
-      (byBroker[name.toLowerCase()] ??= []).add(l);
+      if (l.brokerName.trim().isEmpty) continue;
+      (byBroker[BrokerDirectory.keyFor(l)] ??= []).add(l);
     }
     final rows = [
-      for (final list in byBroker.values)
+      for (final e in byBroker.entries)
         BrokerEnergyRow(
-          name: list.first.brokerName.trim(),
-          lands: list.length,
-          ownerMeetings: list
+          key: e.key,
+          name: dir.nameFor(e.value.first),
+          lands: e.value.length,
+          ownerMeetings: e.value
               .where((l) =>
                   leadIdsWithOwnerMeeting.contains(l.leadId) ||
                   l.status.isAcquired)
               .length,
-          converted: list.where((l) => l.status.isAcquired).length,
-          dropped: list.where((l) => l.status == LeadStatus.dropped).length,
-          lastLandOn: list
+          converted: e.value.where((l) => l.status.isAcquired).length,
+          dropped: e.value.where((l) => l.status == LeadStatus.dropped).length,
+          lastLandOn: e.value
               .map((l) => l.addedOn)
               .reduce((a, b) => a.isAfter(b) ? a : b),
         ),

@@ -6,6 +6,7 @@ import '../../models/land_lead.dart';
 import '../../models/land_lead_meeting.dart';
 import '../../models/monthly_target_submission.dart';
 import '../../services/app_store.dart';
+import '../../services/broker_directory.dart';
 import '../../services/employee_service.dart';
 import '../../services/management_bi_activity_service.dart';
 import '../../services/monthly_target_submission_service.dart';
@@ -150,8 +151,9 @@ class _TargetTabState extends State<_TargetTab> {
     // this employee's leads — same rule as the employee's own Home card.
     final firstSeen = <String, DateTime>{};
     for (final l in myLeads) {
-      final broker = l.brokerName.trim().toLowerCase();
-      if (broker.isEmpty) continue;
+      // By mobile number: one broker typed two ways is still one broker.
+      if (l.brokerName.trim().isEmpty) continue;
+      final broker = BrokerDirectory.keyFor(l);
       final existing = firstSeen[broker];
       if (existing == null || l.addedOn.isBefore(existing)) {
         firstSeen[broker] = l.addedOn;
