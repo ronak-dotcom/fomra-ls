@@ -2,10 +2,16 @@ import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show AppLifecycleListener;
+import 'package:http/http.dart' show ClientException;
+import 'package:supabase_flutter/supabase_flutter.dart'
+    show AuthRetryableFetchException, PostgrestException;
 
 import '../models/land_lead.dart';
 import '../screens/task_management/task_management_screen.dart' as tasks;
 import 'app_store.dart';
+import 'auth_service.dart';
+import 'error_log_service.dart';
 import 'land_lead_service.dart';
 import 'offline_queue_store.dart';
 import 'voice_note_service.dart';
@@ -16,19 +22,62 @@ class OfflineSyncService extends ChangeNotifier {
   static final instance = OfflineSyncService._();
 
   StreamSubscription<List<ConnectivityResult>>? _sub;
+  Timer? _retryTimer;
+  AppLifecycleListener? _lifecycle;
   bool _online = true;
   bool _syncing = false;
   int _pending = 0;
+  int _failed = 0;
   String? _lastSyncMessage;
+
+  /// After this many failed tries a queued item is shown as "couldn't
+  /// upload" (it keeps retrying).
+  static const failedAfterAttempts = 3;
 
   bool get isOnline => _online;
   bool get isSyncing => _syncing;
   int get pendingCount => _pending;
+
+  /// Queued items that keep failing (not just waiting for signal).
+  int get failedCount => _failed;
   String? get lastSyncMessage => _lastSyncMessage;
+
+  /// Whether [e] means "no / weak network" (so the save should be queued),
+  /// as opposed to the server refusing it (shown to the user instead).
+  static bool isNetworkError(Object e) {
+    if (e is TimeoutException || e is ClientException) return true;
+    if (e is AuthRetryableFetchException) return true;
+    if (e is PostgrestException) {
+      // A refusal from the database has a code; a failed fetch has none.
+      final code = e.code ?? '';
+      return code.isEmpty ||
+          e.message.contains('Failed to fetch') ||
+          e.message.contains('NetworkError');
+    }
+    final text = e.toString();
+    return text.contains('SocketException') ||
+        text.contains('Failed to fetch') ||
+        text.contains('XMLHttpRequest error') ||
+        text.contains('NetworkError') ||
+        text.contains('Connection closed') ||
+        text.contains('Connection refused');
+  }
 
   Future<void> start() async {
     await _refreshConnectivity();
     await refreshPendingCount();
+    // Upload anything queued on an earlier visit straight away, then keep
+    // trying every minute while something waits, and whenever the app comes
+    // back to the screen — not only when the phone reports "back online".
+    if (_pending > 0) unawaited(syncNow());
+    _retryTimer?.cancel();
+    _retryTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (_pending > 0 && !_syncing) unawaited(syncNow());
+    });
+    _lifecycle?.dispose();
+    _lifecycle = AppLifecycleListener(onResume: () {
+      if (_pending > 0 && !_syncing) unawaited(syncNow());
+    });
     _sub?.cancel();
     _sub = Connectivity().onConnectivityChanged.listen((results) async {
       final next = results.any((r) => r != ConnectivityResult.none);
@@ -44,6 +93,10 @@ class OfflineSyncService extends ChangeNotifier {
   Future<void> disposeService() async {
     await _sub?.cancel();
     _sub = null;
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    _lifecycle?.dispose();
+    _lifecycle = null;
   }
 
   Future<void> _refreshConnectivity() async {
@@ -58,12 +111,20 @@ class OfflineSyncService extends ChangeNotifier {
 
   Future<void> refreshPendingCount() async {
     _pending = await OfflineQueueStore.pendingCount;
+    try {
+      _failed = (await OfflineQueueStore.load())
+          .where((o) => o.attempts >= failedAfterAttempts)
+          .length;
+    } catch (_) {}
     notifyListeners();
   }
 
+  /// [clientRef] is the Add Lead form's tag for this save; the upload uses
+  /// it so a save that half-went-through can't create a duplicate.
   Future<void> enqueueCreateLead({
     required LandLead lead,
     List<Uint8List> photoBytes = const [],
+    String? clientRef,
   }) async {
     final blobIds = <String>[];
     for (final bytes in photoBytes) {
@@ -80,6 +141,7 @@ class OfflineSyncService extends ChangeNotifier {
       createdAt: DateTime.now().toUtc(),
       payload: {
         'temp_id': tempId,
+        if (clientRef != null) 'client_ref': clientRef,
         'lead': _leadToMap(offlineLead, overrideId: tempId),
       },
       blobIds: blobIds,
@@ -194,16 +256,33 @@ class OfflineSyncService extends ChangeNotifier {
     notifyListeners();
     var synced = 0;
     try {
+      // The login token may have expired while there was no signal.
+      if (!await AuthService.instance.ensureLiveSession()) {
+        _lastSyncMessage = 'Waiting to reconnect your login — will retry.';
+        return 0;
+      }
       final ops = await OfflineQueueStore.load();
       for (final op in [...ops]) {
         try {
           await _process(op);
           await OfflineQueueStore.remove(op.id);
           synced++;
-        } catch (e) {
+        } catch (e, st) {
           op.attempts += 1;
           op.lastError = e.toString();
           await OfflineQueueStore.update(op);
+          // A refusal (not just no signal) goes to the error log, so a stuck
+          // upload can be traced without the executive reporting it.
+          if (!isNetworkError(e)) {
+            unawaited(ErrorLogService.capture(
+              e,
+              stack: st,
+              action: 'offline_sync_${op.type.name}',
+              source: 'offline_sync',
+              message: 'Queued ${op.type.name} failed (try ${op.attempts}): '
+                  '${e.toString()}',
+            ));
+          }
           // Stop on first hard failure to preserve order for dependent ops.
           if (op.attempts >= 5) continue;
           break;
@@ -248,6 +327,9 @@ class OfflineSyncService extends ChangeNotifier {
     final created = await LandLeadService.create(
       draft,
       sitePhotoBytes: photos,
+      // Older queue entries have no tag; the op id still de-duplicates
+      // retries of this upload.
+      clientRef: op.payload['client_ref'] as String? ?? op.id,
     );
     AppStore.instance.removeLead(tempId);
     AppStore.instance.addLead(created);

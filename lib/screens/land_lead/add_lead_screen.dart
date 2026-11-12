@@ -111,6 +111,15 @@ class AddLeadScreen extends StatefulWidget {
 }
 
 class _AddLeadScreenState extends State<AddLeadScreen> {
+  /// Tags this form's save. Sent with the lead (online or queued offline), so
+  /// a save that is retried after a lost reply can't create a duplicate.
+  final String _clientRef =
+      'lead_${DateTime.now().microsecondsSinceEpoch}_${identityHashCode(Object())}';
+
+  /// On a weak signal, wait this long for the save before keeping it on the
+  /// phone and uploading it automatically later.
+  static const _saveTimeout = Duration(seconds: 25);
+
   final _formKey = GlobalKey<FormState>();
 
   // Section 1 — MCQ
@@ -1258,11 +1267,12 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
         if (_isEdit) {
           await sync.enqueueUpdateLead(lead: lead, photoBytes: photoBytes);
         } else {
-          await sync.enqueueCreateLead(lead: lead, photoBytes: photoBytes);
+          await sync.enqueueCreateLead(
+              lead: lead, photoBytes: photoBytes, clientRef: _clientRef);
         }
         if (!mounted) return;
-        AppFeedback.warning(
-            context, 'Saved offline — will sync when network returns.');
+        AppFeedback.warning(context,
+            'No signal — saved on this phone. It will upload automatically.');
         Navigator.pop(context, lead);
         return;
       }
@@ -1278,24 +1288,31 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
               lead,
               sitePhotoBytes: photoBytes,
               onProgress: _onSaveProgress,
-            );
+              clientRef: _clientRef,
+            ).timeout(_saveTimeout);
       if (!mounted) return;
       Navigator.pop(context, saved);
     } catch (e) {
-      // Network failure mid-save → queue for later.
-      try {
-        final sync = OfflineSyncService.instance;
-        if (_isEdit) {
-          await sync.enqueueUpdateLead(lead: lead, photoBytes: photoBytes);
-        } else {
-          await sync.enqueueCreateLead(lead: lead, photoBytes: photoBytes);
-        }
-        if (!mounted) return;
-        AppFeedback.warning(
-            context, 'Network error — queued offline for sync.');
-        Navigator.pop(context, lead);
-        return;
-      } catch (_) {}
+      // No / weak signal mid-save → keep it on the phone and upload later.
+      // (A refusal from the server is shown instead — queuing it would only
+      // fail again.) The same tag means a save that did reach the server
+      // isn't created twice.
+      if (OfflineSyncService.isNetworkError(e)) {
+        try {
+          final sync = OfflineSyncService.instance;
+          if (_isEdit) {
+            await sync.enqueueUpdateLead(lead: lead, photoBytes: photoBytes);
+          } else {
+            await sync.enqueueCreateLead(
+                lead: lead, photoBytes: photoBytes, clientRef: _clientRef);
+          }
+          if (!mounted) return;
+          AppFeedback.warning(context,
+              'Weak signal — saved on this phone. It will upload automatically.');
+          Navigator.pop(context, lead);
+          return;
+        } catch (_) {}
+      }
       if (!mounted) return;
       setState(() => _saving = false);
       AppFeedback.error(

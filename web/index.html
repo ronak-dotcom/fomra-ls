@@ -139,6 +139,11 @@
         }
         return Promise.reject(new Error('service worker disabled'));
       };
+      // Our own app-shell worker (app_sw.js): network-first, so deploys still
+      // show at once, but the app can open with no signal in the field.
+      window.addEventListener('load', function () {
+        __origRegister('app_sw.js', { scope: '/' }).catch(function () {});
+      });
     }
   </script>
 

@@ -4,7 +4,7 @@ publish_to: 'none'
 version: 1.0.1+37
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: '>=3.4.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -15,6 +15,8 @@ dependencies:
   fl_chart: ^0.66.2
   geolocator: ^13.0.0
   connectivity_plus: ^6.1.4
+  # IndexedDB for photos queued offline (lib/services/offline_blob_store_web.dart).
+  web: ^1.1.1
   path_provider: ^2.1.5
   record: ^7.1.1
   audioplayers: ^6.4.0
