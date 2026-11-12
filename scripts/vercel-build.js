@@ -136,11 +136,19 @@ run('flutter pub get');
 // logged clearly but does not fail the deploy, so this adds a real
 // verification signal without introducing a new way to block production
 // releases. Revisit this trade-off if/once GitHub Actions is reliable again.
-try {
-  run('flutter test --reporter expanded');
-  console.log('flutter test: ALL TESTS PASSED');
-} catch (err) {
-  console.log('flutter test: ONE OR MORE TESTS FAILED (see output above) — continuing the build anyway, this step is non-blocking by design.');
+//
+// Off by default: the suite (and its very long failure logs) pushed builds
+// past Vercel's 45-minute limit (BUILD_EXCEEDED_MAXIMUM_TIME), so production
+// never updated. Set VERCEL_RUN_TESTS=1 on the project to turn it back on.
+if (process.env.VERCEL_RUN_TESTS === '1') {
+  try {
+    run('flutter test --reporter compact', { timeout: 10 * 60 * 1000 });
+    console.log('flutter test: ALL TESTS PASSED');
+  } catch (err) {
+    console.log('flutter test: ONE OR MORE TESTS FAILED (see output above) — continuing the build anyway, this step is non-blocking by design.');
+  }
+} else {
+  console.log('flutter test: skipped (set VERCEL_RUN_TESTS=1 to run it here).');
 }
 
 // Stamp the commit into the build so error-log entries say which version of
