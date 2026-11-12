@@ -145,10 +145,13 @@ class AuthService {
 
     final local = (await tabGetString(_localSessionKey)) == 'true';
     // Keep the session while the Supabase session is missing only if it's a
-    // local login or we're still inside the post-login grace window. This stops
-    // a reload from bouncing the user back to the login screen.
+    // local login, we're still inside the post-login grace window, or this
+    // tab still holds a saved Supabase session that just couldn't be
+    // refreshed (no signal in the field). This stops a reload from bouncing
+    // the user back to the login screen — offline they could never log in.
     if (!local &&
         !(await _withinLoginGrace()) &&
+        !(await hasSavedSession()) &&
         _client.auth.currentUser == null) {
       _portal = null;
       _loginEmail = null;
@@ -189,9 +192,38 @@ class AuthService {
     return _defaultNameForEmail(normalized);
   }
 
+  /// Where this tab keeps its Supabase session (see main.dart).
+  static const savedSessionKey = 'fomrals-supabase-session';
+
+  /// This tab holds a saved Supabase session — signed in, even if it could not
+  /// be refreshed yet because there is no network.
+  Future<bool> hasSavedSession() async =>
+      (await tabGetString(savedSessionKey)) != null;
+
+  /// Before talking to the database after being offline: if the login token
+  /// expired while there was no signal, refresh it from this tab's saved
+  /// session. Returns whether a live session is in place.
+  Future<bool> ensureLiveSession() async {
+    if (_client.auth.currentUser != null &&
+        !(_client.auth.currentSession?.isExpired ?? true)) {
+      return true;
+    }
+    final saved = await tabGetString(savedSessionKey);
+    if (saved == null) return _client.auth.currentUser != null;
+    try {
+      await _client.auth.recoverSession(saved);
+    } catch (_) {
+      // Still offline, or the session was revoked (gotrue then signs out).
+    }
+    return _client.auth.currentUser != null;
+  }
+
   Future<bool> checkSession() async {
     await restoreSession();
     if (_client.auth.currentUser != null) return true;
+    // Opened with no signal and an expired token: stay signed in from the
+    // saved session; it is refreshed when the network returns.
+    if (_portal != null && await hasSavedSession()) return true;
     if ((await tabGetString(_localSessionKey)) == 'true' && _portal != null) {
       return true;
     }

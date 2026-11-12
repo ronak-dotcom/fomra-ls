@@ -19,14 +19,25 @@ class OfflineStatusBanner extends StatelessWidget {
         }
 
         final offline = !sync.isOnline;
-        final color = offline
-            ? AppColors.warning
-            : (sync.isSyncing ? AppColors.info : AppColors.primary);
-        final text = offline
-            ? 'Offline · ${sync.pendingCount} change(s) queued'
-            : sync.isSyncing
-                ? 'Syncing queued field data…'
-                : '${sync.pendingCount} change(s) waiting to sync';
+        // Something keeps failing (not just waiting for signal): say so,
+        // plainly, so it isn't left unseen. It keeps retrying, and the
+        // reason is in the error log.
+        final failed = sync.failedCount > 0 && !sync.isSyncing;
+        final color = failed
+            ? AppColors.error
+            : offline
+                ? AppColors.warning
+                : (sync.isSyncing ? AppColors.info : AppColors.primary);
+        final n = sync.pendingCount;
+        final text = failed
+            ? '${sync.failedCount} saved item${sync.failedCount == 1 ? '' : 's'} '
+                "couldn't upload yet — tap to retry"
+            : offline
+                ? 'No signal · $n saved on this phone — will upload '
+                    'automatically'
+                : sync.isSyncing
+                    ? 'Uploading saved field data…'
+                    : '$n saved on this phone, uploading…';
 
         return Material(
           color: color.withValues(alpha: 0.12),
@@ -39,9 +50,11 @@ class OfflineStatusBanner extends StatelessWidget {
               child: Row(
                 children: [
                   Icon(
-                    offline
-                        ? Icons.cloud_off_rounded
-                        : Icons.cloud_sync_rounded,
+                    failed
+                        ? Icons.error_outline_rounded
+                        : offline
+                            ? Icons.cloud_off_rounded
+                            : Icons.cloud_sync_rounded,
                     size: 18,
                     color: color,
                   ),

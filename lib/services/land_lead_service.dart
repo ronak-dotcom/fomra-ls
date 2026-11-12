@@ -53,12 +53,23 @@ class LandLeadService {
     return row == null ? null : _fromRow(row);
   }
 
+  /// [clientRef] tags one "Save" of the Add Lead form. If the same save is
+  /// sent twice — the first reply was lost on a weak signal, or it was queued
+  /// offline and retried — the lead already saved under that tag is returned
+  /// instead of creating a duplicate (and gets its photos if they were lost).
   static Future<LandLead> create(
     LandLead lead, {
     List<Uint8List> sitePhotoBytes = const [],
     LeadSaveProgressCallback? onProgress,
+    String? clientRef,
   }) async {
     onProgress?.call('Saving lead details…');
+    if (clientRef != null) {
+      final existing = await _findByClientRef(clientRef);
+      if (existing != null) {
+        return _attachMissingPhotos(existing, sitePhotoBytes, onProgress);
+      }
+    }
     final userId = _db.auth.currentUser?.id;
     final createdByName = AuthService.instance.currentUser?.fullName ?? '';
     final createdByRole =
@@ -68,7 +79,9 @@ class LandLeadService {
     var sitePhotoUrls = List<String>.from(lead.sitePhotoUrls);
     var sitePhotoUrl = lead.sitePhotoUrl;
 
-    final row = await _insertLandLead(
+    final Map<String, dynamic> row;
+    try {
+      row = await _insertLandLead(
       {
         'id': leadId,
         'input_source': lead.inputSource.name,
@@ -99,10 +112,22 @@ class LandLeadService {
         if (userId != null) 'created_by': userId,
         if (createdByName.isNotEmpty) 'created_by_name': createdByName,
         'created_by_role': createdByRole,
+        if (clientRef != null) 'client_ref': clientRef,
       },
       lead.additionalOwners,
       lead.additionalSurveyNumbers,
     );
+    } on PostgrestException catch (e) {
+      // The same save landed a moment ago (a retry racing the original):
+      // use that lead rather than failing.
+      if (e.code == '23505' && clientRef != null) {
+        final existing = await _findByClientRef(clientRef);
+        if (existing != null) {
+          return _attachMissingPhotos(existing, sitePhotoBytes, onProgress);
+        }
+      }
+      rethrow;
+    }
 
     final photos = sitePhotoBytes.where((b) => b.isNotEmpty).take(4).toList();
     if (photos.isNotEmpty) {
@@ -141,6 +166,44 @@ class LandLeadService {
       executiveName: created.createdByName,
     );
     return created;
+  }
+
+  /// The lead saved under [clientRef], if any (null when the column isn't
+  /// there yet or the lookup fails — then a normal create goes ahead).
+  static Future<LandLead?> _findByClientRef(String clientRef) async {
+    try {
+      final row = await _db
+          .from('land_leads')
+          .select()
+          .eq('client_ref', clientRef)
+          .maybeSingle();
+      return row == null ? null : _fromRow(row);
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST204' || e.code == '42703') return null;
+      rethrow;
+    }
+  }
+
+  /// A retried save whose lead already exists: upload its photos if the
+  /// first attempt saved the lead but lost the photos.
+  static Future<LandLead> _attachMissingPhotos(
+    LandLead existing,
+    List<Uint8List> sitePhotoBytes,
+    LeadSaveProgressCallback? onProgress,
+  ) async {
+    final photos = sitePhotoBytes.where((b) => b.isNotEmpty).take(4).toList();
+    if (photos.isEmpty || existing.sitePhotoUrls.isNotEmpty) return existing;
+    final urls = <String>[];
+    for (var i = 0; i < photos.length; i++) {
+      onProgress?.call('Uploading photo ${i + 1} of ${photos.length}…');
+      urls.add(await _uploadSitePhoto(existing.leadId, photos[i], index: i + 1));
+    }
+    await _db.from('land_leads').update({
+      'site_photo_url': urls.first,
+      'site_photo_urls': urls,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', existing.leadId);
+    return existing.copyWith(sitePhotoUrl: urls.first, sitePhotoUrls: urls);
   }
 
   /// Inserts a lead row, including `additional_owners` and
@@ -203,7 +266,11 @@ class LandLeadService {
 
   /// Optional payload keys that may not exist yet on a database that hasn't
   /// had the corresponding `supabase/land_lead_*.sql` migration applied.
-  static const _optionalColumns = ['additional_owners', 'additional_survey_numbers'];
+  static const _optionalColumns = [
+    'additional_owners',
+    'additional_survey_numbers',
+    'client_ref',
+  ];
 
   /// Returns the payload key a `PGRST204` "column not found" error refers
   /// to, if it's one of [_optionalColumns] present in [payload] — so callers

@@ -16,6 +16,13 @@
   },
   "headers": [
     {
+      "source": "/app_sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" },
+        { "key": "Service-Worker-Allowed", "value": "/" }
+      ]
+    },
+    {
       "source": "/flutter_service_worker.js",
       "headers": [
         { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" },
