@@ -105,6 +105,8 @@ void main() {
     expect(paceOf(d.managementMeetings.progress), TargetPace.onPace);
     expect([d.leads.length, d.legal.length, d.closed.length], [2, 1, 1]);
     expect(d.closedAcres, closeTo(2, 0.01));
+    // Open sites by age: lead 4 (legal, 9 days) is open; 5 is closed.
+    expect([for (final b in d.openByAge) b.length], [1, 0, 0, 0]);
   });
 
   test('a pending target does not count', () {

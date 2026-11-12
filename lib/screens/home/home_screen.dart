@@ -35,7 +35,6 @@ import '../../services/view_scope.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/fomra_layout.dart';
 import '../../theme/fomra_theme_context.dart';
-import '../../models/app_notification.dart';
 import '../../models/land_lead_signed_request.dart';
 import '../../models/land_lead_site_visit.dart';
 import '../settings/employee_monthly_targets_page.dart';
@@ -43,7 +42,8 @@ import '../settings/monthly_target_approvals_page.dart';
 import '../../widgets/fomra_app_bar.dart';
 import '../../widgets/fomra_app_shell.dart';
 import '../../widgets/ui/app_feedback.dart';
-import '../../widgets/management_executive_dashboard.dart';
+import '../../widgets/management_home_cards.dart';
+import '../../analytics/management_bi_metrics.dart';
 import '../../widgets/offline_status_banner.dart';
 import '../../widgets/monthly_target_progress_card.dart';
 import '../../widgets/portal_home_sections.dart';
@@ -61,11 +61,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   DateTime _clock = DateTime.now();
-
-  /// Read-only view of the shared notification state the header bell owns —
-  /// the management dashboard renders the same list the bell does.
-  List<AppNotification> get _notifications =>
-      NotificationHub.instance.notifications;
 
   List<LandLeadSiteVisit> _pendingApprovals = [];
   List<LandLeadSignedRequest> _pendingSigned = [];
@@ -897,7 +892,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final ownerMeetingPending = summaryLeads
         .where((l) => l.status == LeadStatus.prospectMeetingPending)
         .length;
-    final teamRows = buildPortalTeamPerformance(leads);
+    final closedLeads = [
+      for (final l in summaryLeads) if (l.status == LeadStatus.signed) l,
+    ];
+    final closedAcres =
+        closedLeads.fold<double>(0, (t, l) => t + biLeadAcres(l));
 
     final dropApprovalPending = _pendingDropApprovals.length;
     final approvalCount = _pendingApprovals.length +
@@ -905,32 +904,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         dropApprovalPending +
         _pendingMonthlyTargets.length;
 
-    final pendingApprovalItems = <PendingApprovalItem>[
-      for (final v in _pendingApprovals)
-        PendingApprovalItem(
-          leadId: v.leadId,
-          label: 'Management site visit',
-          since: v.visitedAt,
-        ),
-      for (final s in _pendingSigned)
-        PendingApprovalItem(
-          leadId: s.leadId,
-          label: 'Project Signed',
-          since: s.createdAt,
-        ),
-      for (final d in _pendingDropApprovals)
-        PendingApprovalItem(
-          leadId: d.leadId,
-          label: 'Drop request',
-          since: d.createdAt,
-        ),
-      for (final t in _pendingMonthlyTargets)
-        PendingApprovalItem(
-          leadId: t.id,
-          label: 'Monthly Target Approval',
-          since: t.submittedAt,
-        ),
-    ];
 
     final designation = TeamHierarchy.currentDesignation;
     final canManageTeam = !_isManagement &&
@@ -973,23 +946,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         accent: AppColors.secondary,
         onTap: () => _goTo('/broker-management'),
       ),
-      if (_isManagement)
-        PortalQuickAction(
-          label: 'No Future Activity',
-          subtitle: '${_noFutureActivityLeads.length} '
-              'site${_noFutureActivityLeads.length == 1 ? '' : 's'} · no meeting '
-              '${NoFutureActivityAnalytics.staleDays}+ days',
-          icon: Icons.event_busy_outlined,
-          accent: AppColors.error,
-          onTap: () => FilteredLeadsScreen.openList(
-            context,
-            title: 'No Future Activity',
-            subtitle:
-                'Active sites with no Land Owner Meeting scheduled and none in '
-                'the last ${NoFutureActivityAnalytics.staleDays} days',
-            leads: _noFutureActivityLeads,
-          ),
-        ),
     ];
 
     return FomraAppShell(
@@ -1023,8 +979,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   // Management, Reporting Managers and Heads all get an
                   // "Approval Pending" queue — each scoped to what is waiting
                   // on them in the approval chain.
-                  thirdLabel:
-                      _canApprove ? 'Approval Pending' : 'Owner meeting pending',
+                  thirdLabel: _canApprove
+                      ? 'Waiting for your approval'
+                      : 'Owner meeting pending',
                   thirdValue:
                       _canApprove ? approvalCount : ownerMeetingPending,
                   thirdIcon: _canApprove
@@ -1034,6 +991,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ? _openApprovalsList
                       : () => FilteredLeadsScreen.open(
                           context, LeadListFilter.ownerMeetingPending),
+                  // Management: Closed (with acres) and the shortcuts that
+                  // used to be the Quick actions card.
+                  fourthLabel: _isManagement
+                      ? 'Closed · ${closedAcres.toStringAsFixed(1)} ac'
+                      : null,
+                  fourthValue: closedLeads.length,
+                  fourthIcon: Icons.verified_outlined,
+                  onFourthTap: () =>
+                      FilteredLeadsScreen.open(context, LeadListFilter.signed),
+                  actions: _isManagement
+                      ? [
+                          PortalHeroAction(
+                              label: 'Add lead',
+                              icon: Icons.add_location_alt_outlined,
+                              onTap: _openAddLead),
+                          PortalHeroAction(
+                              label: 'All properties',
+                              icon: Icons.map_outlined,
+                              onTap: () => _openAllProjectsMap(leads)),
+                          PortalHeroAction(
+                              label: 'Owners',
+                              icon: Icons.person_outline,
+                              onTap: () => _goTo('/owner-history')),
+                          PortalHeroAction(
+                              label: 'Brokers',
+                              icon: Icons.handshake_outlined,
+                              onTap: () => _goTo('/broker-management')),
+                        ]
+                      : const [],
                   onSummaryTap: (filter) {
                     // "Total sites" opens the full Land Workspace directly;
                     // the other tiles open their filtered list.
@@ -1046,6 +1032,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
+              if (_isManagement) ...[
+                const _HomeGroupLabel(number: 1, text: 'Act on these'),
+                PortalFadeSection(
+                  index: 1,
+                  child: PortalSectionCard(
+                    title: 'Needs attention',
+                    subtitle: 'Tap a line to open those sites',
+                    icon: Icons.flag_outlined,
+                    child: NeedsAttentionCard(
+                      leads: _homeSummaryLeads,
+                      approvalCount: approvalCount,
+                      onOpenApprovals: _openApprovalsList,
+                      noNextStep: _noFutureActivityLeads,
+                      noNextStepDays: NoFutureActivityAnalytics.staleDays,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                const _HomeGroupLabel(number: 2, text: 'People'),
+              ],
               // Team Performance: site visits today / week / month and
               // meetings against the month's target, ranked; tap a name for
               // the pipeline. Management and managers see each executive in
@@ -1053,9 +1059,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               PortalFadeSection(
                 index: 1,
                 child: PortalSectionCard(
-                  title: 'Team Performance',
-                  subtitle: 'Site visits & meetings against this month\'s '
-                      'target · tap a name for the pipeline',
+                  title: 'Team this month',
+                  subtitle: 'Site visits & meetings against target · tap a '
+                      'name for the pipeline and site age',
                   icon: Icons.emoji_events_outlined,
                   child: TeamPerformanceCard(
                     leads: _homeSummaryLeads,
@@ -1068,7 +1074,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               const SizedBox(height: AppSpacing.lg),
               // Reviewers (Management, Reporting Manager, Head) see what needs
               // reviewing; each tile opens that list.
-              if (_canApprove) ...[
+              if (_canApprove && !_isManagement) ...[
                 PortalFadeSection(
                   index: 1,
                   child: PortalSectionCard(
@@ -1085,35 +1091,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 PortalFadeSection(
                   index: 2,
                   child: PortalSectionCard(
-                    title: 'Brokers · Energisers & Low Yield',
-                    subtitle: 'Last 120 days · share of each broker\'s lands '
-                        'where we met the actual Land Owner · tap a group',
+                    title: 'Brokers · last 120 days',
+                    subtitle: 'Energiser = land owner met on over 60% of '
+                        'their lands · Low Yield = under 40% · tap a group',
                     icon: Icons.handshake_outlined,
                     child: BrokerEnergySummary(leads: leads),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                _quickActionsSection(quickActions),
-                const SizedBox(height: AppSpacing.lg),
+                const _HomeGroupLabel(number: 3, text: 'Properties'),
                 PortalFadeSection(
-                  index: 2,
-                  child: ManagementExecutiveDashboard(
-                    leads: leads,
-                    teamRows: teamRows,
-                    notifications: _notifications,
-                    pendingApprovals: pendingApprovalItems,
-                    widgetIds: const [
-                      'pipelineDeals',
-                      'pendingWorkflow',
-                    ],
-                    onViewLead: (lead) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => LeadDetailScreen(lead: lead),
-                        ),
-                      );
-                    },
+                  index: 3,
+                  child: PortalSectionCard(
+                    title: 'Property pipeline',
+                    subtitle: 'Where every site stands · tap a stage for '
+                        'the list',
+                    icon: Icons.account_tree_outlined,
+                    child: PropertyPipelineCard(leads: _homeSummaryLeads),
                   ),
                 ),
               ] else ...[
@@ -1469,4 +1463,42 @@ class _TaskSummaryCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A small numbered group heading on the management Home
+/// ("1 · Act on these", "2 · People", "3 · Properties").
+class _HomeGroupLabel extends StatelessWidget {
+  final int number;
+  final String text;
+  const _HomeGroupLabel({required this.number, required this.text});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(left: 4, bottom: 10),
+        child: Row(children: [
+          Container(
+            width: 22,
+            height: 22,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.gold.withValues(alpha: 0.18),
+              shape: BoxShape.circle,
+            ),
+            child: Text('$number',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.gold,
+                )),
+          ),
+          const SizedBox(width: 8),
+          Text(text.toUpperCase(),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.8,
+                color: context.fomraTextSecondary,
+              )),
+        ]),
+      );
 }

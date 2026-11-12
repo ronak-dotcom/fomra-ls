@@ -136,6 +136,15 @@ class PortalWelcomeHeader extends StatelessWidget {
   final IconData thirdIcon;
   final VoidCallback? onThirdTap;
 
+  /// Optional fourth KPI tile (management: Closed, with acres in the label).
+  final String? fourthLabel;
+  final int? fourthValue;
+  final IconData? fourthIcon;
+  final VoidCallback? onFourthTap;
+
+  /// Optional shortcut buttons under the tiles.
+  final List<PortalHeroAction> actions;
+
   const PortalWelcomeHeader({
     super.key,
     required this.greeting,
@@ -147,6 +156,11 @@ class PortalWelcomeHeader extends StatelessWidget {
     required this.thirdIcon,
     this.onThirdTap,
     this.onSummaryTap,
+    this.fourthLabel,
+    this.fourthValue,
+    this.fourthIcon,
+    this.onFourthTap,
+    this.actions = const [],
   });
 
   @override
@@ -252,21 +266,48 @@ class PortalWelcomeHeader extends StatelessWidget {
                         compact: square,
                         onTap: onThirdTap,
                       ),
+                      if (fourthLabel != null)
+                        _HeroRingTile(
+                          label: fourthLabel!,
+                          value: fourthValue ?? 0,
+                          progress: share(fourthValue ?? 0),
+                          icon: fourthIcon ?? Icons.verified_outlined,
+                          color: AppColors.goldLight,
+                          compact: square,
+                          onTap: onFourthTap,
+                        ),
                     ];
-                    return IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (var i = 0; i < tiles.length; i++) ...[
-                            Expanded(child: tiles[i]),
-                            if (i < tiles.length - 1)
-                              SizedBox(width: square ? 8 : AppSpacing.sm),
-                          ],
-                        ],
-                      ),
-                    );
+                    final gap = square ? 8.0 : AppSpacing.sm;
+                    Widget row(List<Widget> ts) => IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (var i = 0; i < ts.length; i++) ...[
+                                Expanded(child: ts[i]),
+                                if (i < ts.length - 1) SizedBox(width: gap),
+                              ],
+                            ],
+                          ),
+                        );
+                    // Four tiles on a narrow screen: two rows of two.
+                    if (tiles.length == 4 && square) {
+                      return Column(children: [
+                        row(tiles.sublist(0, 2)),
+                        SizedBox(height: gap),
+                        row(tiles.sublist(2)),
+                      ]);
+                    }
+                    return row(tiles);
                   },
                 ),
+                if (actions.isNotEmpty) ...[
+                  SizedBox(height: phone ? 14 : 18),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [for (final a in actions) _HeroActionPill(a)],
+                  ),
+                ],
               ],
             ),
           ),
@@ -274,6 +315,47 @@ class PortalWelcomeHeader extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A shortcut button on the welcome header.
+class PortalHeroAction {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  const PortalHeroAction(
+      {required this.label, required this.icon, required this.onTap});
+}
+
+class _HeroActionPill extends StatelessWidget {
+  final PortalHeroAction action;
+  const _HeroActionPill(this.action);
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: action.onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(action.icon, size: 16, color: AppColors.goldLight),
+              const SizedBox(width: 6),
+              Text(action.label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  )),
+            ]),
+          ),
+        ),
+      );
 }
 
 /// Vivid ring colours that glow on the ink hero (Apple Fitness-style).
