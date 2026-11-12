@@ -2,6 +2,7 @@ import '../models/land_lead.dart';
 import '../models/land_lead_meeting.dart';
 import '../models/monthly_target_submission.dart';
 import '../utils/lead_location_parser.dart';
+import 'management_bi_metrics.dart';
 import 'monthly_target_progress.dart';
 
 /// One line of a monthly target: what was achieved this month, against the
@@ -48,6 +49,10 @@ class TeamPerformanceRow {
   final List<LandLead> closed;
   final double closedAcres;
 
+  /// Their open sites (not closed or dropped) by age since the Lead ID was
+  /// created: 0–30, 31–60, 61–90 and 90+ days.
+  final List<List<LandLead>> openByAge;
+
   const TeamPerformanceRow({
     required this.executive,
     required this.rank,
@@ -61,6 +66,7 @@ class TeamPerformanceRow {
     required this.legal,
     required this.closed,
     required this.closedAcres,
+    required this.openByAge,
   });
 
   /// [leads] and [meetings] are what the viewer may see; pass ALL meetings so
@@ -161,6 +167,15 @@ class TeamPerformanceRow {
         closed: closed,
         closedAcres: closed.fold<double>(
             0, (s, l) => s + (parseLandExtentSqft(l.landExtent) ?? 0) / 43560),
+        openByAge: [
+          for (final b in BiAgeBucket.values)
+            [
+              for (final l in mine)
+                if (!l.status.isTerminal &&
+                    BiAgeBucketX.forAgeDays(biLeadAgeDays(l, n)) == b)
+                  l,
+            ],
+        ],
       ));
     }
 
@@ -194,5 +209,6 @@ class TeamPerformanceRow {
         legal: legal,
         closed: closed,
         closedAcres: closedAcres,
+        openByAge: openByAge,
       );
 }

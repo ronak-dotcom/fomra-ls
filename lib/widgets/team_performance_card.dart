@@ -121,7 +121,7 @@ class _TeamPerformanceCardState extends State<TeamPerformanceCard> {
             '${showRank ? 'Ranked by site visits this month (new Lead IDs). ' : ''}'
             'Meetings count the first one per land. Bars: green on pace for '
             "today's date, amber behind, red far behind. Tap "
-            '${showRank ? 'a name' : 'your name'} for the pipeline, any '
+            '${showRank ? 'a name' : 'your name'} for the pipeline and site age, any '
             'number for the properties.',
             style: TextStyle(
                 fontSize: 12, height: 1.4, color: context.fomraTextSecondary),
@@ -428,12 +428,11 @@ class _TeamPerformanceCardState extends State<TeamPerformanceCard> {
 
   Widget _pipeline(TeamPerformanceRow r, {bool compact = false}) {
     Widget tile(String label, List<LandLead> leads, Color color,
-            {String? extra, String? short}) =>
+            {String? extra, String? short, String sub = 'Pipeline'}) =>
         Expanded(
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
-            onTap: () =>
-                _openList('$label · ${r.executive}', 'Pipeline', leads),
+            onTap: () => _openList('$label · ${r.executive}', sub, leads),
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 3),
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -488,10 +487,38 @@ class _TeamPerformanceCardState extends State<TeamPerformanceCard> {
                   ? null
                   : '${r.closedAcres.toStringAsFixed(1)} ac'),
         ])),
+        Padding(
+          padding: const EdgeInsets.only(left: 3, top: 12, bottom: 6),
+          child: Text('OPEN SITES BY AGE',
+              style: _h(context).copyWith(color: AppColors.info)),
+        ),
+        IntrinsicHeight(
+          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            for (var i = 0; i < 4; i++)
+              tile(
+                  const [
+                    '0–30 days',
+                    '31–60 days',
+                    '61–90 days',
+                    '90+ days'
+                  ][i],
+                  r.openByAge[i],
+                  _ageColors[i],
+                  short: const ['0–30 d', '31–60 d', '61–90 d', '90+ d'][i],
+                  sub: 'Open sites by age'),
+          ]),
+        ),
       ],
     );
   }
 }
+
+const _ageColors = [
+  AppColors.success,
+  AppColors.info,
+  AppColors.warning,
+  AppColors.error,
+];
 
 Color _paceColor(BuildContext context, TargetPace pace, int achieved) =>
     switch (pace) {
