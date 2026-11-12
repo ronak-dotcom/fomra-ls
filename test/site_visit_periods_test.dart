@@ -1,10 +1,8 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fomra_ls/analytics/monthly_target_progress.dart';
 import 'package:fomra_ls/models/land_lead.dart';
 import 'package:fomra_ls/models/land_lead_site_visit.dart';
 import 'package:fomra_ls/services/report_catalog_service.dart';
-import 'package:fomra_ls/widgets/site_visit_summary.dart';
 
 LandLead _lead(String id, String by, DateTime on) => LandLead(
       leadId: id,
@@ -45,27 +43,6 @@ void main() {
     expect([s.today.length, s.week.length, s.month.length], [1, 2, 3]);
     final d = rows.last;
     expect([d.today.length, d.week.length, d.month.length], [0, 0, 1]);
-  });
-
-  testWidgets('card shows a team total and each executive', (t) async {
-    await t.pumpWidget(MaterialApp(
-      home: Scaffold(body: SiteVisitSummary(leads: _leads, now: _now)),
-    ));
-    expect(find.text('Team total'), findsOneWidget);
-    expect(find.text('Saurabh'), findsOneWidget);
-    expect(find.text('THIS WEEK'), findsOneWidget);
-  });
-
-  testWidgets('an executive sees only their own row', (t) async {
-    await t.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: SiteVisitSummary(
-            leads: _leads, now: _now, onlyExecutive: 'Devaraj'),
-      ),
-    ));
-    expect(find.text('Devaraj'), findsOneWidget);
-    expect(find.text('Saurabh'), findsNothing);
-    expect(find.text('Team total'), findsNothing);
   });
 
   test('Site Visit report: new Lead IDs by executive, revisits apart', () {

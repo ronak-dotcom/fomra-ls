@@ -49,7 +49,7 @@ import '../../widgets/monthly_target_progress_card.dart';
 import '../../widgets/portal_home_sections.dart';
 import '../../widgets/broker_energy_summary.dart';
 import '../../widgets/property_review_summary.dart';
-import '../../widgets/site_visit_summary.dart';
+import '../../widgets/team_performance_card.dart';
 import '../../widgets/ui/app_components.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -1046,17 +1046,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
-              // Site visits (new Lead IDs) for today / this week / this month.
-              // Management and managers see each executive in their scope;
-              // an executive sees their own row.
+              // Team Performance: site visits today / week / month and
+              // meetings against the month's target, ranked; tap a name for
+              // the pipeline. Management and managers see each executive in
+              // their scope; an executive sees their own row.
               PortalFadeSection(
                 index: 1,
                 child: PortalSectionCard(
-                  title: 'Site Visits',
-                  subtitle: 'New Lead IDs · week from Monday · tap a number '
-                      'for the properties',
-                  icon: Icons.location_on_outlined,
-                  child: SiteVisitSummary(
+                  title: 'Team Performance',
+                  subtitle: 'Site visits & meetings against this month\'s '
+                      'target · tap a name for the pipeline',
+                  icon: Icons.emoji_events_outlined,
+                  child: TeamPerformanceCard(
                     leads: _homeSummaryLeads,
                     onlyExecutive: _canApprove
                         ? null
@@ -1103,8 +1104,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     pendingApprovals: pendingApprovalItems,
                     widgetIds: const [
                       'pipelineDeals',
-                      'leaderboard',
-                      'monthlyTargets',
                       'pendingWorkflow',
                     ],
                     onViewLead: (lead) {
