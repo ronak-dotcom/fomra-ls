@@ -18,7 +18,7 @@ Color? landMeetingStatusColor(LandMeetingStatus s) => switch (s) {
 /// Lead page: who we have met on this land, at a glance. A headline
 /// (Land Owner met / only Agreement Holder / only relatives / no meeting yet)
 /// and every meeting, newest first, with who attended, when and by whom.
-class WhoWeMetCard extends StatelessWidget {
+class WhoWeMetCard extends StatefulWidget {
   final List<LandLeadMeeting> meetings;
 
   /// Opens the full meeting history.
@@ -27,17 +27,31 @@ class WhoWeMetCard extends StatelessWidget {
   /// Meetings listed before "+N more".
   final int maxRows;
 
+  /// Phones: start as one line (the headline); tap to show the meetings.
+  final bool collapsible;
+
   const WhoWeMetCard({
     super.key,
     required this.meetings,
     this.onOpen,
     this.maxRows = 4,
+    this.collapsible = false,
   });
 
+  @override
+  State<WhoWeMetCard> createState() => _WhoWeMetCardState();
+}
+
+class _WhoWeMetCardState extends State<WhoWeMetCard> {
   static final _date = DateFormat('d MMM yyyy');
+  bool _expanded = false;
 
   @override
   Widget build(BuildContext context) {
+    final meetings = widget.meetings;
+    final onOpen = widget.onOpen;
+    final maxRows = widget.maxRows;
+    final collapsed = widget.collapsible && !_expanded;
     final status = LandMeetingStatusX.of(meetings);
     final color = landMeetingStatusColor(status) ?? context.fomraTextTertiary;
     final sorted = [...meetings]..sort((a, b) => b.metAt.compareTo(a.metAt));
@@ -76,7 +90,11 @@ class WhoWeMetCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: meetings.isEmpty ? null : onOpen,
+        onTap: meetings.isEmpty
+            ? null
+            : widget.collapsible
+                ? () => setState(() => _expanded = !_expanded)
+                : onOpen,
         child: Container(
           padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
           decoration: BoxDecoration(
@@ -101,9 +119,15 @@ class WhoWeMetCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (meetings.isNotEmpty && onOpen != null)
-                  Icon(Icons.chevron_right_rounded,
-                      size: 20, color: context.fomraTextTertiary),
+                if (meetings.isNotEmpty && (onOpen != null || widget.collapsible))
+                  Icon(
+                      widget.collapsible
+                          ? (_expanded
+                              ? Icons.expand_less_rounded
+                              : Icons.expand_more_rounded)
+                          : Icons.chevron_right_rounded,
+                      size: 20,
+                      color: context.fomraTextTertiary),
               ]),
               const SizedBox(height: 6),
               Row(children: [
@@ -120,11 +144,12 @@ class WhoWeMetCard extends StatelessWidget {
                   ),
                 ),
               ]),
+              if (!collapsed)
               for (final m in sorted.take(maxRows)) ...[
                 const SizedBox(height: 8),
                 _MeetingRow(meeting: m, date: _date.format(m.metAt)),
               ],
-              if (sorted.length > maxRows)
+              if (!collapsed && sorted.length > maxRows)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
@@ -137,7 +162,17 @@ class WhoWeMetCard extends StatelessWidget {
                     ),
                   ),
                 ),
-              if (hint != null) ...[
+              if (!collapsed && widget.collapsible && onOpen != null &&
+                  meetings.isNotEmpty)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: onOpen,
+                    icon: const Icon(Icons.history_rounded, size: 16),
+                    label: const Text('Meeting history'),
+                  ),
+                ),
+              if (!collapsed && hint != null) ...[
                 const SizedBox(height: 8),
                 Text(
                   hint,

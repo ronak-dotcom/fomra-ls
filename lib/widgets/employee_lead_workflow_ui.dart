@@ -365,9 +365,7 @@ class _FollowUpCard extends StatelessWidget {
 class _StatPair extends StatelessWidget {
   final String label;
   final String value;
-  final Color? color;
-
-  const _StatPair({required this.label, required this.value, this.color});
+  const _StatPair({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -382,7 +380,7 @@ class _StatPair extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w800,
-            color: color ?? context.fomraTextPrimary,
+            color: context.fomraTextPrimary,
           ),
         ),
       ],

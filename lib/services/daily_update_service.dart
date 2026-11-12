@@ -32,7 +32,7 @@ class DailyUpdateService {
           .eq('update_date', dateKey(date))
           .limit(1);
       if (rows.isEmpty) return null;
-      return DailyUpdate.fromJson(rows.first as Map<String, dynamic>);
+      return DailyUpdate.fromJson(rows.first);
     } catch (_) {
       return null;
     }

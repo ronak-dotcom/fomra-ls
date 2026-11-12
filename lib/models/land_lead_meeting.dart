@@ -28,8 +28,13 @@ class MeetingAttendeeTypes {
   ];
 
   /// Short label for tags ("Agreement Holder / PoA").
-  static String short(String type) =>
-      type == agreementHolder ? 'Agreement Holder / PoA' : type;
+  /// Meetings logged before Relative and Friend were split show as
+  /// "Relative / Friend", next to the new options.
+  static String short(String type) => switch (type) {
+        agreementHolder => 'Agreement Holder / PoA',
+        familyOrFriend => 'Relative / Friend',
+        _ => type,
+      };
 
   /// Attendee types that count as "we actually met the decision-maker" for
   /// the landowner-meeting-completed milestone.

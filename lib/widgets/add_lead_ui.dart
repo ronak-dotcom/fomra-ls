@@ -939,7 +939,6 @@ class _AddLeadMapPickerState extends State<AddLeadMapPicker> {
     final pinnedPoint = widget.pinnedPoint;
     final resolving = widget.resolving;
     final fetchingMyLocation = widget.fetchingMyLocation;
-    final status = widget.status;
     final onMapReady = widget.onMapReady;
     final onTap = widget.onTap;
     final onMyLocation = widget.onMyLocation;
@@ -978,7 +977,7 @@ class _AddLeadMapPickerState extends State<AddLeadMapPicker> {
                 if (pinnedPoint != null)
                   MarkerLayer(markers: [
                     Marker(
-                      point: pinnedPoint!,
+                      point: pinnedPoint,
                       width: 40,
                       height: 48,
                       child: const Icon(

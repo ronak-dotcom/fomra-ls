@@ -381,12 +381,6 @@ class _MonthlyTargetApprovalsPageState
 
 enum _EditAction { save, approve, reject }
 
-class _EditResult {
-  final _EditAction action;
-  final Map<String, int> values;
-  const _EditResult(this.action, this.values);
-}
-
 /// Management edit modal: Save Changes (stays pending), Approve, or Reject.
 class _EditTargetsDialog extends StatefulWidget {
   final MonthlyTargetSubmission submission;
