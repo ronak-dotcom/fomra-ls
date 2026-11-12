@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
@@ -422,5 +421,3 @@ class OfflineSyncService extends ChangeNotifier {
   }
 }
 
-// Keep dart:convert import used if needed for debugging.
-const _ = jsonEncode;

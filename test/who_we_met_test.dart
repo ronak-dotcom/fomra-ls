@@ -77,4 +77,30 @@ void main() {
     await pump(t, const []);
     expect(find.text('No meeting yet'), findsOneWidget);
   });
+
+  testWidgets('on phones it starts as one line and expands on tap',
+      (t) async {
+    await t.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: WhoWeMetCard(
+          collapsible: true,
+          onOpen: () {},
+          meetings: [
+            _m(DateTime(2026, 11, 6), [MeetingAttendeeTypes.landOwner]),
+          ],
+        ),
+      ),
+    ));
+    expect(find.text('Land Owner met'), findsOneWidget);
+    expect(find.text('6 Nov 2026 · Saurabh'), findsNothing);
+    await t.tap(find.text('Land Owner met'));
+    await t.pump();
+    expect(find.text('6 Nov 2026 · Saurabh'), findsOneWidget);
+    expect(find.text('Meeting history'), findsOneWidget);
+  });
+
+  test('old Family / Friend meetings read as Relative / Friend', () {
+    expect(MeetingAttendeeTypes.short(MeetingAttendeeTypes.familyOrFriend),
+        'Relative / Friend');
+  });
 }

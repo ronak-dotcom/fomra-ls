@@ -1514,8 +1514,12 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
 
     // Who we have met on this land, right under the lead's summary: owner
     // met / only agreement holder / only relatives / none. Tap for history.
+    // Phones: both cards start as one line and expand on tap, so the lead's
+    // actions are reachable without a long scroll.
+    final phone = FomraLayout.isMobile(context);
     final whoWeMet = WhoWeMetCard(
       meetings: _meetings,
+      collapsible: phone,
       onOpen: () => showFomraDialog<void>(
         context: context,
         builder: (_) => MeetingLogDialog(
@@ -1527,6 +1531,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
     );
 
     final reviewCard = PropertyReviewCard(
+      collapsible: phone,
       latest: _reviews.isEmpty ? null : _reviews.first,
       reviewCount: _reviews.length,
       canRecord: LeadReviewService.canReview && !_isLocked,

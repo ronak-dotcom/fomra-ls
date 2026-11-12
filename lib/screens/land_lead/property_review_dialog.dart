@@ -418,7 +418,7 @@ class _PropertyReviewDialogState extends State<_PropertyReviewDialog> {
 /// Compact card on Lead Detail showing the latest property review — when it
 /// was reviewed, by whom, the note, and when the next review is due (with an
 /// Overdue / Due today flag). Tapping opens the review dialog.
-class PropertyReviewCard extends StatelessWidget {
+class PropertyReviewCard extends StatefulWidget {
   final LeadReview? latest;
   final int reviewCount;
 
@@ -427,18 +427,33 @@ class PropertyReviewCard extends StatelessWidget {
   final bool canRecord;
   final VoidCallback onOpen;
 
+  /// Phones: start as one line (last / next review); tap for the details.
+  final bool collapsible;
+
   const PropertyReviewCard({
     super.key,
     required this.latest,
     required this.reviewCount,
     required this.canRecord,
     required this.onOpen,
+    this.collapsible = false,
   });
 
   @override
+  State<PropertyReviewCard> createState() => _PropertyReviewCardState();
+}
+
+class _PropertyReviewCardState extends State<PropertyReviewCard> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
-    final r = latest;
-    return Container(
+    final r = widget.latest;
+    final canRecord = widget.canRecord;
+    final reviewCount = widget.reviewCount;
+    final onOpen = widget.onOpen;
+    final collapsed = widget.collapsible && !_expanded;
+    final card = Container(
       decoration: BoxDecoration(
         color: context.fomraSurface,
         borderRadius: BorderRadius.circular(14),
@@ -487,7 +502,28 @@ class PropertyReviewCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          if (r == null)
+          if (collapsed)
+            Row(children: [
+              Expanded(
+                child: Text(
+                  r == null
+                      ? 'Not reviewed yet'
+                      : 'Last ${r.reviewedLabel} · Next '
+                          '${r.nextReviewLabel ?? 'not scheduled'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: context.fomraTextSecondary,
+                  ),
+                ),
+              ),
+              if (r != null)
+                Icon(Icons.expand_more_rounded,
+                    size: 20, color: context.fomraTextTertiary),
+            ])
+          else if (r == null)
             Text(
               canRecord
                   ? 'Not reviewed yet. Tap Review to record your review and '
@@ -522,6 +558,12 @@ class PropertyReviewCard extends StatelessWidget {
           ],
         ],
       ),
+    );
+    if (!widget.collapsible || r == null) return card;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => setState(() => _expanded = !_expanded),
+      child: card,
     );
   }
 

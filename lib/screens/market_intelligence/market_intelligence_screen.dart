@@ -197,8 +197,6 @@ class _MarketIntelligenceScreenState extends State<MarketIntelligenceScreen> {
   // Valuation inputs
   final _roadWidthCtrl = TextEditingController();
   final _landSizeCtrl = TextEditingController();
-  String _locationCategory = 'Urban';
-  final String _developmentPotential = 'Medium';
   _ValuationResult? _valuationResult;
 
   // Competitor Projects (SquareYards + NoBroker)
@@ -229,7 +227,6 @@ class _MarketIntelligenceScreenState extends State<MarketIntelligenceScreen> {
   String? _tngisCentroid;
   bool _tngisParcelLoading = false;
   String? _tngisParcelError;
-  Map<String, String>? _tngisParcelPreview;
   List<_TngisSubdivisionRow> _tngisSubdivisions = [];
   bool _tngisFmbAvailable = false;
   String? _tngisFmbNote;
@@ -283,13 +280,6 @@ class _MarketIntelligenceScreenState extends State<MarketIntelligenceScreen> {
       _landSizeCtrl.text = sqft.round().toString();
     }
 
-    _locationCategory = switch (lead.landType) {
-      LandType.commercial || LandType.industrial => 'Premium',
-      LandType.residential => 'Urban',
-      LandType.agricultural => 'Rural',
-      LandType.nonAgricultural => 'Semi-Urban',
-      LandType.other => 'Urban',
-    };
 
     setState(() {
       _leadLocation = loc;
@@ -555,7 +545,6 @@ class _MarketIntelligenceScreenState extends State<MarketIntelligenceScreen> {
       _tngisGiServices = null;
       _tngisUlpin = null;
       _tngisCentroid = null;
-      _tngisParcelPreview = null;
       _tngisSubdivisions = [];
       _tngisFmbAvailable = false;
       _tngisFmbNote = null;
@@ -590,7 +579,6 @@ class _MarketIntelligenceScreenState extends State<MarketIntelligenceScreen> {
       _tngisCentroid = null;
       _tngisGiViewerUrl = null;
       _tngisGiServices = null;
-      _tngisParcelPreview = null;
       _tngisSubdivisions = [];
       _tngisFmbAvailable = false;
       _tngisFmbNote = null;
@@ -721,7 +709,6 @@ class _MarketIntelligenceScreenState extends State<MarketIntelligenceScreen> {
           data['village'] as String?,
           fields['Village'],
         );
-        _tngisParcelPreview = fields.isNotEmpty ? fields : null;
         _tngisParcelError = null;
         _tngisFmbAvailable = data['fmbAvailable'] == true;
         _tngisFmbNote = data['fmbNote']?.toString();
@@ -752,7 +739,6 @@ class _MarketIntelligenceScreenState extends State<MarketIntelligenceScreen> {
         _tngisGiServices = null;
         _tngisUlpin = null;
         _tngisCentroid = null;
-        _tngisParcelPreview = null;
         _tngisSubdivisions = [];
         _tngisFmbAvailable = false;
         _tngisFmbNote = null;
@@ -764,7 +750,6 @@ class _MarketIntelligenceScreenState extends State<MarketIntelligenceScreen> {
         _tngisGiServices = null;
         _tngisUlpin = null;
         _tngisCentroid = null;
-        _tngisParcelPreview = null;
         _tngisSubdivisions = [];
         _tngisFmbAvailable = false;
         _tngisFmbNote = null;
@@ -2823,101 +2808,6 @@ class _MarketIntelligenceScreenState extends State<MarketIntelligenceScreen> {
     );
   }
 
-  Widget _buildParcelSection() {
-    final preview = _tngisParcelPreview;
-    final hasTiles = preview != null && preview.isNotEmpty;
-    final hasPin = _activeLatLng != null;
-    if (!hasPin && !hasTiles && !_tngisParcelLoading && _tngisParcelError == null) {
-      return const SizedBox.shrink();
-    }
-
-    final tiles = <Widget>[];
-    if (_tngisUlpin?.isNotEmpty == true) {
-      tiles.add(MarketIntelInfoTile(
-        label: 'ULPIN',
-        value: _tngisUlpin!,
-        icon: Icons.fingerprint_outlined,
-      ));
-    }
-    if (_tngisSurvey?.isNotEmpty == true) {
-      tiles.add(MarketIntelInfoTile(
-        label: 'Survey Number',
-        value: _tngisSurvey!,
-        icon: Icons.grid_on_outlined,
-      ));
-    }
-    if (_tngisSubDiv?.isNotEmpty == true) {
-      tiles.add(MarketIntelInfoTile(
-        label: 'Sub Division',
-        value: _tngisSubDiv!,
-        icon: Icons.view_column_outlined,
-      ));
-    }
-    if (preview != null) {
-      for (final entry in preview.entries) {
-        final value = entry.value.trim();
-        if (value.isEmpty || value == '-') continue;
-        tiles.add(MarketIntelInfoTile(
-          label: entry.key,
-          value: value,
-          icon: marketIntelIconForField(entry.key),
-        ));
-      }
-    }
-
-    return _SectionCard(
-      title: 'Parcel Information',
-      subtitle: 'Survey and subdivision from TNGIS',
-      icon: Icons.landscape_outlined,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (_tngisParcelLoading)
-            const Row(
-              children: [
-                SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Reading parcel from TNGIS…',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-              ],
-            )
-          else if (tiles.isEmpty)
-            Text(
-              hasPin
-                  ? 'Tap the land plot on the map to load parcel details from TNGIS.'
-                  : 'Pin a location to load parcel information.',
-              style: TextStyle(
-                fontSize: 13,
-                height: 1.45,
-                color: context.fomraTextSecondary,
-              ),
-            )
-          else
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: tiles,
-            ),
-          if (_tngisParcelError != null && !_tngisParcelLoading) ...[
-            const SizedBox(height: 12),
-            _ErrorBanner(_tngisParcelError!),
-          ],
-        ],
-      ),
-    );
-  }
-
   // â”€â”€ Section: POI Collection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   void _showPoiList(_PoiCategory cat) {
@@ -3836,76 +3726,6 @@ class _BenchmarkTile extends StatelessWidget {
       );
 }
 
-class _OutputCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-  final IconData icon;
-  const _OutputCard(
-      {required this.label,
-      required this.value,
-      required this.color,
-      required this.icon});
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.07),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.25)),
-        ),
-        child: Column(children: [
-          Icon(icon, color: color, size: 22),
-          const SizedBox(height: 6),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 11,
-                  color: color.withValues(alpha: 0.8),
-                  fontWeight: FontWeight.w600)),
-          const SizedBox(height: 2),
-          Text(value,
-              style: TextStyle(
-                  fontSize: 16, color: color, fontWeight: FontWeight.w800)),
-        ]),
-      );
-}
-
-class _AutoChip extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color? tone;
-  const _AutoChip(this.label, this.value) : tone = null;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = tone ?? AppColors.success;
-    return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withValues(alpha: 0.25)),
-        ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(
-            tone != null ? Icons.info_outline : Icons.check_circle_outline,
-            size: 12,
-            color: color,
-          ),
-          const SizedBox(width: 5),
-          Flexible(
-            child: Text('$label: $value',
-                style: TextStyle(
-                    fontSize: 11,
-                    color: color,
-                    fontWeight: FontWeight.w600)),
-          ),
-        ]),
-      );
-  }
-}
-
 class _FieldLabel extends StatelessWidget {
   final String text;
   const _FieldLabel(this.text);
@@ -4138,137 +3958,37 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
   String get _subLabel => _isUrban ? 'Block / Sub-div' : 'Sub Division';
 
   // ── Patta state ──
-  bool   _initingPatta = false;
   List<_Option> _districts = _kStaticDistricts;
   _Option? _selDistrict;
   List<_Option> _taluks   = [];
-  bool   _loadingTaluks   = false;
-  String? _talukError;
   _Option? _selTaluk;
-  List<_Option> _villages = [];
-  bool   _loadingVillages = false;
-  String? _villageError;
   _Option? _selVillage;
   final _surveyCtrl  = TextEditingController();
   final _subDivCtrl  = TextEditingController();
   bool   _fetchingPatta   = false;
   Map<String, String>?      _pattaFields;
-  List<Map<String, String>> _pattaOwners = [];
   String? _pattaError;
-  String? _pattaSource;
   Map<String, dynamic>? _pattaDocuments;
   final Map<String, _SubdivDocBundle> _subdivBundles = {};
   Uint8List? _fmbPdfBytes;
   String? _fmbLoadError;
   bool _loadingFmb = false;
-  final bool   _showManualPatta = false;
-  bool   _showManualEc    = false;
   Timer? _pattaDebounce;
 
   // â”€â”€ EC state â”€â”€
-  List<_Option> _ecZones = [
-    const _Option('1', 'Chennai'),
-    const _Option('2', 'Coimbatore'),
-    const _Option('4', 'Madurai'),
-  ];
-
-  static const _kStaticEcDistricts = <String, List<_Option>>{
-    '1': [ // North Zone
-      _Option('2', 'Chennai'), _Option('8', 'Chengalpattu'),
-      _Option('9', 'Kancheepuram'), _Option('21', 'Ranipet'),
-      _Option('28', 'Tiruvallur'), _Option('29', 'Tiruvannamalai'),
-      _Option('30', 'Vellore'), _Option('32', 'Viluppuram'),
-      _Option('6', 'Kallakurichi'), _Option('25', 'Tirupattur'),
-    ],
-    '2': [ // South Zone
-      _Option('4', 'Coimbatore'), _Option('7', 'Dharmapuri'),
-      _Option('10', 'Erode'), _Option('11', 'Krishnagiri'),
-      _Option('14', 'Namakkal'), _Option('15', 'Nilgiris'),
-      _Option('20', 'Salem'), _Option('26', 'Tiruppur'),
-    ],
-    '3': [ // Central Zone
-      _Option('1', 'Ariyalur'), _Option('3', 'Cuddalore'),
-      _Option('5', 'Dindigul'), _Option('12', 'Kanniyakumari'),
-      _Option('13', 'Karur'), _Option('16', 'Madurai'),
-      _Option('17', 'Mayiladuthurai'), _Option('18', 'Nagapattinam'),
-      _Option('19', 'Perambalur'), _Option('22', 'Pudukkottai'),
-      _Option('23', 'Ramanathapuram'), _Option('24', 'Sivagangai'),
-      _Option('27', 'Thanjavur'), _Option('31', 'Tenkasi'),
-      _Option('33', 'Theni'), _Option('34', 'Tiruchirappalli'),
-      _Option('35', 'Tirunelveli'), _Option('36', 'Tiruvarur'),
-      _Option('37', 'Thoothukudi'), _Option('38', 'Virudhunagar'),
-    ],
-  };
 
   // Keyed by district code. SRO codes are sequential placeholders;
   // real codes are loaded from tnreginet when reachable.
-  static const _kStaticEcSros = <String, List<_Option>>{
-    '2': [ // Chennai
-      _Option('1', 'Adambakkam'), _Option('2', 'Ambattur'), _Option('3', 'Anna Nagar'),
-      _Option('4', 'Chromepet'), _Option('5', 'Egmore'), _Option('6', 'Guindy'),
-      _Option('7', 'Kodambakkam'), _Option('8', 'Kolathur'), _Option('9', 'Madhavaram'),
-      _Option('10', 'Madipakkam'), _Option('11', 'Mylapore'), _Option('12', 'Perambur'),
-      _Option('13', 'Poonamallee'), _Option('14', 'Porur'), _Option('15', 'Purasawalkam'),
-      _Option('16', 'Saidapet'), _Option('17', 'Sholinganallur'), _Option('18', 'T.Nagar'),
-      _Option('19', 'Thiruvottiyur'), _Option('20', 'Velachery'), _Option('21', 'Villivakkam'),
-    ],
-    '8': [ // Chengalpattu
-      _Option('1', 'Chengalpattu'), _Option('2', 'Chrompet'), _Option('3', 'Kancheepuram'),
-      _Option('4', 'Tambaram'), _Option('5', 'Vandalur'),
-    ],
-    '9': [ // Kancheepuram
-      _Option('1', 'Kancheepuram'), _Option('2', 'Sriperumbudur'), _Option('3', 'Uthiramerur'),
-    ],
-    '28': [ // Tiruvallur
-      _Option('1', 'Tiruvallur'), _Option('2', 'Avadi'), _Option('3', 'Ponneri'),
-      _Option('4', 'Gummidipoondi'), _Option('5', 'Poonamallee'),
-    ],
-    '30': [ // Vellore
-      _Option('1', 'Vellore'), _Option('2', 'Arakkonam'), _Option('3', 'Arcot'),
-      _Option('4', 'Gudiyatham'), _Option('5', 'Katpadi'),
-    ],
-    '4': [ // Coimbatore
-      _Option('1', 'Coimbatore North'), _Option('2', 'Coimbatore South'),
-      _Option('3', 'Pollachi'), _Option('4', 'Mettupalayam'), _Option('5', 'Valparai'),
-    ],
-    '16': [ // Madurai
-      _Option('1', 'Madurai North'), _Option('2', 'Madurai South'),
-      _Option('3', 'Melur'), _Option('4', 'Sholavandan'), _Option('5', 'Usilampatti'),
-    ],
-    '34': [ // Tiruchirappalli
-      _Option('1', 'Tiruchirappalli'), _Option('2', 'Lalgudi'), _Option('3', 'Musiri'),
-      _Option('4', 'Srirangam'), _Option('5', 'Thuraiyur'),
-    ],
-    '20': [ // Salem
-      _Option('1', 'Salem'), _Option('2', 'Attur'), _Option('3', 'Mettur'),
-      _Option('4', 'Omalur'), _Option('5', 'Rasipuram'),
-    ],
-    '10': [ // Erode
-      _Option('1', 'Erode'), _Option('2', 'Bhavani'), _Option('3', 'Gobichettipalayam'),
-      _Option('4', 'Sathyamangalam'), _Option('5', 'Perundurai'),
-    ],
-    '35': [ // Tirunelveli
-      _Option('1', 'Tirunelveli'), _Option('2', 'Palayamkottai'), _Option('3', 'Nanguneri'),
-      _Option('4', 'Sankarankovil'), _Option('5', 'Shencottah'),
-    ],
-  };
-
-  bool   _autoFillingEc = false;
   _Option? _selZone;
-  List<_Option> _ecDists = [];
-  bool   _loadingEcDists = false;
   _Option? _selEcDist;
   List<_Option> _ecSros  = [];
-  bool   _loadingEcSros  = false;
   _Option? _selEcSro;
   final _ecSurveyCtrl = TextEditingController();
   final _ecSubDivCtrl = TextEditingController();
   final _ecFromCtrl   = TextEditingController();
   final _ecToCtrl     = TextEditingController();
   bool   _fetchingEc   = false;
-  List<Map<String, String>> _ecResults = [];
   List<Map<String, String>> _ecAllRecords = [];
-  List<_EcEntry> _ecEntries = [];
   String? _selEcEntryId;
   String? _ecDocumentHtml;
   Uint8List? _ecPdfBytes;
@@ -4277,11 +3997,8 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
   Map<String, String> _ecMeta = {};
   List<_EcPeriod> _ecPeriods = [];
   _EcPeriod? _selEcPeriod;
-  bool _loadingEcPeriods = false;
   String? _ecError;
   String? _ecCaptchaSession;
-  String? _ecCaptchaImage;
-  bool _loadingEcCaptcha = false;
   final _ecCaptchaCtrl = TextEditingController();
 
   String? _selectedGiService;
@@ -4886,9 +4603,7 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
     }
 
     setState(() {
-      _pattaSource = result['source'] as String?;
       _pattaFields = fields.isEmpty ? null : fields;
-      _pattaOwners = owners;
       _pattaDocuments = result['documents'] as Map<String, dynamic>?;
       final patta = _pattaDocuments?['patta'] as Map<String, dynamic>?;
       if (patta != null && patta['official'] == true) {
@@ -4896,10 +4611,6 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
         if (docFields != null && docFields.isNotEmpty) {
           _pattaFields = docFields.map((k, v) => MapEntry(k.toString(), v.toString()));
         }
-        final docOwners = (patta['owners'] as List<dynamic>? ?? []).map((o) {
-          return (o as Map<String, dynamic>).map((k, v) => MapEntry(k, v.toString()));
-        }).toList();
-        if (docOwners.isNotEmpty) _pattaOwners = docOwners;
       }
       final pattaErr = patta?['error'] as String?;
       final hasPattaDoc = patta != null && patta['available'] == true
@@ -4955,8 +4666,6 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
     }
   }
 
-  Future<void> _loadFmbPdfIfNeeded() async => _loadFmbForSelectedParcel();
-
   /// Fetch patta from TNGIS for the active map location (or device GPS).
   Future<void> _fetchPattaForLocation({bool useDeviceGps = false}) async {
     double? lat = useDeviceGps ? null : widget.lat;
@@ -4965,9 +4674,7 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
     setState(() {
       _fetchingPatta = true;
       _pattaFields = null;
-      _pattaOwners = [];
       _pattaError = null;
-      _pattaSource = null;
       _pattaDocuments = null;
       _fmbPdfBytes = null;
       _fmbLoadError = null;
@@ -5041,7 +4748,7 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
   }
 
   Future<void> _initDistricts() async {
-    setState(() => _initingPatta = true);
+    setState(() {});
     try {
       final data = await ApiClient.getList('/api/tnlands/districts');
       final loaded = _toOptions(data);
@@ -5066,7 +4773,7 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
         }
       });
     } finally {
-      setState(() => _initingPatta = false);
+      setState(() {});
     }
   }
 
@@ -5074,21 +4781,18 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
     setState(() {
       _selDistrict = district;
       _taluks = []; _selTaluk = null;
-      _villages = []; _selVillage = null;
-      _loadingTaluks = true; _talukError = null;
+_selVillage = null;
     });
     try {
       final data = await ApiClient.getList('/api/tnlands/taluks?dc=${district.code}');
       final loaded = _toOptions(data);
-      setState(() { _taluks = loaded; _loadingTaluks = false; });
+      setState(() { _taluks = loaded;  });
       if (autoFill && widget.taluk != null && loaded.isNotEmpty) {
         final match = _matchOption(loaded, widget.taluk);
         if (match != null) await _loadVillages(match, autoFill: true);
       }
     } catch (e) {
       setState(() {
-        _loadingTaluks = false;
-        _talukError = 'Failed to load taluks. Tap to retry.';
       });
     }
   }
@@ -5096,25 +4800,20 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
   Future<void> _loadVillages(_Option taluk, {bool autoFill = false}) async {
     setState(() {
       _selTaluk = taluk;
-      _villages = []; _selVillage = null;
-      _loadingVillages = true; _villageError = null;
+_selVillage = null;
     });
     try {
       final data = await ApiClient.getList(
           '/api/tnlands/villages?dc=${_selDistrict!.code}&tc=${taluk.code}');
       final loaded = _toOptions(data);
       setState(() {
-        _villages = loaded;
         if (autoFill && widget.village != null && loaded.isNotEmpty) {
           _selVillage = _matchOption(loaded, widget.village);
         }
-        _loadingVillages = false;
       });
       if (autoFill) _maybeAutoFetchPatta();
     } catch (e) {
       setState(() {
-        _loadingVillages = false;
-        _villageError = 'Failed to load villages. Tap to retry.';
       });
     }
   }
@@ -5127,9 +4826,7 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
     setState(() {
       _fetchingPatta = true;
       _pattaFields = null;
-      _pattaOwners = [];
       _pattaError = null;
-      _pattaSource = null;
       _pattaDocuments = null;
       _fmbPdfBytes = null;
       _fmbLoadError = null;
@@ -5164,9 +4861,7 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
     setState(() {
       _fetchingPatta = true;
       _pattaFields = null;
-      _pattaOwners = [];
       _pattaError = null;
-      _pattaSource = null;
       _pattaDocuments = null;
       _fmbPdfBytes = null;
       _fmbLoadError = null;
@@ -5203,30 +4898,29 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
     try {
       final data = await ApiClient.getList('/api/tnlands/ec/zones');
       final loaded = _toOptions(data);
-      if (loaded.isNotEmpty) setState(() => _ecZones = loaded);
+      if (loaded.isNotEmpty) setState(() {});
     } catch (_) {}
   }
 
   Future<void> _loadEcCaptcha() async {
-    setState(() => _loadingEcCaptcha = true);
+    setState(() {});
     try {
       final result = await ApiClient.get('/api/tnlands/ec/captcha');
       setState(() {
         _ecCaptchaSession = result['sessionId'] as String?;
-        _ecCaptchaImage = result['captchaImage'] as String?;
         _ecCaptchaCtrl.clear();
       });
     } catch (e) {
       setState(() => _ecError = 'Could not load EC captcha. Tap refresh to retry.');
     } finally {
-      setState(() => _loadingEcCaptcha = false);
+      setState(() {});
     }
   }
 
   // ── EC methods ─────────────────────────────────────────────────────────────
 
   Future<void> _loadEcPeriods() async {
-    setState(() => _loadingEcPeriods = true);
+    setState(() {});
     try {
       final data = await ApiClient.getList('/api/tnlands/ec/periods');
       final loaded = data.map((d) => _EcPeriod.fromJson(d as Map<String, dynamic>)).toList();
@@ -5252,7 +4946,7 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
         _selEcPeriod ??= _ecPeriods.first;
       });
     } finally {
-      setState(() => _loadingEcPeriods = false);
+      setState(() {});
     }
   }
 
@@ -5278,8 +4972,6 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
     setState(() {
       _ecSource = result['source'] as String?;
       _ecAllRecords = records;
-      _ecResults = records;
-      _ecEntries = entries;
       _selEcEntryId = entries.length == 1 ? entries.first.id : 'all';
       _ecMeta = meta;
       _ecDocumentHtml = doc?['html'] as String?;
@@ -5340,7 +5032,7 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
     String? taluk,
     String? village,
   }) async {
-    setState(() { _autoFillingEc = true; _ecError = null; });
+    setState(() {  _ecError = null; });
 
     var params = '';
     if (widget.lat != null && widget.lon != null) {
@@ -5361,7 +5053,6 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
 
     if (params.isEmpty) {
       setState(() {
-        _autoFillingEc = false;
         _ecError = 'Set a map location first (tap the map).';
       });
       return false;
@@ -5382,7 +5073,6 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
       if (zone == null || distObj == null || sros.isEmpty) {
         setState(() {
           _ecError = 'Could not load SRO list for this district.';
-          _showManualEc = true;
         });
         return false;
       }
@@ -5390,7 +5080,6 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
       setState(() {
         _selZone = _Option(zone['code'] as String, zone['name'] as String);
         _selEcDist = _Option(distObj['code'] as String, distObj['name'] as String);
-        _ecDists = [_selEcDist!];
         _ecSros = sros;
         _selEcSro = suggested != null
             ? _Option(suggested['code'] as String, suggested['name'] as String)
@@ -5401,69 +5090,16 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
     } on ApiException catch (e) {
       setState(() {
         _ecError = e.message;
-        _showManualEc = true;
       });
       return false;
     } catch (e) {
       setState(() {
         _ecError = e.toString().replaceAll('Exception: ', '');
-        _showManualEc = true;
       });
       return false;
     } finally {
-      setState(() => _autoFillingEc = false);
+      setState(() {});
     }
-  }
-
-  Future<void> _fetchEcForLocation() async {
-    if (_selEcPeriod == null) {
-      setState(() => _ecError = 'Select an EC period first.');
-      return;
-    }
-    if (_ecCaptchaSession == null || _ecCaptchaCtrl.text.trim().isEmpty) {
-      setState(() => _ecError = 'Enter the captcha code from the image below.');
-      if (_ecCaptchaImage == null) await _loadEcCaptcha();
-      return;
-    }
-
-    setState(() {
-      _fetchingEc = true;
-      _ecError = null;
-      _ecDocumentHtml = null;
-      _ecPdfBytes = null;
-      _ecPdfFileName = null;
-      _ecAllRecords = [];
-      _ecEntries = [];
-      _ecResults = [];
-    });
-
-    if (_ecSurveyCtrl.text.trim().isEmpty) {
-      final fromPatta = _pattaFields?['Survey Number'];
-      if (fromPatta != null && fromPatta.isNotEmpty) {
-        _ecSurveyCtrl.text = fromPatta;
-      } else if (widget.surveyNumber != null && widget.surveyNumber!.isNotEmpty) {
-        _ecSurveyCtrl.text = widget.surveyNumber!;
-      }
-    }
-
-    if (_selZone == null || _selEcDist == null || _selEcSro == null) {
-      final ok = await _resolveEcFromServer();
-      if (!ok) {
-        setState(() => _fetchingEc = false);
-        return;
-      }
-    }
-
-    if (_selZone == null || _selEcDist == null || _selEcSro == null) {
-      setState(() {
-        _ecError = 'Could not resolve Zone/District/SRO. Use manual selection below.';
-        _showManualEc = true;
-        _fetchingEc = false;
-      });
-      return;
-    }
-
-    await _searchEcWithPeriod(_selEcPeriod!);
   }
 
   Future<void> _searchEcWithPeriod(_EcPeriod period, {bool tryAlternateSros = true}) async {
@@ -5579,60 +5215,6 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
     await _resolveEcFromServer();
   }
 
-  /// GPS-based EC auto-fill — uses map pin + resolve API.
-  Future<void> _fetchEcByGps() async {
-    await _resolveEcFromServer();
-  }
-
-  Future<void> _loadEcDistricts(_Option zone) async {
-    setState(() {
-      _selZone = zone; _ecDists = []; _selEcDist = null;
-      _ecSros = []; _selEcSro = null; _loadingEcDists = true;
-    });
-    try {
-      final data = await ApiClient.getList(
-          '/api/tnlands/ec/districts?zone=${zone.code}');
-      final loaded = _toOptions(data);
-      setState(() {
-        _ecDists = loaded.isNotEmpty
-            ? loaded
-            : (_kStaticEcDistricts[zone.code] ?? []);
-        _loadingEcDists = false;
-      });
-    } catch (_) {
-      setState(() {
-        _ecDists = _kStaticEcDistricts[zone.code] ?? [];
-        _loadingEcDists = false;
-      });
-    }
-  }
-
-  Future<void> _loadEcSros(_Option district, {bool autoFirst = false}) async {
-    setState(() {
-      _selEcDist = district; _ecSros = []; _selEcSro = null;
-      _loadingEcSros = true;
-    });
-    try {
-      final data = await ApiClient.getList(
-          '/api/tnlands/ec/sros?zone=${_selZone!.code}&dc=${district.code}');
-      final loaded = _toOptions(data);
-      setState(() {
-        _ecSros = loaded.isNotEmpty ? loaded : (_kStaticEcSros[district.code] ?? []);
-        if (autoFirst && _ecSros.isNotEmpty) _selEcSro = _ecSros.first;
-        _loadingEcSros = false;
-      });
-      if (autoFirst) _maybeAutoFetchEc();
-    } catch (_) {
-      final fallback = _kStaticEcSros[district.code] ?? [];
-      setState(() {
-        _ecSros = fallback;
-        if (autoFirst && fallback.isNotEmpty) _selEcSro = fallback.first;
-        _loadingEcSros = false;
-      });
-      if (autoFirst) _maybeAutoFetchEc();
-    }
-  }
-
   Future<void> _searchEc() async {
     if (_selEcPeriod != null) {
       await _searchEcWithPeriod(_selEcPeriod!);
@@ -5644,7 +5226,7 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
       setState(() => _ecError = 'Fill all fields before searching.');
       return;
     }
-    setState(() { _fetchingEc = true; _ecResults = []; _ecError = null; });
+    setState(() { _fetchingEc = true;  _ecError = null; });
     try {
       if (_ecCaptchaSession == null || _ecCaptchaCtrl.text.trim().isEmpty) {
         setState(() {
@@ -6220,7 +5802,6 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
       _ecDocumentHtml = null;
       _ecPdfBytes = null;
       _ecAllRecords = [];
-      _ecResults = [];
     });
     try {
       final parts = <String>[
@@ -6413,21 +5994,6 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
     return Text(
       'Tap EC again after selecting a plot on the map.',
       style: TextStyle(fontSize: 11, color: context.fomraTextSecondary),
-    );
-  }
-
-  String? get _ecResolvedLabel {
-    if (_selZone == null || _selEcDist == null) return null;
-    final sro = _selEcSro?.name ?? '';
-    return 'Resolved: ${_selZone!.name} · ${_selEcDist!.name}${sro.isNotEmpty ? ' · $sro' : ''}';
-  }
-
-  Widget _buildGiEcPeriodPicker() {
-    return DropdownButtonFormField<_EcPeriod>(
-      initialValue: _selEcPeriod,
-      decoration: _inputDec(context, 'EC period'),
-      items: _ecPeriods.map((p) => DropdownMenuItem(value: p, child: Text(p.label, style: const TextStyle(fontSize: 12)))).toList(),
-      onChanged: (p) => setState(() => _selEcPeriod = p),
     );
   }
 
@@ -6679,498 +6245,9 @@ class _GovtDocsSectionState extends State<_GovtDocsSection> {
     );
   }
 
-  Widget _buildSubdivisionCard(_TngisSubdivisionRow row, Color color) {
-    final bundle = _subdivBundles[row.key] ??= _SubdivDocBundle();
-    final patta = bundle.documents?['patta'] as Map<String, dynamic>?;
-    final fmb = bundle.documents?['fmb'] as Map<String, dynamic>?;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: context.fomraSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: row.containsPoint
-              ? (context.isDarkMode
-                      ? AppColors.primaryLight
-                      : const Color(0xFF1565C0))
-                  .withValues(alpha: 0.45)
-              : color.withValues(alpha: 0.25),
-          width: row.containsPoint ? 2 : 1,
-        ),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        if (row.containsPoint)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Text('Selected plot',
-                style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: context.isDarkMode
-                        ? AppColors.primaryLight
-                        : const Color(0xFF1565C0))),
-          ),
-        _kv(_surveyLabel, row.surveyNumber),
-        _kv(_subLabel, row.subLabel),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: bundle.loadingPatta
-                    ? null
-                    : () => _fetchPattaForSubdivision(row),
-                icon: bundle.loadingPatta
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.article_outlined, size: 16),
-                label: Text(bundle.loadingPatta ? 'Loading…' : 'Load Patta'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: bundle.loadingFmb
-                    ? null
-                    : () => _fetchFmbForSubdivision(row),
-                icon: bundle.loadingFmb
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.picture_as_pdf_outlined, size: 16),
-                label: Text(bundle.loadingFmb ? 'Loading…' : 'Load FMB'),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1B5E20).withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(AppColors.radiusSm),
-            border: Border.all(color: const Color(0xFF1B5E20).withValues(alpha: 0.25)),
-          ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Patta / Chitta',
-                style: TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF1B5E20))),
-            const SizedBox(height: 6),
-            if (bundle.loadingPatta)
-              const Center(
-                  child: Padding(
-                padding: EdgeInsets.all(12),
-                child: SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2)),
-              ))
-            else if (patta != null && patta['available'] == true && (patta['html'] as String?)?.isNotEmpty == true)
-              PattaHtmlPreview(
-                key: ValueKey('patta-${row.key}-${(patta['html'] as String).hashCode}'),
-                html: patta['html'] as String,
-                title: 'Survey ${row.surveyNumber} · Sub ${row.subLabel}',
-              )
-            else if (patta?['error'] != null)
-              Text(patta!['error'].toString(),
-                  style: TextStyle(fontSize: 11, color: Colors.orange.shade900))
-            else
-              Text(
-                'Tap Load Patta for this subdivision.',
-                style: TextStyle(fontSize: 11, color: context.fomraTextSecondary),
-              ),
-          ]),
-        ),
-        const SizedBox(height: 10),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: const Color(0xFFC62828).withValues(alpha: 0.04),
-            borderRadius: BorderRadius.circular(AppColors.radiusSm),
-            border: Border.all(color: const Color(0xFFC62828).withValues(alpha: 0.25)),
-          ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('FMB Sketch',
-                style: TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFC62828))),
-            const SizedBox(height: 6),
-            if (bundle.loadingFmb)
-              const Center(
-                  child: Padding(
-                padding: EdgeInsets.all(12),
-                child: SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2)),
-              ))
-            else if (bundle.fmbPdf != null)
-              _buildFmbSketchButton(
-                title: 'FMB Sketch · Survey ${row.surveyNumber} · Sub ${row.subLabel}',
-                subtitle:
-                    'Official TSLR/FMB sketch · ${(bundle.fmbPdf!.length / 1024).round()} KB',
-                onTap: () => _showFmbSketch(
-                  bundle.fmbPdf!,
-                  fileName:
-                      'FMB Survey ${row.surveyNumber} Sub ${row.subLabel}.pdf',
-                  survey: row.surveyNumber,
-                  sub: row.subLabel,
-                ),
-              )
-            else if (bundle.fmbError != null)
-              Text(bundle.fmbError!,
-                  style: TextStyle(fontSize: 11, color: Colors.orange.shade900))
-            else if (fmb?['error'] != null)
-              Text(fmb!['error'].toString(),
-                  style: TextStyle(fontSize: 11, color: Colors.orange.shade900))
-            else
-              Text(
-                row.fmbAvailable
-                    ? 'Loading FMB from TNGIS…'
-                    : 'FMB may not be digitized for this subdivision.',
-                style: TextStyle(fontSize: 11, color: context.fomraTextSecondary),
-              ),
-          ]),
-        ),
-      ]),
-    );
-  }
-
-  Widget _buildPattaResult() {
-    const color = Color(0xFF1B5E20);
-    return Container(
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Row(children: [
-          Icon(Icons.check_circle_outline, color: color, size: 16),
-          SizedBox(width: 6),
-          Text('Patta Details',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
-        ]),
-        if (_pattaSource != null) ...[
-          const SizedBox(height: 4),
-          Text('Source: $_pattaSource',
-              style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
-        ],
-        const SizedBox(height: 10),
-        if (_pattaFields != null)
-          ...(_pattaFields!.entries.map((e) => _kv(e.key, e.value))),
-        if (_pattaOwners.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          const Text('Owners',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
-          const SizedBox(height: 4),
-          ..._pattaOwners.map((owner) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: context.fomraSurface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: context.fomraBorder),
-                  ),
-                  child: Column(children: owner.entries.map((e) => _kv(e.key, e.value)).toList()),
-                ),
-              )),
-        ],
-        if (_pattaDocuments != null) ...[
-          const SizedBox(height: 12),
-          const Divider(height: 1),
-          const SizedBox(height: 10),
-          const Text('Official Documents',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
-          const SizedBox(height: 8),
-          ..._buildPattaDocumentActions(color),
-        ],
-      ]),
-    );
-  }
-
-  List<Widget> _buildPattaDocumentActions(Color color) {
-    final docs = _pattaDocuments!;
-    final patta = docs['patta'] as Map<String, dynamic>?;
-    final fmb = docs['fmb'] as Map<String, dynamic>?;
-    final widgets = <Widget>[];
-
-    if (patta != null) {
-      final available = patta['available'] == true;
-      final html = patta['html'] as String?;
-      final pattaChildren = <Widget>[
-        const Text('Patta / Chitta',
-            style: TextStyle(
-                fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF1B5E20))),
-        const SizedBox(height: 6),
-      ];
-      if (available && (html != null && html.isNotEmpty || (patta['pdfBase64'] as String?)?.isNotEmpty == true)) {
-        pattaChildren.add(_buildPattaDocPreview(patta));
-        if (patta['note'] != null) {
-          pattaChildren.add(const SizedBox(height: 4));
-          pattaChildren.add(Text(patta['note'].toString(),
-              style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)));
-        }
-      } else if (patta['error'] != null) {
-        pattaChildren.add(Text(patta['error'].toString(),
-            style: TextStyle(fontSize: 11, color: Colors.orange.shade900)));
-      }
-      widgets.add(Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1B5E20).withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(AppColors.radiusSm),
-          border: Border.all(color: const Color(0xFF1B5E20).withValues(alpha: 0.25)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: pattaChildren,
-        ),
-      ));
-      widgets.add(const SizedBox(height: 12));
-    }
-
-    if (fmb != null) {
-      final hasProbe = fmb['downloadUrl'] != null;
-      final confirmedAvailable = fmb['available'] == true;
-      final fmbChildren = <Widget>[
-        const Text('FMB Sketch',
-            style: TextStyle(
-                fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFC62828))),
-        const SizedBox(height: 6),
-      ];
-      if (_loadingFmb) {
-        fmbChildren.add(const Padding(
-          padding: EdgeInsets.symmetric(vertical: 16),
-          child: Center(
-            child: SizedBox(
-              width: 28,
-              height: 28,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFC62828)),
-            ),
-          ),
-        ));
-      } else if (_fmbPdfBytes != null) {
-        final fmbFileName = (fmb['fileName'] as String?) ?? 'FMB Sketch.pdf';
-        final sizeKb = (_fmbPdfBytes!.length / 1024).round();
-        fmbChildren.add(_buildFmbSketchButton(
-          title: fmbFileName,
-          subtitle: 'Official TSLR/FMB sketch · $sizeKb KB',
-          onTap: () => _showFmbSketch(_fmbPdfBytes!, fileName: fmbFileName),
-        ));
-      } else if (_fmbLoadError != null) {
-        fmbChildren.add(Text(_fmbLoadError!,
-            style: TextStyle(fontSize: 11, color: Colors.orange.shade900)));
-      } else if (hasProbe) {
-        fmbChildren.add(OutlinedButton.icon(
-          onPressed: _loadingFmb ? null : _loadFmbPdfIfNeeded,
-          icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
-          label: const Text('Load FMB sketch PDF'),
-        ));
-      } else if (!confirmedAvailable) {
-        fmbChildren.add(Text(
-          fmb['error']?.toString() ?? 'FMB not digitized for this subdivision.',
-          style: TextStyle(fontSize: 11, color: Colors.orange.shade900),
-        ));
-      }
-      widgets.add(Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: const Color(0xFFC62828).withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(AppColors.radiusSm),
-          border: Border.all(color: const Color(0xFFC62828).withValues(alpha: 0.25)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: fmbChildren,
-        ),
-      ));
-    }
-
-    return widgets;
-  }
-
   // â”€â”€ EC UI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  Widget _ecPeriodDropdown(Color color) {
-    if (_loadingEcPeriods) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 12),
-        child: Row(children: [
-          SizedBox(width: 14, height: 14,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFC62828))),
-          SizedBox(width: 10),
-          Text('Loading periods…', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-        ]),
-      );
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppColors.radiusSm),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<_EcPeriod>(
-          value: _selEcPeriod,
-          isExpanded: true,
-          hint: const Text('Select year / period',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-          items: _ecPeriods
-              .map((p) => DropdownMenuItem(
-                    value: p,
-                    child: Text(p.label, style: const TextStyle(fontSize: 12)),
-                  ))
-              .toList(),
-          onChanged: _ecPeriods.isEmpty
-              ? null
-              : (p) {
-                  if (p == null) return;
-                  setState(() => _selEcPeriod = p);
-                  if (_selZone != null && _ecSurveyCtrl.text.trim().isNotEmpty) {
-                    _searchEcWithPeriod(p);
-                  }
-                },
-          icon: Icon(Icons.keyboard_arrow_down, size: 18, color: color),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEcResults() {
-    const color = Color(0xFFC62828);
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        const Icon(Icons.check_circle_outline, color: color, size: 16),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            '${_ecAllRecords.length} EC record${_ecAllRecords.length == 1 ? '' : 's'} · ${_selEcPeriod?.label ?? 'selected period'}',
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color),
-          ),
-        ),
-      ]),
-      if (_ecSource != null) ...[
-        const SizedBox(height: 4),
-        Text('Source: $_ecSource',
-            style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
-      ],
-      if (_ecEntries.length > 1) ...[
-        const SizedBox(height: 10),
-        const Text('View by registration date',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
-        const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(AppColors.radiusSm),
-            border: Border.all(color: color.withValues(alpha: 0.25)),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selEcEntryId ?? 'all',
-              isExpanded: true,
-              items: [
-                const DropdownMenuItem(
-                  value: 'all',
-                  child: Text('All records in period', style: TextStyle(fontSize: 12)),
-                ),
-                ..._ecEntries.map((e) => DropdownMenuItem(
-                      value: e.id,
-                      child: Text(e.label, style: const TextStyle(fontSize: 12)),
-                    )),
-              ],
-              onChanged: (id) {
-                if (id == null) return;
-                setState(() => _selEcEntryId = id);
-                _refreshEcEntryPreview();
-              },
-            ),
-          ),
-        ),
-      ],
-      if (_ecPdfBytes != null) ...[
-        const SizedBox(height: 10),
-        PattaDocumentPreview(
-          key: ValueKey('ec-pdf-${_ecPdfBytes!.length}'),
-          pdfBytes: _ecPdfBytes,
-          fileName: _ecPdfFileName ?? 'Encumbrance Certificate.pdf',
-        ),
-      ],
-      if (_ecDocumentHtml != null && _ecPdfBytes == null) ...[
-        const SizedBox(height: 10),
-        PattaHtmlPreview(
-          key: ValueKey('ec-html-${_ecDocumentHtml!.hashCode}'),
-          html: _ecDocumentHtml!,
-          title: 'Encumbrance Certificate (EC)',
-        ),
-      ],
-    ]);
-  }
-
   // â”€â”€ Shared UI helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-  Widget _dropdown(
-    String label,
-    List<_Option> options,
-    _Option? selected,
-    Color color, {
-    bool loading = false,
-    String? hint,
-    required Function(_Option) onChanged,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppColors.radiusSm),
-        border: Border.all(
-            color: selected != null ? color.withValues(alpha: 0.5) : const Color(0xFFE5E7EB)),
-      ),
-      child: loading
-          ? const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Row(children: [
-                SizedBox(width: 14, height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
-                SizedBox(width: 10),
-                Text('Loading...', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-              ]),
-            )
-          : DropdownButtonHideUnderline(
-              child: DropdownButton<_Option>(
-                value: selected,
-                isExpanded: true,
-                hint: Text(hint ?? label,
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                items: options
-                    .map((o) => DropdownMenuItem(
-                          value: o,
-                          child: Text(o.name,
-                              style: const TextStyle(fontSize: 12, color: AppColors.textPrimary)),
-                        ))
-                    .toList(),
-                onChanged: options.isEmpty
-                    ? null
-                    : (v) { if (v != null) onChanged(v); },
-                icon: Icon(Icons.keyboard_arrow_down,
-                    size: 18,
-                    color: selected != null ? color : AppColors.textSecondary),
-              ),
-            ),
-    );
-  }
 
   Widget _kv(String key, String value) => Padding(
         padding: const EdgeInsets.only(bottom: 4),

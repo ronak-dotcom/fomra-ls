@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import '../../models/gps_fix.dart';
 import '../../models/land_lead.dart';
@@ -785,44 +784,6 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
           _fetchingLocation = false;
         });
       }
-    }
-  }
-
-  Future<void> _centerMapOnMyLocation() async {
-    setState(() {
-      _fetchingLocation = true;
-      _locationStatus = 'Getting your location…';
-    });
-
-    try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        _setStatus('Location services disabled. Enable GPS to center the map.');
-        return;
-      }
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        _setStatus('Location permission denied.');
-        return;
-      }
-
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 15),
-        ),
-      );
-
-      final point = LatLng(position.latitude, position.longitude);
-      await _onMapPin(point);
-    } on LocationServiceDisabledException {
-      _setStatus('Location services are disabled.');
-    } catch (e) {
-      _setStatus('Error: ${e.toString().replaceAll('Exception: ', '')}');
     }
   }
 
