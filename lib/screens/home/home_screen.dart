@@ -49,6 +49,7 @@ import '../../widgets/monthly_target_progress_card.dart';
 import '../../widgets/portal_home_sections.dart';
 import '../../widgets/broker_energy_summary.dart';
 import '../../widgets/property_review_summary.dart';
+import '../../widgets/site_visit_summary.dart';
 import '../../widgets/ui/app_components.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -1042,6 +1043,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       FilteredLeadsScreen.open(context, filter);
                     }
                   },
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              // Site visits (new Lead IDs) for today / this week / this month.
+              // Management and managers see each executive in their scope;
+              // an executive sees their own row.
+              PortalFadeSection(
+                index: 1,
+                child: PortalSectionCard(
+                  title: 'Site Visits',
+                  subtitle: 'New Lead IDs · week from Monday · tap a number '
+                      'for the properties',
+                  icon: Icons.location_on_outlined,
+                  child: SiteVisitSummary(
+                    leads: _homeSummaryLeads,
+                    onlyExecutive: _canApprove
+                        ? null
+                        : AuthService.instance.currentUser?.fullName,
+                  ),
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),

@@ -158,3 +158,59 @@ class FirstMeetings {
     );
   }
 }
+
+/// Site visits (new Lead IDs) one executive made in the current day, week
+/// (from Monday) and month — the lands behind each count, so a tap can list
+/// them.
+class SiteVisitPeriods {
+  final String executive;
+  final List<LandLead> today;
+  final List<LandLead> week;
+  final List<LandLead> month;
+
+  const SiteVisitPeriods({
+    required this.executive,
+    required this.today,
+    required this.week,
+    required this.month,
+  });
+
+  /// One row per executive with a site visit this month, most this month
+  /// first. [now] is local time.
+  static List<SiteVisitPeriods> byExecutive(
+    Iterable<LandLead> leads, {
+    DateTime? now,
+  }) {
+    final n = now ?? DateTime.now();
+    final day = DateTime(n.year, n.month, n.day);
+    final weekStart = day.subtract(Duration(days: day.weekday - 1));
+    final monthStart = DateTime(n.year, n.month, 1);
+    final byName = <String, List<LandLead>>{};
+    final display = <String, String>{};
+    for (final l in leads) {
+      final name = l.createdByName.trim();
+      if (name.isEmpty) continue;
+      final at = l.addedOn.toLocal();
+      if (at.isBefore(monthStart) || at.isAfter(n)) continue;
+      final key = name.toLowerCase();
+      display.putIfAbsent(key, () => name);
+      (byName[key] ??= []).add(l);
+    }
+    bool from(LandLead l, DateTime start) => !l.addedOn.toLocal().isBefore(start);
+    final rows = [
+      for (final e in byName.entries)
+        SiteVisitPeriods(
+          executive: display[e.key]!,
+          today: [for (final l in e.value) if (from(l, day)) l],
+          week: [for (final l in e.value) if (from(l, weekStart)) l],
+          month: e.value,
+        ),
+    ]..sort((a, b) {
+        final byMonth = b.month.length.compareTo(a.month.length);
+        return byMonth != 0
+            ? byMonth
+            : a.executive.toLowerCase().compareTo(b.executive.toLowerCase());
+      });
+    return rows;
+  }
+}

@@ -115,7 +115,7 @@ extension ReportKindX on ReportKind {
         ReportKind.conversion => 'Acquisition and conversion rates',
         ReportKind.siteAgeing => 'Age buckets across the pipeline',
         ReportKind.pendingApproval => 'Visits awaiting management approval',
-        ReportKind.siteVisit => 'All logged site visits',
+        ReportKind.siteVisit => 'Site visits (new Lead IDs) by executive',
         ReportKind.survey => 'Survey numbers and pending surveys',
         ReportKind.legal => 'Legal verification and document progress',
         ReportKind.document => 'Uploaded legal document inventory',
@@ -831,49 +831,95 @@ class ReportCatalogService {
     );
   }
 
+  /// Site visits = new Lead IDs (the first visit, which creates the lead),
+  /// the same rule as the monthly targets: per executive, then every one.
+  /// Revisits and management site visits on those lands are listed apart.
+  /// The Reports filters (date range, executive, district...) apply.
   static ReportPreviewData _siteVisitPreview(
     List<LandLead> leads,
     List<LandLeadSiteVisit> visits, {
     required bool cap,
   }) {
+    final sorted = [...leads]..sort((a, b) => b.addedOn.compareTo(a.addedOn));
+    final byExec = <String, List<LandLead>>{};
+    for (final l in sorted) {
+      final name =
+          l.createdByName.trim().isEmpty ? '-' : l.createdByName.trim();
+      (byExec[name] ??= []).add(l);
+    }
+    final execs = byExec.entries.toList()
+      ..sort((a, b) => b.value.length.compareTo(a.value.length));
+
     final leadMap = {for (final l in leads) l.leadId: l};
-    final rows = visits
-        .map((v) {
-          final lead = leadMap[v.leadId];
-          return [
-            v.leadId,
-            lead?.ownerName ?? '-',
-            v.visitType.label,
-            v.approvalStatus.label,
-            v.loggedByName.isEmpty ? '-' : v.loggedByName,
-            _date.format(v.visitedAt),
-          ];
-        })
-        .toList();
+    final revisits = visits.where((v) => leadMap.containsKey(v.leadId)).toList()
+      ..sort((a, b) => b.visitedAt.compareTo(a.visitedAt));
 
     return ReportPreviewData(
       generatedAt: DateTime.now(),
       summary: [
-        (label: 'Site visits', value: '${visits.length}'),
-        (
-          label: 'Pending',
-          value:
-              '${visits.where((v) => v.approvalStatus == SiteVisitApprovalStatus.pending).length}'
-        ),
+        (label: 'Site visits (new Lead IDs)', value: '${sorted.length}'),
+        (label: 'Executives', value: '${execs.length}'),
+        (label: 'Revisits & management visits', value: '${revisits.length}'),
       ],
       sections: [
         ReportPreviewSection(
-          title: 'Site Visit Reports',
+          title: 'Site visits by executive',
+          headers: const ['Executive', 'Site visits', 'Last visit'],
+          rows: [
+            for (final e in execs)
+              [e.key, '${e.value.length}', _date.format(e.value.first.addedOn)],
+          ],
+          rowLeads: [for (final e in execs) e.value],
+          emptyMessage: 'No site visits in this period.',
+        ),
+        ReportPreviewSection(
+          title: 'Site visits (new Lead IDs)',
           headers: const [
             'Lead ID',
-            'Owner',
+            'Property',
+            'Village',
+            'District',
+            'Executive',
+            'Date',
+          ],
+          rows: _maybeCap([
+            for (final l in sorted)
+              [
+                l.leadId,
+                l.displayName,
+                l.village.trim().isEmpty ? '-' : l.village.trim(),
+                l.district.trim().isEmpty ? '-' : l.district.trim(),
+                l.createdByName.trim().isEmpty ? '-' : l.createdByName.trim(),
+                _date.format(l.addedOn),
+              ],
+          ], cap),
+          rowLeads: _maybeCapLeads([for (final l in sorted) [l]], cap),
+          emptyMessage: 'No site visits in this period.',
+        ),
+        ReportPreviewSection(
+          title: 'Revisits & management visits',
+          headers: const [
+            'Lead ID',
+            'Property',
             'Type',
             'Approval',
             'Logged by',
             'Date',
           ],
-          rows: _maybeCap(rows, cap),
-          emptyMessage: 'No site visits logged.',
+          rows: _maybeCap([
+            for (final v in revisits)
+              [
+                v.leadId,
+                leadMap[v.leadId]?.displayName ?? '-',
+                v.visitType.label,
+                v.approvalStatus.label,
+                v.loggedByName.isEmpty ? '-' : v.loggedByName,
+                _date.format(v.visitedAt),
+              ],
+          ], cap),
+          rowLeads: _maybeCapLeads(
+              [for (final v in revisits) [leadMap[v.leadId]!]], cap),
+          emptyMessage: 'No revisits logged on these lands.',
         ),
       ],
     );
