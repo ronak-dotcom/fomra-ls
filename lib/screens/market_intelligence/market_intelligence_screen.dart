@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:fl_chart/fl_chart.dart';
 import '../../services/api_client.dart';
+import '../../services/infra_score_store.dart';
 import '../../services/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -786,7 +787,14 @@ class _MarketIntelligenceScreenState extends State<MarketIntelligenceScreen> {
       final roadFt = parseRoadWidthFt(widget.lead?.roadWidth ?? '') ??
           double.tryParse(_roadWidthCtrl.text);
 
-      final data = await ApiClient.post(
+      // A lead's score is saved once loaded, so it shows instantly next time
+      // and doesn't depend on the public map servers being free.
+      final leadId = widget.lead?.leadId;
+      Map<String, dynamic>? data = leadId == null
+          ? null
+          : await InfraScoreStore.load(
+              leadId, requestRadius, requestLat, requestLon);
+      data ??= await ApiClient.post(
         '/api/poi/infrastructure',
         {
           'lat': requestLat,
@@ -795,7 +803,11 @@ class _MarketIntelligenceScreenState extends State<MarketIntelligenceScreen> {
           if (roadFt != null) 'roadWidthFt': roadFt,
         },
         auth: false,
-      ).timeout(const Duration(seconds: 35));
+      ).timeout(const Duration(seconds: 58));
+      if (leadId != null && data['cachedForLead'] != true) {
+        InfraScoreStore.save(
+            leadId, requestRadius, requestLat, requestLon, data);
+      }
 
       if (!mounted || fetchSeq != _poiFetchSeq) return;
 

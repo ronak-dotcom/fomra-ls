@@ -52,6 +52,7 @@ import '../../widgets/lead_map_controls.dart';
 import '../../widgets/offline_status_banner.dart';
 import '../../widgets/portal_page_layout.dart';
 import '../../widgets/ui/app_components.dart';
+import '../../models/owner_profile.dart';
 import '../../widgets/owner_profile_widgets.dart';
 import '../../widgets/who_we_met_card.dart';
 import '../../utils/phone_validation.dart';
@@ -1286,18 +1287,19 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
           lead: lead,
           onOwnerProfileSaved: (l) {
             if (!mounted) return;
-            setState(() => lead = lead.copyWith(
-                ownerOccupation: l.ownerOccupation,
-                ownerLives: l.ownerLives,
-                ownerDecision: l.ownerDecision));
+            setState(() => lead = OwnerProfileValues.of(l).applyTo(
+                lead.copyWith(
+                  ownerName: l.ownerName,
+                  contactDetails: l.contactDetails,
+                  contactType: l.contactType,
+                  additionalOwners: l.additionalOwners,
+                )));
           },
           onMeetingSaved: viewOnly
               ? null
-              : () {
-                  if (lead.status == LeadStatus.prospectMeetingPending) {
-                    _changeStatus(LeadStatus.prospectMeetingCompleted);
-                  }
-                },
+              : (managementPresent) => _changeStatus(statusAfterMeeting(
+                  lead.status,
+                  managementPresent: managementPresent)),
         ),
       );
       await _loadActivityData();
@@ -1631,8 +1633,6 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
                                           summary,
                                           const SizedBox(height: 12),
                                           whoWeMet,
-                                  const SizedBox(height: 12),
-                                  ownerStrip,
                                           const SizedBox(height: 12),
                                           ownerStrip,
                                           if (renameBanner != null) ...[
@@ -1687,6 +1687,8 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
                                   summary,
                                   const SizedBox(height: 12),
                                   whoWeMet,
+                                  const SizedBox(height: 12),
+                                  ownerStrip,
                                   if (renameBanner != null) ...[
                                     const SizedBox(height: 12),
                                     renameBanner,
@@ -4143,8 +4145,23 @@ class _LeadInfoCards extends StatelessWidget {
         title: 'Contact & Lead',
         icon: Icons.contacts_outlined,
         fields: [
-          _Field('Owner', _v(lead.ownerName)),
+          _Field(
+              lead.additionalOwners.isEmpty
+                  ? 'Owner'
+                  : 'Owner ★ point of contact',
+              _v(lead.ownerName)),
           _phoneField('Owner Number', lead.contactDetails),
+          if (lead.additionalOwners.isNotEmpty)
+            _Field(
+              'Other owners',
+              [
+                for (final o in lead.additionalOwners)
+                  [o.name.trim(), o.contact.trim()]
+                      .where((x) => x.isNotEmpty)
+                      .join(' · '),
+              ].where((x) => x.isNotEmpty).join('\n'),
+              wide: true,
+            ),
           _Field(
             'Main Contact Is',
             _v(LeadContactTypes.label(lead.contactType, lead.contactRelation)),

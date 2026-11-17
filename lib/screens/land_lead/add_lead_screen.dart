@@ -309,6 +309,7 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
     // updating the moment the user types their own name (see
     // _onLeadNameChanged) — this is a starting point, not a lock-in.
     _locationCtrl.addListener(_maybeSuggestLeadName);
+    _villageCtrl.addListener(_maybeSuggestLeadName);
     _extentValueCtrl.addListener(_maybeSuggestLeadName);
     _leadNameCtrl.addListener(_onLeadNameChanged);
     final existing = widget.existingLead;
@@ -433,7 +434,11 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
   }
 
   String? _suggestedLeadName() {
-    final location = _locationCtrl.text.trim();
+    // Village reads better than the map's road name ("Mappedu 5 acres");
+    // the location is the fallback until a village is typed.
+    final village = _villageCtrl.text.trim();
+    final location =
+        village.isNotEmpty ? village : _locationCtrl.text.trim();
     final extentValue = _extentValueCtrl.text.trim();
     final extent = extentValue.isEmpty
         ? ''
@@ -1063,15 +1068,18 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${d.lead.ownerName.isEmpty ? "(no name)" : d.lead.ownerName} '
-                          '· ${d.lead.leadId}',
+                          'Lead ${d.lead.leadId} · '
+                          '${d.lead.leadName.trim().isNotEmpty ? d.lead.leadName.trim() : d.lead.village.trim()}',
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
-                        Text(
-                          'Matched on: ${d.matchedFields.join(", ")}',
-                          style: TextStyle(
-                              fontSize: 12, color: Colors.grey.shade600),
-                        ),
+                        for (final why in d.matchedFields)
+                          Text(
+                            why,
+                            style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFB45309)),
+                          ),
                       ],
                     ),
                   )),

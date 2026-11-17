@@ -7,10 +7,14 @@ const {
   computeInfrastructureScores,
 } = require('../lib/overpassInfrastructure');
 
+// Public Overpass servers, tried together; the first good answer wins.
+// (overpass.kumi.systems and overpass.openstreetmap.ru stopped answering
+// reliably, which is what broke the infrastructure score.)
 const MIRRORS = [
-  { hostname: 'overpass.kumi.systems',     path: '/api/interpreter' },
-  { hostname: 'overpass-api.de',           path: '/api/interpreter' },
-  { hostname: 'overpass.openstreetmap.ru', path: '/api/interpreter' },
+  { hostname: 'overpass-api.de',         path: '/api/interpreter' },
+  { hostname: 'overpass.private.coffee', path: '/api/interpreter' },
+  { hostname: 'maps.mail.ru',            path: '/osm/tools/overpass/api/interpreter' },
+  { hostname: 'overpass.kumi.systems',   path: '/api/interpreter' },
 ];
 
 /** Short-lived cache — repeated taps / refreshes return instantly. */
@@ -48,7 +52,7 @@ function queryMirror(mirror, body) {
         'User-Agent':     'FomraLS/1.0 (fomra.digital26@gmail.com)',
         'Accept':         'application/json',
       },
-      timeout: 28000,
+      timeout: 45000,
     };
 
     const req = https.request(options, (res) => {
@@ -109,8 +113,11 @@ async function runOverpassQuery(query) {
 
   try {
     return await Promise.any(attempts);
-  } catch (_) {
-    const err = new Error('All Overpass mirrors failed');
+  } catch (agg) {
+    // Say why each server failed, so the error a user reports is useful.
+    const reasons = (agg.errors || []).map((e) => e.message).join('; ');
+    const err = new Error(
+      `Map data servers are busy — try again in a minute (${reasons || 'no answer'})`);
     err.status = 502;
     throw err;
   }

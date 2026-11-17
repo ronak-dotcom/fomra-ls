@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/employee_profile.dart';
 import '../models/land_lead.dart';
+import '../models/owner_profile.dart';
 import 'lead_visibility.dart';
 import 'view_scope.dart';
 
@@ -74,12 +75,24 @@ class AppStore extends ChangeNotifier {
 
   /// Updates just the owner profile of a stored lead (so a concurrent status
   /// change made from an older copy can't undo it).
-  void patchOwnerProfile(String leadId,
-      {required String type, required String lives, required String decision}) {
+  void patchOwnerProfile(String leadId, OwnerProfileValues v) {
+    final idx = leads.indexWhere((l) => l.leadId == leadId);
+    if (idx == -1) return;
+    leads[idx] = v.applyTo(leads[idx]);
+    notifyListeners();
+  }
+
+  /// Updates just the owners (main + additional) of a stored lead.
+  void patchOwners(String leadId,
+      {required OwnerContact primary, required List<OwnerContact> others}) {
     final idx = leads.indexWhere((l) => l.leadId == leadId);
     if (idx == -1) return;
     leads[idx] = leads[idx].copyWith(
-        ownerOccupation: type, ownerLives: lives, ownerDecision: decision);
+      ownerName: primary.name,
+      contactDetails: primary.contact,
+      contactType: LeadContactTypes.landOwner,
+      additionalOwners: others,
+    );
     notifyListeners();
   }
 

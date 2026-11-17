@@ -87,7 +87,7 @@ function buildInfrastructureQuery(lat, lon, radiusMeters) {
     parts.push(`way["highway"="${hw}"]${area};`);
   }
 
-  return `[out:json][timeout:25];\n(\n${parts.join('\n')}\n);\nout tags center;`;
+  return `[out:json][timeout:40];\n(\n${parts.join('\n')}\n);\nout tags center;`;
 }
 
 function haversineKm(lat1, lon1, lat2, lon2) {

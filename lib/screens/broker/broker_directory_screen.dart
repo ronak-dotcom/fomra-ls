@@ -24,7 +24,7 @@ class BrokerDirectoryScreen extends StatefulWidget {
 
 class _BrokerDirectoryScreenState extends State<BrokerDirectoryScreen> {
   String _query = '';
-  bool _reviewOnly = false;
+  _DirTab _tab = _DirTab.all;
 
   @override
   void initState() {
@@ -112,16 +112,32 @@ class _BrokerDirectoryScreenState extends State<BrokerDirectoryScreen> {
     final leadsByPhone = _leadsByPhone;
     final q = _query.trim().toLowerCase();
     final digits = _query.replaceAll(RegExp(r'\D'), '');
-    final reviewCount = all.where((b) => b.needsReview).length;
+    _DirTab tabOf(BrokerEntry b) {
+      if (b.displayName.trim().isEmpty) return _DirTab.blank;
+      if (b.needsReview ||
+          PhoneValidation.looksWrong(b.phone) ||
+          _sameNameOthers(b, all).isNotEmpty) {
+        return _DirTab.review;
+      }
+      return _DirTab.completed;
+    }
+
+    final counts = {
+      for (final t in _DirTab.values)
+        t: t == _DirTab.all
+            ? all.length
+            : all.where((b) => tabOf(b) == t).length,
+    };
     final shown = all.where((b) {
-      if (_reviewOnly && !b.needsReview) return false;
+      if (_tab != _DirTab.all && tabOf(b) != _tab) return false;
       if (q.isEmpty) return true;
       if (digits.length >= 3 && b.phone.contains(digits)) return true;
       return {b.displayName, ...b.aliases}
           .any((n) => n.toLowerCase().contains(q));
     }).toList()
       ..sort((a, b) {
-        if (a.needsReview != b.needsReview) return a.needsReview ? -1 : 1;
+        final ar = tabOf(a) == _DirTab.review, br = tabOf(b) == _DirTab.review;
+        if (ar != br) return ar ? -1 : 1;
         final byLeads = (leadsByPhone[b.phone]?.length ?? 0)
             .compareTo(leadsByPhone[a.phone]?.length ?? 0);
         return byLeads != 0
@@ -160,29 +176,37 @@ class _BrokerDirectoryScreenState extends State<BrokerDirectoryScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                Wrap(spacing: 8, children: [
-                  ChoiceChip(
-                    label: Text('All (${all.length})'),
-                    selected: !_reviewOnly,
-                    onSelected: (_) => setState(() => _reviewOnly = false),
-                  ),
-                  ChoiceChip(
-                    label: Text('Needs review ($reviewCount)'),
-                    selected: _reviewOnly,
-                    onSelected: (_) => setState(() => _reviewOnly = true),
-                  ),
+                Wrap(spacing: 8, runSpacing: 8, children: [
+                  for (final t in _DirTab.values)
+                    ChoiceChip(
+                      label: Text('${t.label}  ${counts[t]}'),
+                      selected: _tab == t,
+                      onSelected: (_) => setState(() => _tab = t),
+                    ),
                 ]),
+                const SizedBox(height: 8),
+                Text(
+                  _tab.help,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: context.fomraTextSecondary,
+                  ),
+                ),
                 const SizedBox(height: 14),
                 if (shown.isEmpty)
                   AppCard(
                     child: EmptyState(
                       icon: Icons.handshake_outlined,
-                      title: _reviewOnly
-                          ? 'Nothing to review'
-                          : 'No brokers match',
-                      message: _reviewOnly
-                          ? 'Every broker number has one confirmed name.'
-                          : 'Try a different name or number.',
+                      title: q.isNotEmpty
+                          ? 'No brokers match'
+                          : switch (_tab) {
+                              _DirTab.review => 'Nothing to review',
+                              _DirTab.blank => 'No blank names',
+                              _ => 'No brokers here',
+                            },
+                      message: q.isNotEmpty
+                          ? 'Try a different name or number.'
+                          : _tab.help,
                     ),
                   ),
                 for (final b in shown)
@@ -254,10 +278,14 @@ class _BrokerCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (entry.needsReview)
-                const _Pill(label: 'Needs review', color: AppColors.warning)
-              else if (entry.reviewedBy.isNotEmpty)
-                const _Pill(label: 'Confirmed', color: AppColors.success),
+              if (entry.displayName.trim().isEmpty)
+                const _Pill(label: 'Blank', color: AppColors.error)
+              else if (entry.needsReview ||
+                  PhoneValidation.looksWrong(entry.phone) ||
+                  sameNameOthers.isNotEmpty)
+                const _Pill(label: 'Under review', color: AppColors.warning)
+              else
+                const _Pill(label: 'Completed', color: AppColors.success),
             ],
           ),
           if (PhoneValidation.looksWrong(entry.phone)) ...[
@@ -542,4 +570,26 @@ class _MergeDialogState extends State<_MergeDialog> {
       ],
     );
   }
+}
+
+/// Broker Directory tabs.
+enum _DirTab { all, review, completed, blank }
+
+extension on _DirTab {
+  String get label => switch (this) {
+        _DirTab.all => 'All',
+        _DirTab.review => 'Under review',
+        _DirTab.completed => 'Completed',
+        _DirTab.blank => 'Blank',
+      };
+
+  String get help => switch (this) {
+        _DirTab.all => 'Every broker number in the app.',
+        _DirTab.review =>
+          'Needs a decision: the number was typed with different names, the '
+              'number looks wrong, or the same name is saved under another '
+              'number (often one digit mistyped — merge them).',
+        _DirTab.completed => 'One clear name and a valid number — nothing to do.',
+        _DirTab.blank => 'A number saved with no broker name — add the name.',
+      };
 }
