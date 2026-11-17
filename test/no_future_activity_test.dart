@@ -39,6 +39,7 @@ LandLeadMeeting _meeting(String leadId, Duration fromNow) => LandLeadMeeting(
       duration: '30m',
       notes: '',
       loggedByName: 'exec',
+      createdAt: _now,
     );
 
 List<String> _select(List<LandLead> leads, List<LandLeadMeeting> meetings) =>

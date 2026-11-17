@@ -1,6 +1,5 @@
 import '../models/land_lead.dart';
 import '../models/land_lead_site_visit.dart';
-import '../models/lead_call_log.dart';
 import '../models/land_lead_meeting.dart';
 import '../services/management_bi_activity_service.dart';
 import 'ai_lead_score.dart';
@@ -12,7 +11,6 @@ enum IntelReminderKind {
   noActivity3Days,
   noMeetingAfterAssignment,
   visitNotUpdated,
-  ownerNotContacted,
   surveyPending,
   legalPending,
 }
@@ -23,7 +21,6 @@ extension IntelReminderKindX on IntelReminderKind {
         IntelReminderKind.noMeetingAfterAssignment =>
           'No meeting after assignment',
         IntelReminderKind.visitNotUpdated => 'Visit not updated',
-        IntelReminderKind.ownerNotContacted => 'Owner not contacted',
         IntelReminderKind.surveyPending => 'Survey pending',
         IntelReminderKind.legalPending => 'Legal pending',
       };
@@ -331,14 +328,6 @@ class ManagementIntelligence {
           }
         }
       }
-      if (!index.hasCall(lead.leadId) && age >= 1) {
-        out.add(IntelReminderItem(
-          lead: lead,
-          kind: IntelReminderKind.ownerNotContacted,
-          daysStale: age,
-          detail: 'No call logged since lead created',
-        ));
-      }
       if (lead.status == LeadStatus.negotiation &&
           lead.surveyNumber.trim().isEmpty) {
         out.add(IntelReminderItem(
@@ -612,7 +601,6 @@ class ManagementIntelligence {
   static double _successScore(LandLead lead, _ActivityIndex index) =>
       AiLeadScore.compute(
         lead: lead,
-        callLogs: index.callsByLead[lead.leadId] ?? const [],
         meetings: index.meetingsByLead[lead.leadId] ?? const [],
         siteVisits: index.visitsByLead[lead.leadId] ?? const [],
       ).score.toDouble();
@@ -696,7 +684,6 @@ class ManagementIntelligence {
     _ActivityIndex index,
     int age,
   ) {
-    if (!index.hasCall(lead.leadId)) return 'Call owner';
     if (!index.hasVisit(lead.leadId) && lead.status.isProspect) {
       return 'Schedule site visit';
     }
@@ -715,21 +702,15 @@ class ManagementIntelligence {
 }
 
 class _ActivityIndex {
-  final Map<String, List<LeadCallLog>> callsByLead;
   final Map<String, List<LandLeadMeeting>> meetingsByLead;
   final Map<String, List<LandLeadSiteVisit>> visitsByLead;
 
   _ActivityIndex({
-    required this.callsByLead,
     required this.meetingsByLead,
     required this.visitsByLead,
   });
 
   factory _ActivityIndex.from(ManagementBiActivityBundle bundle) {
-    final calls = <String, List<LeadCallLog>>{};
-    for (final c in bundle.calls) {
-      (calls[c.leadId] ??= []).add(c);
-    }
     final meetings = <String, List<LandLeadMeeting>>{};
     for (final m in bundle.meetings) {
       (meetings[m.leadId] ??= []).add(m);
@@ -739,13 +720,11 @@ class _ActivityIndex {
       (visits[v.leadId] ??= []).add(v);
     }
     return _ActivityIndex(
-      callsByLead: calls,
       meetingsByLead: meetings,
       visitsByLead: visits,
     );
   }
 
-  bool hasCall(String id) => callsByLead[id]?.isNotEmpty ?? false;
   bool hasMeeting(String id) => meetingsByLead[id]?.isNotEmpty ?? false;
   bool hasVisit(String id) => visitsByLead[id]?.isNotEmpty ?? false;
 
@@ -756,9 +735,6 @@ class _ActivityIndex {
       if (best == null || t.isAfter(best!)) best = t;
     }
 
-    for (final c in callsByLead[id] ?? const []) {
-      consider(c.calledAt);
-    }
     for (final m in meetingsByLead[id] ?? const []) {
       consider(m.metAt);
     }

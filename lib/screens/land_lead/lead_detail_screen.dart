@@ -12,7 +12,6 @@ import '../../models/lead_change_request.dart';
 import '../../models/land_lead_legal_document.dart';
 import '../../models/land_lead_meeting.dart';
 import '../../models/land_lead_site_visit.dart';
-import '../../models/lead_call_log.dart';
 import '../../models/lead_follow_up.dart';
 import '../../models/lead_review.dart';
 import '../../services/app_store.dart';
@@ -37,7 +36,6 @@ import '../../services/nearby_features_service.dart';
 import '../../utils/lead_auto_notes.dart';
 import '../../utils/lead_location_parser.dart';
 import '../../services/land_lead_site_visit_service.dart';
-import '../../services/lead_call_log_service.dart';
 import '../../services/voice_note_service.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/fomra_layout.dart';
@@ -59,7 +57,6 @@ import '../../utils/phone_validation.dart';
 import '../market_intelligence/market_intelligence_screen.dart';
 import '../task_management/task_management_screen.dart';
 import 'add_lead_screen.dart';
-import 'calls_log_dialog.dart';
 import 'follow_up_dialog.dart';
 import 'lead_drop_reason_dialog.dart';
 import 'management_visit_review_dialog.dart';
@@ -127,9 +124,6 @@ List<
   }
 
   return [
-    e(1, 'Outgoing call', 'Arun Kumar', 'Answered · 4 min',
-        'Owner confirmed interest and asked to schedule a site visit.',
-        Icons.call_outlined, _ActivityFilter.calls),
     e(2, 'Note', 'Priya S', 'Logged',
         'Owner prefers weekend meetings close to the site.',
         Icons.notes_outlined, _ActivityFilter.notes),
@@ -176,7 +170,6 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
     with SingleTickerProviderStateMixin {
   late LandLead lead = widget.lead;
   late final TabController _tabController;
-  List<LeadCallLog> _callLogs = [];
   List<LandLeadSiteVisit> _siteVisits = [];
   List<LandLeadMeeting> _meetings = [];
   List<LandLeadLegalDocument> _legalDocs = [];
@@ -208,7 +201,6 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
   /// timeline chips only. Quick Actions open dialogs and do not select filters.
   _ActivityFilter _activityFilter = _ActivityFilter.all;
   _SiteVisitScope _siteVisitScope = _SiteVisitScope.self;
-  _CallStatFilter _callStatFilter = _CallStatFilter.none;
 
   final GlobalKey _timelineKey = GlobalKey();
   final ScrollController _scrollController = ScrollController();
@@ -281,7 +273,6 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
   Future<void> _applyActivityFilter({
     required _ActivityFilter filter,
     _SiteVisitScope? siteVisitScope,
-    _CallStatFilter callStatFilter = _CallStatFilter.none,
   }) async {
     // Switch tab synchronously so the timeline mounts before we scroll to it.
     final needsTabSwitch = !_viewOnly && _tabController.index != 0;
@@ -291,7 +282,6 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
     setState(() {
       _activityFilter = filter;
       if (siteVisitScope != null) _siteVisitScope = siteVisitScope;
-      _callStatFilter = callStatFilter;
     });
     await _scrollToTimeline(
       delay: needsTabSwitch
@@ -332,17 +322,13 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
   }
 
   void _onTimelineFilterSelected(_ActivityFilter filter) {
-    _applyActivityFilter(
-      filter: filter,
-      callStatFilter: _CallStatFilter.none,
-    );
+    _applyActivityFilter(filter: filter);
   }
 
   void _onSiteVisitScopeSelected(_SiteVisitScope scope) {
     _applyActivityFilter(
       filter: _ActivityFilter.siteVisits,
       siteVisitScope: scope,
-      callStatFilter: _CallStatFilter.none,
     );
   }
 
@@ -380,7 +366,6 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
   Future<void> _loadActivityData() async {
     try {
       final results = await Future.wait([
-        LeadCallLogService.getForLead(lead.leadId),
         LandLeadSiteVisitService.getAllForLead(lead.leadId),
         LandLeadMeetingService.getForLead(lead.leadId),
         LandLeadLegalService.getDocuments(lead.leadId),
@@ -391,25 +376,18 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
       ]);
       if (!mounted) return;
       setState(() {
-        _callLogs = results[0] as List<LeadCallLog>;
-        _siteVisits = results[1] as List<LandLeadSiteVisit>;
-        _meetings = results[2] as List<LandLeadMeeting>;
-        _legalDocs = results[3] as List<LandLeadLegalDocument>;
-        _signedRequests = results[4] as List<LandLeadSignedRequest>;
-        _followUps = results[5] as List<LeadFollowUp>;
+        _siteVisits = results[0] as List<LandLeadSiteVisit>;
+        _meetings = results[1] as List<LandLeadMeeting>;
+        _legalDocs = results[2] as List<LandLeadLegalDocument>;
+        _signedRequests = results[3] as List<LandLeadSignedRequest>;
+        _followUps = results[4] as List<LeadFollowUp>;
       });
     } catch (_) {
       // Tables may not exist yet — keep counts at zero.
       try {
-        final results = await Future.wait([
-          LeadCallLogService.getForLead(lead.leadId),
-          LandLeadSiteVisitService.getAllForLead(lead.leadId),
-        ]);
+        final visits = await LandLeadSiteVisitService.getAllForLead(lead.leadId);
         if (!mounted) return;
-        setState(() {
-          _callLogs = results[0] as List<LeadCallLog>;
-          _siteVisits = results[1] as List<LandLeadSiteVisit>;
-        });
+        setState(() => _siteVisits = visits);
       } catch (_) {}
     }
   }
@@ -417,7 +395,6 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
   EmployeeLeadWorkflowInsight get _workflowInsight =>
       EmployeeLeadWorkflow.build(
         lead: lead,
-        callLogs: _callLogs,
         siteVisits: _siteVisits,
         meetings: _meetings,
         legalDocCount: _legalDocs.length,
@@ -427,9 +404,6 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
   /// shortcut to doing the thing it asks for.
   void _onNextActionTap() {
     switch (_workflowInsight.nextAction.kind) {
-      case EmployeeNextActionKind.callOwner:
-        _handleDetailAction('Calls');
-        break;
       case EmployeeNextActionKind.landOwnerMeeting:
         _handleDetailAction('Meeting');
         break;
@@ -486,8 +460,6 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
   /// management on every lead — but never once the lead is locked.
   bool get _canEditSite => RoleAccess.canEdit && !_isLocked;
 
-  CallActivityMetrics get _callMetrics =>
-      CallActivityMetrics.fromLogs(_callLogs);
 
   /// Non-rejected site visits — matches what Conducted Site Visits filters to.
   int get _conductedSiteVisitCount => _siteVisits
@@ -1123,27 +1095,6 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
         _applyActivityFilter(
           filter: _ActivityFilter.siteVisits,
           siteVisitScope: _SiteVisitScope.all,
-          callStatFilter: _CallStatFilter.none,
-        );
-      case _StatCardKind.outgoingNotAnswered:
-        _applyActivityFilter(
-          filter: _ActivityFilter.calls,
-          callStatFilter: _CallStatFilter.outgoingNotAnswered,
-        );
-      case _StatCardKind.outgoingAnswered:
-        _applyActivityFilter(
-          filter: _ActivityFilter.calls,
-          callStatFilter: _CallStatFilter.outgoingAnswered,
-        );
-      case _StatCardKind.incomingNotAnswered:
-        _applyActivityFilter(
-          filter: _ActivityFilter.calls,
-          callStatFilter: _CallStatFilter.incomingNotAnswered,
-        );
-      case _StatCardKind.incomingAnswered:
-        _applyActivityFilter(
-          filter: _ActivityFilter.calls,
-          callStatFilter: _CallStatFilter.incomingAnswered,
         );
     }
   }
@@ -1231,19 +1182,6 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
       if (updated == null || !mounted) return;
       setState(() => lead = updated);
       AppStore.instance.replaceLead(updated);
-      return;
-    }
-
-    if (label == 'Calls') {
-      await showFomraDialog<void>(
-        context: context,
-        builder: (ctx) => CallsLogDialog(
-          leadId: lead.leadId,
-          ownerName: lead.ownerName,
-          readOnly: viewOnly,
-        ),
-      );
-      await _loadActivityData();
       return;
     }
 
@@ -1356,7 +1294,6 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
     }
 
     final icon = switch (label) {
-      'Calls' => Icons.call_outlined,
       'Site visit' => Icons.location_on_outlined,
       'Management site visit' => Icons.apartment_outlined,
       'Meeting' => Icons.groups_outlined,
@@ -1490,15 +1427,12 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
       tabController: _tabController,
       tabs: _tabs,
       siteVisitCount: _conductedSiteVisitCount,
-      callMetrics: _callMetrics,
-      callLogs: _callLogs,
       siteVisits: _siteVisits,
       meetings: _meetings,
       legalDocs: _legalDocs,
       signedRequests: _signedRequests,
       activityFilter: _activityFilter,
       siteVisitScope: _siteVisitScope,
-      callStatFilter: _callStatFilter,
       timelineKey: _timelineKey,
       onDetailAction: _handleDetailAction,
       onStatCardTap: _handleStatCardTap,
@@ -2454,15 +2388,12 @@ class _WorkspacePanel extends StatelessWidget {
   final TabController tabController;
   final List<String> tabs;
   final int siteVisitCount;
-  final CallActivityMetrics callMetrics;
-  final List<LeadCallLog> callLogs;
   final List<LandLeadSiteVisit> siteVisits;
   final List<LandLeadMeeting> meetings;
   final List<LandLeadLegalDocument> legalDocs;
   final List<LandLeadSignedRequest> signedRequests;
   final _ActivityFilter activityFilter;
   final _SiteVisitScope siteVisitScope;
-  final _CallStatFilter callStatFilter;
   final GlobalKey timelineKey;
   final ValueChanged<String> onDetailAction;
   final ValueChanged<_StatCardKind> onStatCardTap;
@@ -2484,15 +2415,12 @@ class _WorkspacePanel extends StatelessWidget {
     required this.tabController,
     required this.tabs,
     required this.siteVisitCount,
-    required this.callMetrics,
-    required this.callLogs,
     required this.siteVisits,
     this.meetings = const [],
     this.legalDocs = const [],
     this.signedRequests = const [],
     required this.activityFilter,
     required this.siteVisitScope,
-    required this.callStatFilter,
     required this.timelineKey,
     required this.onDetailAction,
     required this.onStatCardTap,
@@ -2508,14 +2436,12 @@ class _WorkspacePanel extends StatelessWidget {
         key: timelineKey,
         child: _ActivityTimeline(
           lead: lead,
-          callLogs: callLogs,
           siteVisits: siteVisits,
           meetings: meetings,
           legalDocs: legalDocs,
           signedRequests: signedRequests,
           filter: activityFilter,
           siteVisitScope: siteVisitScope,
-          callStatFilter: callStatFilter,
           onFilterSelected: onTimelineFilterSelected,
           onSiteVisitScopeSelected: onSiteVisitScopeSelected,
           onClearFilter: onClearFilter,
@@ -2593,10 +2519,8 @@ class _WorkspacePanel extends StatelessWidget {
             ],
             _ActivitySummaryRow(
               siteVisitCount: siteVisitCount,
-              callMetrics: callMetrics,
               activityFilter: activityFilter,
               siteVisitScope: siteVisitScope,
-              callStatFilter: callStatFilter,
               onStatCardTap: onStatCardTap,
             ),
             const SizedBox(height: 14),
@@ -2697,7 +2621,6 @@ class _ActionToolbar extends StatelessWidget {
   Widget build(BuildContext context) {
     final actions = [
       (Icons.sticky_note_2_outlined, 'Notes', AppColors.purple),
-      (Icons.call_outlined, 'Calls', AppColors.purple),
       (Icons.location_on_outlined, 'Site visit', AppColors.purple),
       (Icons.apartment_outlined, 'Management site visit', AppColors.purple),
       (Icons.groups_outlined, 'Meeting', AppColors.purple),
@@ -2812,7 +2735,7 @@ class _ActionToolbar extends StatelessWidget {
 }
 
 /// Shown directly on phones; everything else sits under "More".
-const _primaryOnPhone = ['Calls', 'Site visit', 'Meeting', 'Notes'];
+const _primaryOnPhone = ['Meeting', 'Site visit', 'Notes'];
 
 /// The "More" sheet's groups, in order. Labels match _ActionToolbar's.
 const _moreActionGroups = <(String, List<String>)>[
@@ -3035,18 +2958,14 @@ class _LeadActionDialog extends StatelessWidget {
 
 class _ActivitySummaryRow extends StatelessWidget {
   final int siteVisitCount;
-  final CallActivityMetrics callMetrics;
   final _ActivityFilter activityFilter;
   final _SiteVisitScope siteVisitScope;
-  final _CallStatFilter callStatFilter;
   final ValueChanged<_StatCardKind> onStatCardTap;
 
   const _ActivitySummaryRow({
     required this.siteVisitCount,
-    required this.callMetrics,
     required this.activityFilter,
     required this.siteVisitScope,
-    required this.callStatFilter,
     required this.onStatCardTap,
   });
 
@@ -3054,16 +2973,7 @@ class _ActivitySummaryRow extends StatelessWidget {
         // Conducted Site Visits highlights for any Site Visits scope (including
         // the card's own "all" scope).
         _StatCardKind.conductedSiteVisits =>
-          activityFilter == _ActivityFilter.siteVisits &&
-              callStatFilter == _CallStatFilter.none,
-        _StatCardKind.outgoingNotAnswered =>
-          callStatFilter == _CallStatFilter.outgoingNotAnswered,
-        _StatCardKind.outgoingAnswered =>
-          callStatFilter == _CallStatFilter.outgoingAnswered,
-        _StatCardKind.incomingNotAnswered =>
-          callStatFilter == _CallStatFilter.incomingNotAnswered,
-        _StatCardKind.incomingAnswered =>
-          callStatFilter == _CallStatFilter.incomingAnswered,
+          activityFilter == _ActivityFilter.siteVisits,
       };
 
   @override
@@ -3075,34 +2985,6 @@ class _ActivitySummaryRow extends StatelessWidget {
         value: '$siteVisitCount',
         icon: Icons.location_on_outlined,
         color: AppColors.purple,
-      ),
-      (
-        kind: _StatCardKind.outgoingNotAnswered,
-        label: 'Outgoing\nNot Answered',
-        value: '${callMetrics.outgoingNotAnswered}',
-        icon: CallOutcome.notAnswered.icon,
-        color: AppColors.warning,
-      ),
-      (
-        kind: _StatCardKind.outgoingAnswered,
-        label: 'Outgoing\nAnswered',
-        value: '${callMetrics.outgoingAnswered}',
-        icon: CallOutcome.answered.icon,
-        color: AppColors.success,
-      ),
-      (
-        kind: _StatCardKind.incomingNotAnswered,
-        label: 'Incoming\nNot Answered',
-        value: '${callMetrics.incomingNotAnswered}',
-        icon: CallOutcome.notAnswered.icon,
-        color: AppColors.warning,
-      ),
-      (
-        kind: _StatCardKind.incomingAnswered,
-        label: 'Incoming\nAnswered',
-        value: '${callMetrics.incomingAnswered}',
-        icon: CallOutcome.answered.icon,
-        color: AppColors.success,
       ),
     ];
 
@@ -3176,12 +3058,17 @@ class _ActivitySummaryRow extends StatelessWidget {
       );
     }
 
-    // One responsive grid at every width — all five across on desktop, wrapping
-    // to 2–3 columns as space tightens. Cards keep an equal width.
+    // One responsive grid at every width; a lone card keeps a card's width.
     const gap = 8.0;
     return LayoutBuilder(
       builder: (context, c) {
         final maxW = c.maxWidth.isFinite ? c.maxWidth : 360.0;
+        if (cells.length == 1) {
+          return Align(
+            alignment: Alignment.centerLeft,
+            child: SizedBox(width: maxW < 200 ? maxW : 200, child: cell(0)),
+          );
+        }
         final cols = (maxW / 132).floor().clamp(2, cells.length);
         final w = (maxW - gap * (cols - 1)) / cols;
         return Wrap(
@@ -3199,24 +3086,10 @@ class _ActivitySummaryRow extends StatelessWidget {
 
 enum _StatCardKind {
   conductedSiteVisits,
-  outgoingNotAnswered,
-  outgoingAnswered,
-  incomingNotAnswered,
-  incomingAnswered,
-}
-
-/// Fine-grained Calls filter applied by the statistics cards.
-enum _CallStatFilter {
-  none,
-  outgoingNotAnswered,
-  outgoingAnswered,
-  incomingNotAnswered,
-  incomingAnswered,
 }
 
 enum _ActivityFilter {
   all,
-  calls,
   siteVisits,
   managementSiteVisits,
   meetings,
@@ -3229,7 +3102,6 @@ enum _ActivityFilter {
 extension on _ActivityFilter {
   String get label => switch (this) {
         _ActivityFilter.all => 'All',
-        _ActivityFilter.calls => 'Calls',
         _ActivityFilter.siteVisits => 'Site Visits',
         _ActivityFilter.managementSiteVisits => 'Management Site Visits',
         _ActivityFilter.meetings => 'Meetings',
@@ -3250,7 +3122,6 @@ enum _SiteVisitScope { self, management, all }
 /// beside the original categories so Quick Actions can target them directly.
 const _kChipFilters = [
   _ActivityFilter.all,
-  _ActivityFilter.calls,
   _ActivityFilter.siteVisits,
   _ActivityFilter.meetings,
   _ActivityFilter.notes,
@@ -3261,28 +3132,24 @@ const _kChipFilters = [
 
 class _ActivityTimeline extends StatelessWidget {
   final LandLead lead;
-  final List<LeadCallLog> callLogs;
   final List<LandLeadSiteVisit> siteVisits;
   final List<LandLeadMeeting> meetings;
   final List<LandLeadLegalDocument> legalDocs;
   final List<LandLeadSignedRequest> signedRequests;
   final _ActivityFilter filter;
   final _SiteVisitScope siteVisitScope;
-  final _CallStatFilter callStatFilter;
   final ValueChanged<_ActivityFilter> onFilterSelected;
   final ValueChanged<_SiteVisitScope> onSiteVisitScopeSelected;
   final VoidCallback onClearFilter;
 
   const _ActivityTimeline({
     required this.lead,
-    required this.callLogs,
     required this.siteVisits,
     this.meetings = const [],
     this.legalDocs = const [],
     this.signedRequests = const [],
     required this.filter,
     required this.siteVisitScope,
-    required this.callStatFilter,
     required this.onFilterSelected,
     required this.onSiteVisitScopeSelected,
     required this.onClearFilter,
@@ -3300,48 +3167,8 @@ class _ActivityTimeline extends StatelessWidget {
       IconData icon,
       String? audioUrl,
       _ActivityFilter category,
-      CallDirection? direction,
-      CallOutcome? outcome,
       bool completedVisit,
     })>[];
-
-    for (final log in callLogs) {
-      final subtitleParts = [
-        _formatReceivedOn(log.calledAt),
-        log.outcome.label,
-        if (log.isAnswered && log.duration.isNotEmpty) '${log.duration} min',
-        if (log.details.isNotEmpty) log.details,
-      ];
-      events.add((
-        at: log.calledAt,
-        title: '${log.direction.label} call',
-        subtitle: subtitleParts.join('\n'),
-        icon: log.outcome.icon,
-        audioUrl: null,
-        category: _ActivityFilter.calls,
-        direction: log.direction,
-        outcome: log.outcome,
-        completedVisit: false,
-      ));
-      if (log.needsFollowUp && log.followUpAt != null) {
-        events.add((
-          at: log.followUpAt!,
-          title: 'Follow-up',
-          subtitle: [
-            _formatReceivedOn(log.followUpAt!),
-            '${log.direction.label} call · ${log.outcome.label}',
-            if (log.details.isNotEmpty) log.details,
-            if (log.loggedByName.isNotEmpty) log.loggedByName,
-          ].join('\n'),
-          icon: Icons.event_available_outlined,
-          audioUrl: null,
-          category: _ActivityFilter.followUp,
-          direction: log.direction,
-          outcome: log.outcome,
-          completedVisit: false,
-        ));
-      }
-    }
 
     for (final visit in siteVisits) {
       final isManagementVisit =
@@ -3361,8 +3188,6 @@ class _ActivityTimeline extends StatelessWidget {
         category: isManagementVisit
             ? _ActivityFilter.managementSiteVisits
             : _ActivityFilter.siteVisits,
-        direction: null,
-        outcome: null,
         completedVisit: _isCompletedVisit(visit),
       ));
     }
@@ -3381,8 +3206,6 @@ class _ActivityTimeline extends StatelessWidget {
         icon: Icons.groups_outlined,
         audioUrl: null,
         category: _ActivityFilter.meetings,
-        direction: null,
-        outcome: null,
         completedVisit: false,
       ));
     }
@@ -3399,8 +3222,6 @@ class _ActivityTimeline extends StatelessWidget {
         icon: Icons.gavel_outlined,
         audioUrl: null,
         category: _ActivityFilter.legal,
-        direction: null,
-        outcome: null,
         completedVisit: false,
       ));
     }
@@ -3418,8 +3239,6 @@ class _ActivityTimeline extends StatelessWidget {
         icon: Icons.draw_outlined,
         audioUrl: null,
         category: _ActivityFilter.signed,
-        direction: null,
-        outcome: null,
         completedVisit: false,
       ));
     }
@@ -3449,8 +3268,6 @@ class _ActivityTimeline extends StatelessWidget {
                     : Icons.notes_outlined)),
         audioUrl: audioUrl,
         category: _ActivityFilter.notes,
-        direction: null,
-        outcome: null,
         completedVisit: false,
       ));
     }
@@ -3467,8 +3284,6 @@ class _ActivityTimeline extends StatelessWidget {
           icon: e.icon,
           audioUrl: e.audioUrl,
           category: e.category,
-          direction: null,
-          outcome: null,
           completedVisit: e.category == _ActivityFilter.siteVisits ||
               e.category == _ActivityFilter.managementSiteVisits,
         ));
@@ -3491,28 +3306,8 @@ class _ActivityTimeline extends StatelessWidget {
               : events.where((e) => e.category == f).length,
     };
 
-    // Apply filters independently: call-stat cards win when set; otherwise the
-    // selected chip (including Site Visits scope) drives the list.
+    // The selected chip (including Site Visits scope) drives the list.
     final filtered = events.where((e) {
-      if (callStatFilter != _CallStatFilter.none) {
-        if (e.category != _ActivityFilter.calls) return false;
-        if (e.direction == null || e.outcome == null) return false;
-        return switch (callStatFilter) {
-          _CallStatFilter.outgoingNotAnswered =>
-            e.direction == CallDirection.outgoing &&
-                e.outcome == CallOutcome.notAnswered,
-          _CallStatFilter.outgoingAnswered =>
-            e.direction == CallDirection.outgoing &&
-                e.outcome == CallOutcome.answered,
-          _CallStatFilter.incomingNotAnswered =>
-            e.direction == CallDirection.incoming &&
-                e.outcome == CallOutcome.notAnswered,
-          _CallStatFilter.incomingAnswered =>
-            e.direction == CallDirection.incoming &&
-                e.outcome == CallOutcome.answered,
-          _CallStatFilter.none => true,
-        };
-      }
       if (filter == _ActivityFilter.all) return true;
       if (filter == _ActivityFilter.siteVisits) {
         final isVisit = e.category == _ActivityFilter.siteVisits ||
@@ -3547,8 +3342,7 @@ class _ActivityTimeline extends StatelessWidget {
       ),
     ];
 
-    final hasActiveFilter =
-        filter != _ActivityFilter.all || callStatFilter != _CallStatFilter.none;
+    final hasActiveFilter = filter != _ActivityFilter.all;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3571,7 +3365,6 @@ class _ActivityTimeline extends StatelessWidget {
           selfVisitCount: selfVisitCount,
           managementVisitCount: mgmtVisitCount,
           filterCounts: filterCounts,
-          callStatFilter: callStatFilter,
         ),
         const SizedBox(height: 10),
         if (filtered.isEmpty)
@@ -3614,8 +3407,7 @@ class _ActivityTimeline extends StatelessWidget {
                 ],
               ),
             ),
-        if (filter == _ActivityFilter.all &&
-            callStatFilter == _CallStatFilter.none)
+        if (filter == _ActivityFilter.all)
           for (final e in staticEvents)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -3881,7 +3673,6 @@ class _ActivityFilterBar extends StatelessWidget {
   final int selfVisitCount;
   final int managementVisitCount;
   final Map<_ActivityFilter, int> filterCounts;
-  final _CallStatFilter callStatFilter;
 
   const _ActivityFilterBar({
     required this.selected,
@@ -3892,7 +3683,6 @@ class _ActivityFilterBar extends StatelessWidget {
     required this.selfVisitCount,
     required this.managementVisitCount,
     required this.filterCounts,
-    required this.callStatFilter,
   });
 
   /// The label for the "own visits" scope differs by portal.
@@ -3918,17 +3708,6 @@ class _ActivityFilterBar extends StatelessWidget {
   ];
 
   String _chipLabel(_ActivityFilter f) {
-    if (f == _ActivityFilter.calls &&
-        callStatFilter != _CallStatFilter.none) {
-      final sub = switch (callStatFilter) {
-        _CallStatFilter.outgoingNotAnswered => 'Outgoing Not Answered',
-        _CallStatFilter.outgoingAnswered => 'Outgoing Answered',
-        _CallStatFilter.incomingNotAnswered => 'Incoming Not Answered',
-        _CallStatFilter.incomingAnswered => 'Incoming Answered',
-        _CallStatFilter.none => 'Calls',
-      };
-      return 'Calls · $sub';
-    }
     if (f == _ActivityFilter.all) return f.label;
     final count = filterCounts[f];
     if (count == null) return f.label;
@@ -3946,10 +3725,7 @@ class _ActivityFilterBar extends StatelessWidget {
         itemBuilder: (context, i) {
           final f = _kChipFilters[i];
           if (f == _ActivityFilter.siteVisits) return _siteVisitsChip(context);
-          // Calls chip stays highlighted for call-stat sub-filters too.
-          final selectedChip = f == selected ||
-              (f == _ActivityFilter.calls &&
-                  callStatFilter != _CallStatFilter.none);
+          final selectedChip = f == selected;
           return _chip(
             context,
             label: _chipLabel(f),
@@ -4019,8 +3795,7 @@ class _ActivityFilterBar extends StatelessWidget {
   /// Unified Site Visits chip: tapping opens a dropdown to pick the scope
   /// (Myself/Executive · Management), each showing its live count.
   Widget _siteVisitsChip(BuildContext context) {
-    final isSelected = selected == _ActivityFilter.siteVisits &&
-        callStatFilter == _CallStatFilter.none;
+    final isSelected = selected == _ActivityFilter.siteVisits;
     return PopupMenuButton<_SiteVisitScope>(
       tooltip: 'Filter site visits',
       position: PopupMenuPosition.under,

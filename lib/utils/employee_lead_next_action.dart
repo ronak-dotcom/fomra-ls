@@ -1,13 +1,11 @@
 import '../models/land_lead.dart';
 import '../models/land_lead_meeting.dart';
 import '../models/land_lead_site_visit.dart';
-import '../models/lead_call_log.dart';
 import '../screens/task_management/task_management_screen.dart';
 
 /// The activities a lead is worked through, in the order they happen. The card
 /// shows the first one that is still pending.
 enum EmployeeNextActionKind {
-  callOwner,
   landOwnerMeeting,
   siteVisit,
   legalVerification,
@@ -23,7 +21,7 @@ enum EmployeeNextActionKind {
 class EmployeeNextAction {
   final EmployeeNextActionKind kind;
 
-  /// Short imperative title, e.g. "Call Owner".
+  /// Short imperative title, e.g. "Conduct Site Visit".
   final String title;
 
   /// Why this is the next action, in one sentence.
@@ -71,7 +69,6 @@ class EmployeeLeadWorkflowInsight {
 class EmployeeLeadWorkflow {
   static EmployeeLeadWorkflowInsight build({
     required LandLead lead,
-    required List<LeadCallLog> callLogs,
     required List<LandLeadSiteVisit> siteVisits,
     required List<LandLeadMeeting> meetings,
     required int legalDocCount,
@@ -83,7 +80,6 @@ class EmployeeLeadWorkflow {
       stage: lead.status,
       nextAction: _nextAction(
         lead: lead,
-        callLogs: callLogs,
         siteVisits: siteVisits,
         meetings: meetings,
         legalDocCount: legalDocCount,
@@ -129,14 +125,13 @@ class EmployeeLeadWorkflow {
   }
 
   /// The highest-priority activity still pending, in the order the pipeline is
-  /// actually worked: call -> land owner meeting -> site visit -> legal ->
+  /// actually worked: land owner meeting -> site visit -> legal ->
   /// management site visit -> signing.
   ///
-  /// Read from the same call / meeting / visit / document data the Activity
+  /// Read from the same meeting / visit / document data the Activity
   /// Timeline shows, so completing an activity moves the card on by itself.
   static EmployeeNextAction _nextAction({
     required LandLead lead,
-    required List<LeadCallLog> callLogs,
     required List<LandLeadSiteVisit> siteVisits,
     required List<LandLeadMeeting> meetings,
     required int legalDocCount,
@@ -158,21 +153,12 @@ class EmployeeLeadWorkflow {
       );
     }
 
-    if (callLogs.isEmpty) {
-      return const EmployeeNextAction(
-        kind: EmployeeNextActionKind.callOwner,
-        title: 'Call Owner',
-        description: 'No call has been logged yet. Contact the owner before '
-            'proceeding to the next stage.',
-      );
-    }
-
     if (meetings.isEmpty) {
       return const EmployeeNextAction(
         kind: EmployeeNextActionKind.landOwnerMeeting,
         title: 'Conduct Land Owner Meeting',
-        description: 'The owner has been called, but no land owner meeting is '
-            'logged yet. Meet them before visiting the site.',
+        description: 'No land owner meeting is logged yet. Meet the owner '
+            'before visiting the site.',
       );
     }
 

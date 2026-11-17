@@ -7,7 +7,6 @@ enum LeadListFilter {
   brokerLeads,
   ownerMeetingPending,
   notes,
-  calls,
   siteVisit,
   managementSiteVisit,
   meeting,
@@ -33,7 +32,6 @@ extension LeadListFilterX on LeadListFilter {
         LeadListFilter.brokerLeads => 'Broker leads',
         LeadListFilter.ownerMeetingPending => 'Owner meeting pending',
         LeadListFilter.notes => 'Notes',
-        LeadListFilter.calls => 'Calls',
         LeadListFilter.siteVisit => 'Site visit',
         LeadListFilter.managementSiteVisit => 'Management site visit',
         LeadListFilter.meeting => 'Meeting',
@@ -53,7 +51,6 @@ extension LeadListFilterX on LeadListFilter {
         LeadListFilter.ownerMeetingPending =>
           'Land owner meetings still pending',
         LeadListFilter.notes => 'Leads with saved notes',
-        LeadListFilter.calls => 'Leads with contact details',
         LeadListFilter.siteVisit => 'Leads with site visit progress',
         LeadListFilter.managementSiteVisit =>
           'Management-assigned leads with site visit progress',
@@ -74,7 +71,6 @@ extension LeadListFilterX on LeadListFilter {
         LeadListFilter.ownerMeetingPending =>
           lead.status == LeadStatus.prospectMeetingPending,
         LeadListFilter.notes => lead.notes.trim().isNotEmpty,
-        LeadListFilter.calls => lead.contactDetails.trim().isNotEmpty,
         LeadListFilter.siteVisit => leadHasSiteVisitProgress(lead),
         LeadListFilter.managementSiteVisit =>
           lead.createdByRole == 'management' &&
@@ -91,7 +87,6 @@ extension LeadListFilterX on LeadListFilter {
 
   static LeadListFilter? forActionLabel(String label) => switch (label) {
         'Notes' => LeadListFilter.notes,
-        'Calls' => LeadListFilter.calls,
         'Site visit' => LeadListFilter.siteVisit,
         'Management site visit' => LeadListFilter.managementSiteVisit,
         'Meeting' => LeadListFilter.meeting,

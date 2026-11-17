@@ -1299,8 +1299,8 @@ class _EmployeeTodayTasksSection extends StatelessWidget {
           leads: staleLeads,
         ),
       (
-        label: 'Call Pending',
-        icon: Icons.call_outlined,
+        label: 'In negotiation',
+        icon: Icons.handshake_outlined,
         color: AppColors.info,
         leads: mine
             .where((l) => l.status == LeadStatus.negotiation)
@@ -1375,7 +1375,7 @@ class _EmployeeTodayTasksSection extends StatelessWidget {
                           subtitle: switch (c.label) {
                             'Overdue Follow-ups' => 'Follow-up date has passed',
                             'No Recent Activity' => 'Nothing logged lately',
-                            'Call Pending' => 'Follow up by call',
+                            'In negotiation' => 'Follow up on terms',
                             'Meeting Pending' => 'Land owner meeting due',
                             'Site Visit Pending' => 'Schedule the site visit',
                             _ => 'Legal verification pending',

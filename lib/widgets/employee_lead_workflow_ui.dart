@@ -7,7 +7,6 @@ import '../theme/fomra_theme_context.dart';
 import '../utils/employee_lead_next_action.dart';
 
 IconData _actionIcon(EmployeeNextActionKind kind) => switch (kind) {
-      EmployeeNextActionKind.callOwner => Icons.phone_in_talk_outlined,
       EmployeeNextActionKind.landOwnerMeeting => Icons.handshake_outlined,
       EmployeeNextActionKind.siteVisit => Icons.place_outlined,
       EmployeeNextActionKind.legalVerification => Icons.balance_outlined,
