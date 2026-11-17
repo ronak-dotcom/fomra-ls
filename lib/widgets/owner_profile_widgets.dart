@@ -8,89 +8,127 @@ import '../theme/app_theme.dart';
 import '../theme/fomra_theme_context.dart';
 import 'ui/app_feedback.dart';
 
-/// The three owner-profile pickers: owner type (choice chips), where they
-/// live and who decides (dropdowns). Values are OwnerProfile keys; '' = not
-/// chosen. Used in the meeting form and the lead page's edit dialog.
-class OwnerProfileFields extends StatelessWidget {
-  final String type;
-  final String lives;
-  final String decision;
-  final ValueChanged<String> onType;
-  final ValueChanged<String> onLives;
-  final ValueChanged<String> onDecision;
+/// The owner-profile pickers: owner type (choice chips), what exactly they do,
+/// where they live (locality / village and town / city, typed) and who
+/// decides on selling. Used in the meeting form and the lead page's edit
+/// dialog. [initial] seeds the text boxes; every change is reported through
+/// [onChanged].
+class OwnerProfileFields extends StatefulWidget {
+  final OwnerProfileValues initial;
+  final ValueChanged<OwnerProfileValues> onChanged;
 
   /// Shown under the type chips when the type is required but missing.
   final String? typeError;
 
   const OwnerProfileFields({
     super.key,
-    required this.type,
-    required this.lives,
-    required this.decision,
-    required this.onType,
-    required this.onLives,
-    required this.onDecision,
+    required this.initial,
+    required this.onChanged,
     this.typeError,
   });
 
   @override
+  State<OwnerProfileFields> createState() => _OwnerProfileFieldsState();
+}
+
+class _OwnerProfileFieldsState extends State<OwnerProfileFields> {
+  late OwnerProfileValues _v = widget.initial;
+  late final _profession = TextEditingController(text: _v.profession);
+  late final _lives = TextEditingController(text: _v.lives);
+  late final _town = TextEditingController(text: _v.town);
+
+  @override
+  void dispose() {
+    _profession.dispose();
+    _lives.dispose();
+    _town.dispose();
+    super.dispose();
+  }
+
+  void _set(OwnerProfileValues v) {
+    setState(() => _v = v);
+    widget.onChanged(v);
+  }
+
+  InputDecoration _dec(String label, {String? helper}) => InputDecoration(
+        labelText: label,
+        helperText: helper,
+        isDense: true,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      );
+
+  @override
   Widget build(BuildContext context) {
-    TextStyle label() => TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: context.fomraTextSecondary,
-        );
-    Widget dropdown(String hint, String value, List<(String, String)> options,
-            ValueChanged<String> onChanged) =>
-        DropdownButtonFormField<String>(
-          initialValue: options.any((o) => o.$1 == value) ? value : null,
-          isExpanded: true,
-          decoration: InputDecoration(
-            labelText: hint,
-            isDense: true,
-            border:
-                OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          items: [
-            for (final (v, l) in options)
-              DropdownMenuItem(value: v, child: Text(l)),
-          ],
-          onChanged: (v) => onChanged(v ?? ''),
-        );
+    final label = TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.w700,
+      color: context.fomraTextSecondary,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Owner is a…', style: label()),
+        Text('Owner is a…', style: label),
         const SizedBox(height: 6),
         Wrap(spacing: 6, runSpacing: 6, children: [
           for (final (v, _) in OwnerProfile.types)
             ChoiceChip(
               label: Text(OwnerProfile.typeShort(v),
                   style: const TextStyle(fontSize: 12)),
-              selected: type == v,
+              selected: _v.type == v,
               selectedColor: AppColors.gold.withValues(alpha: 0.22),
-              onSelected: (on) => onType(on ? v : ''),
+              onSelected: (on) => _set(_v.copyWith(type: on ? v : '')),
             ),
         ]),
-        if (typeError != null)
+        if (widget.typeError != null)
           Padding(
             padding: const EdgeInsets.only(top: 4),
-            child: Text(typeError!,
+            child: Text(widget.typeError!,
                 style: const TextStyle(fontSize: 12, color: AppColors.error)),
           ),
         const SizedBox(height: 12),
-        dropdown('Lives (optional)', lives, OwnerProfile.livesOptions, onLives),
+        TextField(
+          controller: _profession,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: _dec('What exactly does the owner do? (optional)',
+              helper: 'e.g. Runs a rice mill in Arakkonam'),
+          onChanged: (t) => _set(_v.copyWith(profession: t.trim())),
+        ),
         const SizedBox(height: 10),
-        dropdown('Who decides on selling (optional)', decision,
-            OwnerProfile.decisionOptions, onDecision),
+        TextField(
+          controller: _lives,
+          textCapitalization: TextCapitalization.words,
+          decoration: _dec('Lives at — locality / village (optional)',
+              helper: 'Area or village, not just the city'),
+          onChanged: (t) => _set(_v.copyWith(lives: t.trim())),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _town,
+          textCapitalization: TextCapitalization.words,
+          decoration: _dec('Town / city (optional)'),
+          onChanged: (t) => _set(_v.copyWith(town: t.trim())),
+        ),
+        const SizedBox(height: 10),
+        DropdownButtonFormField<String>(
+          initialValue: OwnerProfile.decisionOptions.any((o) => o.$1 == _v.decision)
+              ? _v.decision
+              : null,
+          isExpanded: true,
+          decoration: _dec('Who decides on selling (optional)'),
+          items: [
+            for (final (v, l) in OwnerProfile.decisionOptions)
+              DropdownMenuItem(value: v, child: Text(l)),
+          ],
+          onChanged: (v) => _set(_v.copyWith(decision: v ?? '')),
+        ),
       ],
     );
   }
 }
 
-/// Lead page: the owner profile at a glance ("Farmer · In the village ·
-/// Family decides together") with an edit button. Shows a prompt when
-/// nothing is recorded yet.
+/// Lead page: the owner profile at a glance ("Business / Trader · Runs a rice
+/// mill · Lives at Velachery, Chennai · Family decides together") with an
+/// edit button. Shows a prompt when nothing is recorded yet.
 class OwnerProfileStrip extends StatelessWidget {
   final LandLead lead;
   final bool canEdit;
@@ -105,14 +143,13 @@ class OwnerProfileStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final type = lead.ownerOccupation.trim();
+    final v = OwnerProfileValues.of(lead);
     final parts = [
-      if (lead.ownerLives.trim().isNotEmpty)
-        OwnerProfile.livesLabel(lead.ownerLives),
-      if (lead.ownerDecision.trim().isNotEmpty)
-        OwnerProfile.decisionLabel(lead.ownerDecision),
+      if (v.profession.isNotEmpty) v.profession,
+      if (v.livesAt.isNotEmpty) 'Lives at ${v.livesAt}',
+      if (v.decision.isNotEmpty) OwnerProfile.decisionLabel(v.decision),
     ];
-    final empty = type.isEmpty && parts.isEmpty;
+    final empty = v.type.isEmpty && parts.isEmpty;
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
       decoration: BoxDecoration(
@@ -150,7 +187,7 @@ class OwnerProfileStrip extends StatelessWidget {
                           letterSpacing: 0.8,
                           color: context.fomraTextTertiary,
                         )),
-                    if (type.isNotEmpty)
+                    if (v.type.isNotEmpty)
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 3),
@@ -158,7 +195,7 @@ class OwnerProfileStrip extends StatelessWidget {
                           color: AppColors.gold.withValues(alpha: 0.18),
                           borderRadius: BorderRadius.circular(999),
                         ),
-                        child: Text(OwnerProfile.typeLabel(type),
+                        child: Text(OwnerProfile.typeLabel(v.type),
                             style: TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w800,
@@ -186,48 +223,43 @@ class OwnerProfileStrip extends StatelessWidget {
   }
 }
 
+/// Saves [v] on the lead and in the store (profile fields only).
+Future<LandLead> saveOwnerProfile(LandLead lead, OwnerProfileValues v) async {
+  await LandLeadService.updateOwnerProfile(lead.leadId, v);
+  AppStore.instance.patchOwnerProfile(lead.leadId, v);
+  return v.applyTo(lead);
+}
+
 /// Dialog to correct a lead's owner profile; saves and updates the store.
 Future<void> editOwnerProfile(BuildContext context, LandLead lead,
     {ValueChanged<LandLead>? onSaved}) async {
-  var type = lead.ownerOccupation.trim();
-  var lives = lead.ownerLives.trim();
-  var decision = lead.ownerDecision.trim();
+  var values = OwnerProfileValues.of(lead);
   final saved = await showDialog<bool>(
     context: context,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setState) => AlertDialog(
-        title: const Text('Owner profile'),
-        content: SizedBox(
-          width: 420,
-          child: SingleChildScrollView(
-            child: OwnerProfileFields(
-              type: type,
-              lives: lives,
-              decision: decision,
-              onType: (v) => setState(() => type = v),
-              onLives: (v) => setState(() => lives = v),
-              onDecision: (v) => setState(() => decision = v),
-            ),
+    builder: (ctx) => AlertDialog(
+      title: const Text('Owner profile'),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: OwnerProfileFields(
+            initial: values,
+            onChanged: (v) => values = v,
           ),
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Save')),
-        ],
       ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel')),
+        FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Save')),
+      ],
     ),
   );
   if (saved != true || !context.mounted) return;
   try {
-    await LandLeadService.updateOwnerProfile(lead.leadId,
-        type: type, lives: lives, decision: decision);
-    final updated = lead.copyWith(
-        ownerOccupation: type, ownerLives: lives, ownerDecision: decision);
-    AppStore.instance.replaceLead(updated);
+    final updated = await saveOwnerProfile(lead, values);
     onSaved?.call(updated);
     if (context.mounted) AppFeedback.success(context, 'Owner profile saved');
   } catch (e) {

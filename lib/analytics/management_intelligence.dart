@@ -218,34 +218,35 @@ class ManagementIntelligence {
     List<LandLead> existingLeads, {
     String? excludeLeadId,
   }) {
+    // Only strong signals: a road / area name is shared by many lands (the
+    // map fills Location in automatically), so it is not a duplicate on its
+    // own. Each match reads as a sentence so the user sees why.
     final owner = _normText(candidate.ownerName);
     final phone = _normPhone(candidate.contactDetails);
     final survey = _normText(candidate.surveyNumber);
     final village = _normText(candidate.village);
-    final location = _normText(candidate.location);
 
     final out = <({LandLead lead, List<String> matchedFields})>[];
     for (final other in existingLeads) {
       if (other.leadId == excludeLeadId) continue;
       final matched = <String>[];
+      final sameVillage =
+          village.length >= 3 && _normText(other.village) == village;
 
-      if (owner.length >= 3 && _normText(other.ownerName) == owner) {
-        matched.add('Owner Name');
+      if (survey.isNotEmpty &&
+          sameVillage &&
+          _normText(other.surveyNumber) == survey) {
+        matched.add('Same survey no. ${candidate.surveyNumber.trim()} in '
+            '${candidate.village.trim()}');
       }
       if (phone.length >= 10 && _normPhone(other.contactDetails) == phone) {
-        matched.add('Mobile Number');
+        matched.add('Same owner mobile ${candidate.contactDetails.trim()}');
       }
-      if (survey.length >= 2 && _normText(other.surveyNumber) == survey) {
-        matched.add('Survey Number');
-      }
-      if (village.length >= 3 &&
-          owner.length >= 3 &&
-          _normText(other.village) == village &&
+      if (owner.length >= 3 &&
+          sameVillage &&
           _normText(other.ownerName) == owner) {
-        matched.add('Village + Owner');
-      }
-      if (location.length >= 5 && _normText(other.location) == location) {
-        matched.add('Location');
+        matched.add('Same owner name (${candidate.ownerName.trim()}) in '
+            '${candidate.village.trim()}');
       }
 
       if (matched.isNotEmpty) out.add((lead: other, matchedFields: matched));

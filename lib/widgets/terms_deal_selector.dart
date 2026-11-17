@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../theme/fomra_theme_context.dart';
 import 'add_lead_ui.dart';
+import 'crore_lakh_field.dart';
 
 // ── Configurable deal type definitions ─────────────────────────────────────────
 
@@ -510,8 +511,19 @@ class _DealField extends StatelessWidget {
     required this.onChanged,
   });
 
+  /// Amounts typed as Crores + Lakhs rather than one long number.
+  static const _moneyFields = {'rate_per_acre', 'advance_amount'};
+
   @override
   Widget build(BuildContext context) {
+    if (_moneyFields.contains(field.id)) {
+      return CroreLakhField(
+        label: field.label,
+        controller: controller,
+        onChanged: onChanged,
+        suffix: field.id == 'rate_per_acre' ? 'per acre' : '',
+      );
+    }
     if (field.type == DealFieldType.dropdown) {
       final iconColor = Theme.of(context).brightness == Brightness.dark
           ? AppColors.primaryLight

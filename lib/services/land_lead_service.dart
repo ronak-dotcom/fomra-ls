@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/lead_location_parser.dart';
 import '../models/land_lead.dart';
+import '../models/owner_profile.dart';
 import '../models/lead_change_request.dart';
 import '../utils/image_compressor.dart';
 import 'app_store.dart';
@@ -84,6 +85,10 @@ class LandLeadService {
       row = await _insertLandLead(
       {
         'id': leadId,
+        // The name typed (or suggested) on Add Lead. Missing here before, so
+        // every new lead showed only its number until it was renamed.
+        'lead_name': lead.leadName,
+        'lead_name_locked': lead.leadNameLocked,
         'input_source': lead.inputSource.name,
         'location': lead.location,
         'gps_coordinates': lead.gpsCoordinates,
@@ -535,17 +540,29 @@ class LandLeadService {
     }).eq('id', leadId);
   }
 
-  /// Saves the land owner profile (type, where they live, who decides).
+  /// Saves the land owner profile (type, what they do, where they live,
+  /// who decides).
   static Future<void> updateOwnerProfile(
-    String leadId, {
-    required String type,
-    required String lives,
-    required String decision,
-  }) async {
+      String leadId, OwnerProfileValues v) async {
     await _db.from('land_leads').update({
-      'owner_occupation': type,
-      'owner_lives': lives,
-      'owner_decision': decision,
+      'owner_occupation': v.type,
+      'owner_profession': v.profession,
+      'owner_lives': v.lives,
+      'owner_town': v.town,
+      'owner_decision': v.decision,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', leadId);
+  }
+
+  /// Saves the land owners met at a meeting: [primary] becomes the lead's
+  /// main owner (point of contact), [others] its additional owners.
+  static Future<void> updateOwners(String leadId,
+      {required OwnerContact primary, required List<OwnerContact> others}) async {
+    await _db.from('land_leads').update({
+      'owner_name': primary.name,
+      'contact_details': primary.contact,
+      'contact_type': LeadContactTypes.landOwner,
+      'additional_owners': [for (final o in others) o.toJson()],
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', leadId);
   }
@@ -1320,7 +1337,9 @@ class LandLeadService {
       landownerMeetingCompletedAt: parseTs(r['landowner_meeting_completed_at']),
       numOwners: r['num_owners'] as String? ?? '',
       ownerOccupation: r['owner_occupation'] as String? ?? '',
+      ownerProfession: r['owner_profession'] as String? ?? '',
       ownerLives: r['owner_lives'] as String? ?? '',
+      ownerTown: r['owner_town'] as String? ?? '',
       ownerDecision: r['owner_decision'] as String? ?? '',
       locationRating: r['location_rating'] as String? ?? 'unknown',
       brokerKnowsOwner: r['broker_knows_owner'] as bool?,

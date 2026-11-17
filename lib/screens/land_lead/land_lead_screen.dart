@@ -873,21 +873,18 @@ class _LandLeadScreenState extends State<LandLeadScreen> {
         leadId: lead.leadId,
         ownerName: lead.ownerName,
         lead: lead,
-        onMeetingSaved: () {
-          if (lead.status == LeadStatus.prospectMeetingPending) {
-            // The stored copy may carry an owner profile saved just now.
-            final current = AppStore.instance.leads.firstWhere(
-                (l) => l.leadId == lead.leadId,
-                orElse: () => lead);
-            final updated =
-                current.copyWith(status: LeadStatus.prospectMeetingCompleted);
-            AppStore.instance.replaceLead(updated);
-            LandLeadService.updateStatus(
-                    lead.leadId, LeadStatus.prospectMeetingCompleted)
-                .catchError((_) {
-              AppStore.instance.replaceLead(lead);
-            });
-          }
+        onMeetingSaved: (managementPresent) {
+          final next =
+              statusAfterMeeting(lead.status, managementPresent: managementPresent);
+          if (next == null) return;
+          // The stored copy may carry owners / profile saved just now.
+          final current = AppStore.instance.leads.firstWhere(
+              (l) => l.leadId == lead.leadId,
+              orElse: () => lead);
+          AppStore.instance.replaceLead(current.copyWith(status: next));
+          LandLeadService.updateStatus(lead.leadId, next).catchError((_) {
+            AppStore.instance.replaceLead(current);
+          });
         },
       ),
     );

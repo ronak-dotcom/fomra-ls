@@ -200,8 +200,14 @@ class LandLead {
   /// Owner type key (see OwnerProfile.types), e.g. 'farmer'.
   final String ownerOccupation;
 
-  /// Where the owner lives / who decides on selling (OwnerProfile keys).
+  /// What exactly the owner does, in their words ("Runs a rice mill").
+  final String ownerProfession;
+
+  /// Where the owner lives: locality / village, and town / city (typed).
   final String ownerLives;
+  final String ownerTown;
+
+  /// Who decides on selling (OwnerProfile.decisionOptions key).
   final String ownerDecision;
   /// unknown / poor / average / good
   final String locationRating;
@@ -283,7 +289,9 @@ class LandLead {
     this.landownerMeetingCompletedAt,
     this.numOwners = '',
     this.ownerOccupation = '',
+    this.ownerProfession = '',
     this.ownerLives = '',
+    this.ownerTown = '',
     this.ownerDecision = '',
     this.locationRating = 'unknown',
     this.brokerKnowsOwner,
@@ -361,7 +369,9 @@ class LandLead {
     DateTime? landownerMeetingCompletedAt,
     String? numOwners,
     String? ownerOccupation,
+    String? ownerProfession,
     String? ownerLives,
+    String? ownerTown,
     String? ownerDecision,
     String? locationRating,
     bool? brokerKnowsOwner,
@@ -441,7 +451,9 @@ class LandLead {
             landownerMeetingCompletedAt ?? this.landownerMeetingCompletedAt,
         numOwners: numOwners ?? this.numOwners,
         ownerOccupation: ownerOccupation ?? this.ownerOccupation,
+        ownerProfession: ownerProfession ?? this.ownerProfession,
         ownerLives: ownerLives ?? this.ownerLives,
+        ownerTown: ownerTown ?? this.ownerTown,
         ownerDecision: ownerDecision ?? this.ownerDecision,
         locationRating: locationRating ?? this.locationRating,
         brokerKnowsOwner: brokerKnowsOwner ?? this.brokerKnowsOwner,
@@ -516,6 +528,22 @@ extension LeadStatusLabel on LeadStatus {
 }
 
 /// Display order for Stage & Status dropdowns and filter chips.
+/// The stage a lead moves to after a meeting is logged, or null to stay.
+/// Any meeting moves "Owner meeting pending" on; one with management present
+/// moves a lead that hasn't got further to "Management meeting completed".
+LeadStatus? statusAfterMeeting(LeadStatus current,
+    {required bool managementPresent}) {
+  if (managementPresent &&
+      (current == LeadStatus.prospectMeetingPending ||
+          current == LeadStatus.prospectMeetingCompleted)) {
+    return LeadStatus.managementMeetingCompleted;
+  }
+  if (current == LeadStatus.prospectMeetingPending) {
+    return LeadStatus.prospectMeetingCompleted;
+  }
+  return null;
+}
+
 const leadStatusPipelineOrder = <LeadStatus>[
   LeadStatus.prospectMeetingPending,
   LeadStatus.prospectMeetingCompleted,

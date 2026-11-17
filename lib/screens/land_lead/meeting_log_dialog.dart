@@ -5,6 +5,9 @@ import 'package:flutter/services.dart';
 import '../../models/land_lead.dart';
 import '../../models/land_lead_meeting.dart';
 import '../../services/land_lead_service.dart';
+import '../../services/meeting_flags_index.dart';
+import '../../models/owner_profile.dart';
+import '../../utils/phone_validation.dart';
 import '../../widgets/owner_profile_widgets.dart';
 import '../../services/app_store.dart';
 import '../../services/land_lead_meeting_service.dart';
@@ -18,7 +21,8 @@ import '../../widgets/ui/dialog_error_banner.dart';
 class MeetingLogDialog extends StatefulWidget {
   final String leadId;
   final String ownerName;
-  final VoidCallback? onMeetingSaved;
+  /// Called after saving, with whether management was present.
+  final ValueChanged<bool>? onMeetingSaved;
   final bool readOnly;
 
   /// When given, meeting the Land Owner also asks for the owner profile
@@ -26,7 +30,8 @@ class MeetingLogDialog extends StatefulWidget {
   /// from this lead.
   final LandLead? lead;
 
-  /// Called with the lead's owner profile after it is saved.
+  /// Called with the lead (owners and owner profile) after the meeting
+  /// changed them.
   final ValueChanged<LandLead>? onOwnerProfileSaved;
 
   const MeetingLogDialog({
@@ -54,10 +59,14 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
   final List<_PersonRow> _people = [_PersonRow()];
   static const _maxPeople = 6;
   bool _managementPresent = false;
-  late String _ownerType = widget.lead?.ownerOccupation.trim() ?? '';
-  late String _ownerLives = widget.lead?.ownerLives.trim() ?? '';
-  late String _ownerDecision = widget.lead?.ownerDecision.trim() ?? '';
+  late OwnerProfileValues _profile = widget.lead == null
+      ? const OwnerProfileValues()
+      : OwnerProfileValues.of(widget.lead!);
   String? _ownerTypeError;
+
+  /// Index in [_people] of the owner marked ★ point of contact (null = the
+  /// first Land Owner row).
+  int? _pocIndex;
   bool _saving = false;
   String? _formError;
   bool _loading = true;
@@ -76,6 +85,7 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
     _notesCtrl.dispose();
     for (final p in _people) {
       p.nameCtrl.dispose();
+      p.mobileCtrl.dispose();
     }
     super.dispose();
   }
@@ -132,21 +142,63 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
 
   bool get _asksOwnerProfile => widget.lead != null && _ownerMet;
 
-  Future<void> _saveOwnerProfile() async {
-    final lead = widget.lead!;
-    if (_ownerType == lead.ownerOccupation.trim() &&
-        _ownerLives == lead.ownerLives.trim() &&
-        _ownerDecision == lead.ownerDecision.trim()) {
-      return;
+  static bool _isOwnerRow(_PersonRow p) =>
+      (p.relation ?? '').isNotEmpty &&
+      PersonMet.attendeeTypeFor(p.relation!) == MeetingAttendeeTypes.landOwner;
+
+  /// Land Owner rows with a name, point of contact first.
+  List<_PersonRow> get _ownerRows {
+    final rows = [
+      for (var i = 0; i < _people.length; i++)
+        if (_isOwnerRow(_people[i]) &&
+            _people[i].nameCtrl.text.trim().isNotEmpty)
+          (i, _people[i]),
+    ];
+    final poc = _effectivePoc;
+    rows.sort((a, b) =>
+        (a.$1 == poc ? 0 : 1).compareTo(b.$1 == poc ? 0 : 1));
+    return [for (final r in rows) r.$2];
+  }
+
+  /// Saves the owners met: the ★ one becomes the lead's main owner, the
+  /// rest (and owners already on the lead) its additional owners.
+  Future<LandLead> _saveOwners(LandLead lead) async {
+    final rows = _ownerRows;
+    if (rows.isEmpty) return lead;
+    OwnerContact contactOf(_PersonRow p) => OwnerContact(
+        name: p.nameCtrl.text.trim(), contact: p.mobileCtrl.text.trim());
+    final primary = contactOf(rows.first);
+    final others = [for (final r in rows.skip(1)) contactOf(r)];
+    String key(OwnerContact o) => o.contact.isNotEmpty
+        ? o.contact
+        : o.name.trim().toLowerCase();
+    final seen = {key(primary), for (final o in others) key(o)};
+    for (final o in [
+      OwnerContact(name: lead.ownerName, contact: lead.contactDetails),
+      ...lead.additionalOwners,
+    ]) {
+      if (o.name.trim().isEmpty && o.contact.trim().isEmpty) continue;
+      if (seen.add(key(o))) others.add(o);
     }
-    await LandLeadService.updateOwnerProfile(lead.leadId,
-        type: _ownerType, lives: _ownerLives, decision: _ownerDecision);
-    AppStore.instance.patchOwnerProfile(lead.leadId,
-        type: _ownerType, lives: _ownerLives, decision: _ownerDecision);
-    widget.onOwnerProfileSaved?.call(lead.copyWith(
-        ownerOccupation: _ownerType,
-        ownerLives: _ownerLives,
-        ownerDecision: _ownerDecision));
+    final unchanged = primary.name == lead.ownerName.trim() &&
+        primary.contact == lead.contactDetails.trim() &&
+        others.length == lead.additionalOwners.length;
+    if (unchanged) return lead;
+    await LandLeadService.updateOwners(lead.leadId,
+        primary: primary, others: others);
+    AppStore.instance
+        .patchOwners(lead.leadId, primary: primary, others: others);
+    return lead.copyWith(
+      ownerName: primary.name,
+      contactDetails: primary.contact,
+      contactType: LeadContactTypes.landOwner,
+      additionalOwners: others,
+    );
+  }
+
+  Future<LandLead> _saveOwnerProfile(LandLead lead) async {
+    if (_profile == OwnerProfileValues.of(lead)) return lead;
+    return saveOwnerProfile(lead, _profile);
   }
 
   Future<void> _save() async {
@@ -164,6 +216,14 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
           'Add the person met — their name and relation to the owner');
       return;
     }
+    for (final p in _people) {
+      final mobile = p.mobileCtrl.text.trim();
+      if (_isOwnerRow(p) && mobile.isNotEmpty && !PhoneValidation.isValid(mobile)) {
+        setState(() => _formError =
+            'Owner mobile must be 10 digits starting with 6, 7, 8 or 9');
+        return;
+      }
+    }
     if (people.any((p) => p.relation.isEmpty)) {
       setState(() => _formError = 'Select the relation for each person met');
       return;
@@ -174,7 +234,7 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
       ..._attendeeTypes,
       for (final p in people) PersonMet.attendeeTypeFor(p.relation),
     };
-    if (_asksOwnerProfile && _ownerType.isEmpty) {
+    if (_asksOwnerProfile && _profile.type.isEmpty) {
       setState(() {
         _ownerTypeError = 'Select what the land owner does';
         _formError = 'Fill the owner profile — what the owner does';
@@ -200,7 +260,12 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
       );
       if (_asksOwnerProfile) {
         try {
-          await _saveOwnerProfile();
+          final base = widget.lead!;
+          var updated = await _saveOwners(base);
+          updated = await _saveOwnerProfile(updated);
+          if (!identical(updated, base)) {
+            widget.onOwnerProfileSaved?.call(updated);
+          }
         } catch (e) {
           if (mounted) {
             AppFeedback.error(
@@ -209,7 +274,10 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
         }
       }
       if (!mounted) return;
-      widget.onMeetingSaved?.call();
+      if (_managementPresent) {
+        MeetingFlagsIndex.instance.markManagementMeeting(widget.leadId);
+      }
+      widget.onMeetingSaved?.call(_managementPresent);
       AppFeedback.success(context, 'Meeting logged');
       Navigator.pop(context);
     } catch (e) {
@@ -427,16 +495,12 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
                     )),
                 const SizedBox(height: 8),
                 OwnerProfileFields(
-                  type: _ownerType,
-                  lives: _ownerLives,
-                  decision: _ownerDecision,
+                  initial: _profile,
                   typeError: _ownerTypeError,
-                  onType: (v) => setState(() {
-                    _ownerType = v;
-                    _ownerTypeError = null;
+                  onChanged: (v) => setState(() {
+                    _profile = v;
+                    if (v.type.isNotEmpty) _ownerTypeError = null;
                   }),
-                  onLives: (v) => setState(() => _ownerLives = v),
-                  onDecision: (v) => setState(() => _ownerDecision = v),
                 ),
               ],
             ),
@@ -482,6 +546,73 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
     );
   }
 
+  /// The point-of-contact owner row: the ★ one, else the first owner.
+  int? get _effectivePoc {
+    if (_pocIndex != null &&
+        _pocIndex! < _people.length &&
+        _isOwnerRow(_people[_pocIndex!])) {
+      return _pocIndex;
+    }
+    for (var i = 0; i < _people.length; i++) {
+      if (_isOwnerRow(_people[i])) return i;
+    }
+    return null;
+  }
+
+  /// One person met; Land Owner rows also take the owner's mobile and,
+  /// with several owners, the ★ point of contact.
+  Widget _personCard(BuildContext context, int i, Widget nameAndRelation) {
+    final p = _people[i];
+    if (widget.lead == null || !_isOwnerRow(p)) return nameAndRelation;
+    final owners = _people.where(_isOwnerRow).length;
+    final poc = _effectivePoc == i;
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: poc && owners > 1
+            ? AppColors.gold.withValues(alpha: 0.06)
+            : null,
+        border: Border.all(
+          color: poc && owners > 1 ? AppColors.gold : context.fomraBorder,
+          width: poc && owners > 1 ? 1.6 : 1,
+        ),
+      ),
+      child: Column(children: [
+        nameAndRelation,
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(
+            child: TextField(
+              key: ValueKey('person-mobile-$i'),
+              controller: p.mobileCtrl,
+              keyboardType: TextInputType.phone,
+              inputFormatters: PhoneValidation.inputFormatters,
+              decoration: _fieldDecoration(context, 'Owner mobile')
+                  .copyWith(isDense: true),
+            ),
+          ),
+          if (owners > 1) ...[
+            const SizedBox(width: 6),
+            OutlinedButton.icon(
+              onPressed: () => setState(() => _pocIndex = i),
+              style: OutlinedButton.styleFrom(
+                backgroundColor:
+                    poc ? AppColors.gold.withValues(alpha: 0.18) : null,
+                side: BorderSide(
+                    color: poc ? AppColors.gold : context.fomraBorder),
+              ),
+              icon: Icon(poc ? Icons.star_rounded : Icons.star_border_rounded,
+                  size: 18, color: AppColors.gold),
+              label: Text(poc ? 'Point of contact' : 'Make contact',
+                  style: const TextStyle(fontSize: 12)),
+            ),
+          ],
+        ]),
+      ]),
+    );
+  }
+
   Widget _buildPeopleMet(BuildContext context) {
     final label = TextStyle(
       fontSize: 12,
@@ -495,7 +626,7 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
         const SizedBox(height: 6),
         for (var i = 0; i < _people.length; i++) ...[
           if (i > 0) const SizedBox(height: 8),
-          Row(
+          _personCard(context, i, Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
@@ -536,14 +667,31 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
                   tooltip: 'Remove',
                   visualDensity: VisualDensity.compact,
                   onPressed: () => setState(() {
-                    _people.removeAt(i).nameCtrl.dispose();
+                    final removed = _people.removeAt(i);
+                    removed.nameCtrl.dispose();
+                    removed.mobileCtrl.dispose();
+                    if (_pocIndex == i) _pocIndex = null;
+                    if (_pocIndex != null && _pocIndex! > i) {
+                      _pocIndex = _pocIndex! - 1;
+                    }
                   }),
                   icon: const Icon(Icons.close_rounded,
                       size: 18, color: AppColors.error),
                 ),
             ],
-          ),
+          )),
         ],
+        if (widget.lead != null &&
+            _people.where(_isOwnerRow).length > 1)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              '★ marks the point of contact — saved as the main owner; '
+              'the other owners are saved as additional owners.',
+              style: TextStyle(
+                  fontSize: 11.5, color: context.fomraTextSecondary),
+            ),
+          ),
         if (_people.length < _maxPeople)
           Align(
             alignment: Alignment.centerLeft,
@@ -582,6 +730,7 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
 
 class _PersonRow {
   final nameCtrl = TextEditingController();
+  final mobileCtrl = TextEditingController();
   String? relation;
 }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/land_lead.dart';
 import '../models/owner_profile.dart';
+import '../services/meeting_flags_index.dart';
 import '../services/broker_directory.dart';
 import '../models/lead_review.dart';
 import '../services/app_store.dart';
@@ -219,6 +220,10 @@ class LandWorkspaceFilters {
   /// Land owner types (OwnerProfile keys, OR). Empty = any.
   final Set<String> ownerTypes;
 
+  /// Only leads that ever had a meeting with management present, whatever
+  /// their stage now (dropped included) — judged on MeetingFlagsIndex.
+  bool hadManagementMeeting;
+
   LandWorkspaceFilters({
     this.status,
     Set<LeadStatus>? statuses,
@@ -242,6 +247,7 @@ class LandWorkspaceFilters {
     this.pendingStatus,
     this.reviewStatus,
     Set<String>? ownerTypes,
+    this.hadManagementMeeting = false,
   })  : landTypes = landTypes ?? {},
         ownerTypes = ownerTypes ?? {},
         statuses = statuses ?? {},
@@ -298,6 +304,7 @@ class LandWorkspaceFilters {
         pendingStatus: pendingStatus,
         reviewStatus: reviewStatus,
         ownerTypes: {...ownerTypes},
+        hadManagementMeeting: hadManagementMeeting,
       );
 
   /// Overwrites every filter with [other]'s — one place to keep in sync when a
@@ -344,6 +351,7 @@ class LandWorkspaceFilters {
     ownerTypes
       ..clear()
       ..addAll(o.ownerTypes);
+    hadManagementMeeting = o.hadManagementMeeting;
   }
 
   void clear() {
@@ -369,6 +377,7 @@ class LandWorkspaceFilters {
     pendingStatus = null;
     reviewStatus = null;
     ownerTypes.clear();
+    hadManagementMeeting = false;
   }
 
   int get activeCount {
@@ -393,6 +402,7 @@ class LandWorkspaceFilters {
     if (pendingStatus != null && pendingStatus!.isNotEmpty) n++;
     if (reviewStatus != null) n++;
     n += ownerTypes.length;
+    if (hadManagementMeeting) n++;
     return n;
   }
 
@@ -416,6 +426,11 @@ class LandWorkspaceFilters {
     if (sources.isNotEmpty && !sources.contains(lead.inputSource)) return false;
     if (ownerTypes.isNotEmpty &&
         !ownerTypes.contains(lead.ownerOccupation.trim())) {
+      return false;
+    }
+    if (hadManagementMeeting &&
+        lead.status != LeadStatus.managementMeetingCompleted &&
+        !MeetingFlagsIndex.instance.hadManagementMeeting(lead.leadId)) {
       return false;
     }
     if (highPriority &&
@@ -511,6 +526,15 @@ class LandWorkspaceFilters {
         label: 'Type: ${t.label}',
         onRemove: () {
           landTypes.remove(t);
+          notify();
+        },
+      ));
+    }
+    if (hadManagementMeeting) {
+      chips.add((
+        label: 'Had a management meeting',
+        onRemove: () {
+          hadManagementMeeting = false;
           notify();
         },
       ));
@@ -872,6 +896,9 @@ Future<LandWorkspaceFilters?> showLandWorkspaceFilterPanel({
   bool showReviewStatus = true,
   bool brokerMultiSelect = false,
 }) {
+  // The "Had a management meeting" filter reads meeting history; start
+  // loading it while the panel is open.
+  MeetingFlagsIndex.instance.ensureLoaded();
   return showGeneralDialog<LandWorkspaceFilters>(
     context: context,
     barrierDismissible: true,
@@ -1265,6 +1292,25 @@ class _LandWorkspaceFilterPanelState extends State<_LandWorkspaceFilterPanel> {
                                   setState(() => _draft.reviewStatus = v),
                             ),
                           ],
+                          const Divider(height: 28),
+                          _sectionTitle('Meetings'),
+                          const SizedBox(height: 4),
+                          _checkTile(
+                            label: 'Had a management meeting',
+                            checked: _draft.hadManagementMeeting,
+                            onChanged: (v) => setState(
+                                () => _draft.hadManagementMeeting = v),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 12, bottom: 4),
+                            child: Text(
+                              'Any stage — dropped and on-hold sites included',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: context.fomraTextSecondary,
+                              ),
+                            ),
+                          ),
                           const Divider(height: 28),
                           _sectionTitle('Created Date Range'),
                           const SizedBox(height: 10),

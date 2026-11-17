@@ -6,6 +6,7 @@ import '../services/app_store.dart';
 import '../services/auth_service.dart';
 import '../services/broker_directory.dart';
 import '../services/lead_review_service.dart';
+import '../services/meeting_flags_index.dart';
 import 'land_workspace_ui.dart';
 
 /// The Land Workspace search + Filters button + active-filter chips, for any
@@ -46,11 +47,18 @@ class _LeadFilterBarState extends State<LeadFilterBar> {
     super.initState();
     LeadReviewIndex.instance.addListener(_onReviewsChanged);
     LeadReviewIndex.instance.ensureLoaded();
+    MeetingFlagsIndex.instance.addListener(_onMeetingsChanged);
+    MeetingFlagsIndex.instance.ensureLoaded();
+  }
+
+  void _onMeetingsChanged() {
+    if (widget.filters.hadManagementMeeting) widget.onChanged();
   }
 
   @override
   void dispose() {
     LeadReviewIndex.instance.removeListener(_onReviewsChanged);
+    MeetingFlagsIndex.instance.removeListener(_onMeetingsChanged);
     super.dispose();
   }
 
