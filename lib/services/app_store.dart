@@ -26,7 +26,7 @@ class AppStore extends ChangeNotifier {
   /// across the whole app. See [LeadVisibility] for the rule itself.
   List<LandLead> get visibleLeads => LeadVisibility.scope(leads);
 
-  /// For the several dialogs (notes, calls, meetings, site visits, legal
+  /// For the several dialogs (notes, meetings, site visits, legal
   /// docs, signed-project) that are only ever passed a bare leadId, not the
   /// full LandLead — looks up its display name so dialog headers can show
   /// "Kottamedu 2.15 acres" instead of "Lead #47". Searches the raw [leads]

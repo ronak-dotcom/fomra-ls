@@ -1,7 +1,6 @@
 import '../models/land_lead.dart';
 import '../models/land_lead_meeting.dart';
 import '../models/land_lead_site_visit.dart';
-import '../models/lead_call_log.dart';
 import '../utils/lead_location_parser.dart';
 import '../services/management_bi_activity_service.dart';
 
@@ -85,11 +84,10 @@ extension BiHeatLevelX on BiHeatLevel {
       };
 }
 
-enum BiSlaKind { firstCall, siteVisit, survey, legal, agreement }
+enum BiSlaKind { siteVisit, survey, legal, agreement }
 
 extension BiSlaKindX on BiSlaKind {
   String get label => switch (this) {
-        BiSlaKind.firstCall => 'First Call',
         BiSlaKind.siteVisit => 'Site Visit',
         BiSlaKind.survey => 'Survey',
         BiSlaKind.legal => 'Legal',
@@ -98,7 +96,6 @@ extension BiSlaKindX on BiSlaKind {
 
   /// Target days from lead creation (approximated — no per-stage timestamps).
   int get targetDays => switch (this) {
-        BiSlaKind.firstCall => 1,
         BiSlaKind.siteVisit => 7,
         BiSlaKind.survey => 14,
         BiSlaKind.legal => 21,
@@ -267,21 +264,15 @@ class ManagementBiSnapshot {
 // ── Index helpers ───────────────────────────────────────────────────────────
 
 class _ActivityIndex {
-  final Map<String, List<LeadCallLog>> callsByLead;
   final Map<String, List<LandLeadMeeting>> meetingsByLead;
   final Map<String, List<LandLeadSiteVisit>> visitsByLead;
 
   _ActivityIndex({
-    required this.callsByLead,
     required this.meetingsByLead,
     required this.visitsByLead,
   });
 
   factory _ActivityIndex.from(ManagementBiActivityBundle bundle) {
-    final calls = <String, List<LeadCallLog>>{};
-    for (final c in bundle.calls) {
-      (calls[c.leadId] ??= []).add(c);
-    }
     final meetings = <String, List<LandLeadMeeting>>{};
     for (final m in bundle.meetings) {
       (meetings[m.leadId] ??= []).add(m);
@@ -291,17 +282,14 @@ class _ActivityIndex {
       (visits[v.leadId] ??= []).add(v);
     }
     return _ActivityIndex(
-      callsByLead: calls,
       meetingsByLead: meetings,
       visitsByLead: visits,
     );
   }
 
-  bool hasCall(String id) => (callsByLead[id]?.isNotEmpty ?? false);
   bool hasMeeting(String id) => (meetingsByLead[id]?.isNotEmpty ?? false);
   bool hasVisit(String id) => (visitsByLead[id]?.isNotEmpty ?? false);
 
-  int callCount(String id) => callsByLead[id]?.length ?? 0;
   int meetingCount(String id) => meetingsByLead[id]?.length ?? 0;
   int visitCount(String id) => visitsByLead[id]?.length ?? 0;
 
@@ -312,9 +300,6 @@ class _ActivityIndex {
       if (best == null || t.isAfter(best!)) best = t;
     }
 
-    for (final c in callsByLead[id] ?? const []) {
-      consider(c.calledAt);
-    }
     for (final m in meetingsByLead[id] ?? const []) {
       consider(m.metAt);
     }
@@ -403,7 +388,7 @@ class ManagementBiMetrics {
       case LeadStatus.prospectMeetingPending:
         if (index.hasVisit(lead.leadId)) return BiFunnelStage.siteVisit;
         if (index.hasMeeting(lead.leadId)) return BiFunnelStage.meeting;
-        if (index.hasCall(lead.leadId) || lead.contactDetails.trim().isNotEmpty) {
+        if (lead.contactDetails.trim().isNotEmpty) {
           return BiFunnelStage.contacted;
         }
         return BiFunnelStage.newLead;
@@ -736,11 +721,6 @@ class ManagementBiMetrics {
     }
 
     for (final l in leads) {
-      addIfOpen(
-        kind: BiSlaKind.firstCall,
-        lead: l,
-        resolved: index.hasCall(l.leadId),
-      );
       addIfOpen(
         kind: BiSlaKind.siteVisit,
         lead: l,

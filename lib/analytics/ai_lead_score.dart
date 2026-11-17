@@ -2,7 +2,6 @@ import '../models/land_lead.dart';
 import '../models/land_lead_legal_document.dart';
 import '../models/land_lead_meeting.dart';
 import '../models/land_lead_site_visit.dart';
-import '../models/lead_call_log.dart';
 import 'management_bi_metrics.dart';
 
 /// Score bands for the weighted AI Lead Score (0-100).
@@ -62,7 +61,6 @@ class AiLeadScoreResult {
 abstract final class AiLeadScore {
   static AiLeadScoreResult compute({
     required LandLead lead,
-    List<LeadCallLog> callLogs = const [],
     List<LandLeadMeeting> meetings = const [],
     List<LandLeadSiteVisit> siteVisits = const [],
     List<LandLeadLegalDocument> legalDocs = const [],
@@ -74,10 +72,10 @@ abstract final class AiLeadScore {
     final categories = <AiScoreCategory>[
       _progressCategory(lead, legalDocs),
       _qualityCategory(lead),
-      _engagementCategory(callLogs, meetings, siteVisits),
+      _engagementCategory(meetings, siteVisits),
       _documentationCategory(legalDocs),
-      _followUpCategory(lead, callLogs, meetings, siteVisits, overdueTaskCount, clock),
-      _riskCategory(lead, callLogs, legalDocs, allLeads, clock),
+      _followUpCategory(lead, meetings, siteVisits, overdueTaskCount, clock),
+      _riskCategory(lead, meetings, siteVisits, legalDocs, allLeads, clock),
     ];
     final total =
         categories.fold<double>(0, (s, c) => s + c.weightedPoints);
@@ -204,38 +202,20 @@ abstract final class AiLeadScore {
   // ── Owner Engagement (20%) ──────────────────────────────────────────────
 
   static AiScoreCategory _engagementCategory(
-    List<LeadCallLog> callLogs,
     List<LandLeadMeeting> meetings,
     List<LandLeadSiteVisit> siteVisits,
   ) {
-    final answered = callLogs.where((c) => c.isAnswered).length;
-    final callsPts = callLogs.isEmpty
-        ? 0.0
-        : (answered / callLogs.length * 100).clamp(0, 100);
-
+    // Meetings and site visits (the team doesn't log calls in the app).
     final meetingsPts = (meetings.length * 50.0).clamp(0, 100);
     final visitsPts = (siteVisits.length * 50.0).clamp(0, 100);
-
-    final sorted = [...callLogs]..sort((a, b) => b.calledAt.compareTo(a.calledAt));
-    final recentAnswered = sorted.take(3).where((c) => c.isAnswered).length;
-    final consistencyPts = sorted.isEmpty
-        ? 0.0
-        : (recentAnswered / sorted.take(3).length * 100).clamp(0, 100);
-
-    final raw = (callsPts + meetingsPts + visitsPts + consistencyPts) / 4;
+    final raw = (meetingsPts + visitsPts) / 2;
     return AiScoreCategory(
       label: 'Owner Engagement',
       weightPercent: 20,
       rawScore: raw,
       notes: [
-        callLogs.isEmpty
-            ? 'No calls logged'
-            : '$answered/${callLogs.length} calls answered',
         '${meetings.length} meeting(s) completed',
         '${siteVisits.length} site visit(s) logged',
-        sorted.isEmpty
-            ? 'No recent contact'
-            : '$recentAnswered/${sorted.take(3).length} of last calls answered',
       ],
     );
   }
@@ -267,13 +247,12 @@ abstract final class AiLeadScore {
 
   static AiScoreCategory _followUpCategory(
     LandLead lead,
-    List<LeadCallLog> callLogs,
     List<LandLeadMeeting> meetings,
     List<LandLeadSiteVisit> siteVisits,
     int overdueTaskCount,
     DateTime now,
   ) {
-    final lastActivity = _lastActivityDate(lead, callLogs, meetings, siteVisits);
+    final lastActivity = _lastActivityDate(lead, meetings, siteVisits);
     final daysSince = now.difference(lastActivity).inDays;
     final recencyPts = daysSince <= 3
         ? 100.0
@@ -292,7 +271,7 @@ abstract final class AiLeadScore {
             : 20.0;
 
     final ageDays = biLeadAgeDays(lead, now).clamp(1, 100000);
-    final totalActivity = callLogs.length + meetings.length + siteVisits.length;
+    final totalActivity = meetings.length + siteVisits.length;
     final expectedTouchpoints = (ageDays / 14).clamp(1, 100000);
     final frequencyPts =
         (totalActivity / expectedTouchpoints * 100).clamp(0, 100);
@@ -316,7 +295,8 @@ abstract final class AiLeadScore {
 
   static AiScoreCategory _riskCategory(
     LandLead lead,
-    List<LeadCallLog> callLogs,
+    List<LandLeadMeeting> meetings,
+    List<LandLeadSiteVisit> siteVisits,
     List<LandLeadLegalDocument> legalDocs,
     List<LandLead> allLeads,
     DateTime now,
@@ -324,7 +304,7 @@ abstract final class AiLeadScore {
     var deductions = 0.0;
     final notes = <String>[];
 
-    final lastActivity = _lastActivityDate(lead, callLogs, const [], const []);
+    final lastActivity = _lastActivityDate(lead, meetings, siteVisits);
     final inactiveDays = now.difference(lastActivity).inDays;
     if (inactiveDays > 30) {
       deductions += 40;
@@ -332,14 +312,6 @@ abstract final class AiLeadScore {
     } else if (inactiveDays > 14) {
       deductions += 20;
       notes.add('No activity in $inactiveDays days');
-    }
-
-    final recentCalls = ([...callLogs]..sort((a, b) => b.calledAt.compareTo(a.calledAt)))
-        .take(3)
-        .toList();
-    if (recentCalls.length >= 2 && recentCalls.every((c) => !c.isAnswered)) {
-      deductions += 25;
-      notes.add('Owner unresponsive on recent calls');
     }
 
     final activeNegotiation =
@@ -415,14 +387,10 @@ abstract final class AiLeadScore {
 
   static DateTime _lastActivityDate(
     LandLead lead,
-    List<LeadCallLog> callLogs,
     List<LandLeadMeeting> meetings,
     List<LandLeadSiteVisit> siteVisits,
   ) {
     var latest = lead.addedOn;
-    for (final c in callLogs) {
-      if (c.calledAt.isAfter(latest)) latest = c.calledAt;
-    }
     for (final m in meetings) {
       if (m.metAt.isAfter(latest)) latest = m.metAt;
     }

@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fomra_ls/models/land_lead.dart';
 import 'package:fomra_ls/models/land_lead_meeting.dart';
 import 'package:fomra_ls/models/land_lead_site_visit.dart';
-import 'package:fomra_ls/models/lead_call_log.dart';
 import 'package:fomra_ls/utils/employee_lead_next_action.dart';
 
 final _now = DateTime(2026, 7, 16);
@@ -29,17 +28,6 @@ LandLead _lead({LeadStatus status = LeadStatus.negotiation}) => LandLead(
       status: status,
     );
 
-List<LeadCallLog> _calls() => [
-      LeadCallLog(
-        id: 'c1',
-        leadId: '12',
-        calledAt: DateTime(2026, 7, 2),
-        duration: '5',
-        details: '',
-        loggedByName: 'Exec',
-      ),
-    ];
-
 List<LandLeadMeeting> _meetings() => [
       LandLeadMeeting(
         id: 'm1',
@@ -48,6 +36,7 @@ List<LandLeadMeeting> _meetings() => [
         duration: '30',
         notes: '',
         loggedByName: 'Exec',
+        createdAt: DateTime(2026, 7, 3),
       ),
     ];
 
@@ -63,19 +52,18 @@ List<LandLeadSiteVisit> _visits(
         loggedByName: 'Exec',
         visitType: type,
         approvalStatus: status,
+        createdAt: DateTime(2026, 7, 4),
       ),
     ];
 
 EmployeeNextAction _action({
   LeadStatus status = LeadStatus.negotiation,
-  List<LeadCallLog> calls = const [],
   List<LandLeadMeeting> meetings = const [],
   List<LandLeadSiteVisit> visits = const [],
   int legalDocCount = 0,
 }) =>
     EmployeeLeadWorkflow.build(
       lead: _lead(status: status),
-      callLogs: calls,
       siteVisits: visits,
       meetings: meetings,
       legalDocCount: legalDocCount,
@@ -84,26 +72,20 @@ EmployeeNextAction _action({
 
 void main() {
   group('the highest-priority pending activity wins', () {
-    test('a lead with nothing done needs the call first', () {
-      expect(_action().kind, EmployeeNextActionKind.callOwner);
-      expect(_action().title, 'Call Owner');
-    });
-
-    test('once the call is logged, the land owner meeting is next', () {
-      final action = _action(calls: _calls());
+    test('a lead with nothing done needs the land owner meeting first', () {
+      final action = _action();
       expect(action.kind, EmployeeNextActionKind.landOwnerMeeting);
       expect(action.title, 'Conduct Land Owner Meeting');
     });
 
     test('once the meeting is logged, the site visit is next', () {
-      final action = _action(calls: _calls(), meetings: _meetings());
+      final action = _action(meetings: _meetings());
       expect(action.kind, EmployeeNextActionKind.siteVisit);
       expect(action.title, 'Conduct Site Visit');
     });
 
     test('once the site visit is logged, legal verification is next', () {
       final action = _action(
-        calls: _calls(),
         meetings: _meetings(),
         visits: _visits(LandLeadSiteVisitType.employee),
       );
@@ -113,7 +95,6 @@ void main() {
 
     test('once legal docs are in, the management site visit is next', () {
       final action = _action(
-        calls: _calls(),
         meetings: _meetings(),
         visits: _visits(LandLeadSiteVisitType.employee),
         legalDocCount: 2,
@@ -124,7 +105,6 @@ void main() {
 
     test('with everything done, signing is next', () {
       final action = _action(
-        calls: _calls(),
         meetings: _meetings(),
         visits: [
           ..._visits(LandLeadSiteVisitType.employee),
@@ -137,7 +117,7 @@ void main() {
     });
 
     test('an earlier pending activity outranks a later one', () {
-      // Legal docs and both visits are done, but nobody ever called the owner.
+      // Legal docs and both visits are done, but the owner was never met.
       final action = _action(
         visits: [
           ..._visits(LandLeadSiteVisitType.employee),
@@ -145,7 +125,7 @@ void main() {
         ],
         legalDocCount: 5,
       );
-      expect(action.kind, EmployeeNextActionKind.callOwner);
+      expect(action.kind, EmployeeNextActionKind.landOwnerMeeting);
     });
   });
 
@@ -167,7 +147,6 @@ void main() {
   group('site visit approval', () {
     test('a visit awaiting approval has already been made', () {
       final action = _action(
-        calls: _calls(),
         meetings: _meetings(),
         visits: _visits(
           LandLeadSiteVisitType.employee,
@@ -179,7 +158,6 @@ void main() {
 
     test('a rejected visit still needs doing', () {
       final action = _action(
-        calls: _calls(),
         meetings: _meetings(),
         visits: _visits(
           LandLeadSiteVisitType.employee,
@@ -191,7 +169,6 @@ void main() {
 
     test('a management visit does not satisfy the employee site visit', () {
       final action = _action(
-        calls: _calls(),
         meetings: _meetings(),
         visits: _visits(LandLeadSiteVisitType.management),
       );
@@ -202,8 +179,7 @@ void main() {
   test('every action explains why it is next', () {
     for (final action in [
       _action(),
-      _action(calls: _calls()),
-      _action(calls: _calls(), meetings: _meetings()),
+      _action(meetings: _meetings()),
       _action(status: LeadStatus.signed),
     ]) {
       expect(action.description, isNotEmpty);
@@ -213,7 +189,6 @@ void main() {
   test('the insight carries the stage the card shows', () {
     final insight = EmployeeLeadWorkflow.build(
       lead: _lead(status: LeadStatus.legal),
-      callLogs: const [],
       siteVisits: const [],
       meetings: const [],
       legalDocCount: 0,
