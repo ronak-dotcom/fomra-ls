@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/land_lead.dart';
+import '../models/owner_profile.dart';
 import '../services/broker_directory.dart';
 import '../models/lead_review.dart';
 import '../services/app_store.dart';
@@ -215,6 +216,9 @@ class LandWorkspaceFilters {
   /// (LeadReviewIndex). Null = any.
   ReviewFilter? reviewStatus;
 
+  /// Land owner types (OwnerProfile keys, OR). Empty = any.
+  final Set<String> ownerTypes;
+
   LandWorkspaceFilters({
     this.status,
     Set<LeadStatus>? statuses,
@@ -237,7 +241,9 @@ class LandWorkspaceFilters {
     this.acresMax,
     this.pendingStatus,
     this.reviewStatus,
+    Set<String>? ownerTypes,
   })  : landTypes = landTypes ?? {},
+        ownerTypes = ownerTypes ?? {},
         statuses = statuses ?? {},
         sources = sources ?? {},
         districts = districts ?? {},
@@ -291,6 +297,7 @@ class LandWorkspaceFilters {
         acresMax: acresMax,
         pendingStatus: pendingStatus,
         reviewStatus: reviewStatus,
+        ownerTypes: {...ownerTypes},
       );
 
   /// Overwrites every filter with [other]'s — one place to keep in sync when a
@@ -334,6 +341,9 @@ class LandWorkspaceFilters {
     acresMax = o.acresMax;
     pendingStatus = o.pendingStatus;
     reviewStatus = o.reviewStatus;
+    ownerTypes
+      ..clear()
+      ..addAll(o.ownerTypes);
   }
 
   void clear() {
@@ -358,6 +368,7 @@ class LandWorkspaceFilters {
     acresMax = null;
     pendingStatus = null;
     reviewStatus = null;
+    ownerTypes.clear();
   }
 
   int get activeCount {
@@ -381,6 +392,7 @@ class LandWorkspaceFilters {
     if (acresMin != null || acresMax != null) n++;
     if (pendingStatus != null && pendingStatus!.isNotEmpty) n++;
     if (reviewStatus != null) n++;
+    n += ownerTypes.length;
     return n;
   }
 
@@ -402,6 +414,10 @@ class LandWorkspaceFilters {
     if (statuses.isNotEmpty && !statuses.contains(lead.status)) return false;
     if (landTypes.isNotEmpty && !landTypes.contains(lead.landType)) return false;
     if (sources.isNotEmpty && !sources.contains(lead.inputSource)) return false;
+    if (ownerTypes.isNotEmpty &&
+        !ownerTypes.contains(lead.ownerOccupation.trim())) {
+      return false;
+    }
     if (highPriority &&
         lead.status != LeadStatus.negotiation &&
         lead.status != LeadStatus.prospectMeetingPending) {
@@ -495,6 +511,15 @@ class LandWorkspaceFilters {
         label: 'Type: ${t.label}',
         onRemove: () {
           landTypes.remove(t);
+          notify();
+        },
+      ));
+    }
+    for (final o in [...ownerTypes]) {
+      chips.add((
+        label: 'Owner: ${OwnerProfile.typeShort(o)}',
+        onRemove: () {
+          ownerTypes.remove(o);
           notify();
         },
       ));
@@ -1038,6 +1063,22 @@ class _LandWorkspaceFilterPanelState extends State<_LandWorkspaceFilterPanel> {
                               }),
                             );
                           }),
+                          const Divider(height: 28),
+                          _sectionTitle('Owner Type'),
+                          const SizedBox(height: 8),
+                          MultiSelectField<String>(
+                            label: 'Owner is a…',
+                            options: [
+                              for (final (v, _) in OwnerProfile.types) v
+                            ],
+                            selected: _draft.ownerTypes,
+                            labelOf: OwnerProfile.typeLabel,
+                            onChanged: (v) => setState(() {
+                              _draft.ownerTypes
+                                ..clear()
+                                ..addAll(v);
+                            }),
+                          ),
                           if (widget.showLeadSource) ...[
                             const Divider(height: 28),
                             _sectionTitle('Lead Source'),

@@ -535,6 +535,21 @@ class LandLeadService {
     }).eq('id', leadId);
   }
 
+  /// Saves the land owner profile (type, where they live, who decides).
+  static Future<void> updateOwnerProfile(
+    String leadId, {
+    required String type,
+    required String lives,
+    required String decision,
+  }) async {
+    await _db.from('land_leads').update({
+      'owner_occupation': type,
+      'owner_lives': lives,
+      'owner_decision': decision,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', leadId);
+  }
+
   static Future<void> updateLocation(
     String leadId, {
     required String location,
@@ -1305,6 +1320,8 @@ class LandLeadService {
       landownerMeetingCompletedAt: parseTs(r['landowner_meeting_completed_at']),
       numOwners: r['num_owners'] as String? ?? '',
       ownerOccupation: r['owner_occupation'] as String? ?? '',
+      ownerLives: r['owner_lives'] as String? ?? '',
+      ownerDecision: r['owner_decision'] as String? ?? '',
       locationRating: r['location_rating'] as String? ?? 'unknown',
       brokerKnowsOwner: r['broker_knows_owner'] as bool?,
       managementMetOwner: r['management_met_owner'] as bool?,
