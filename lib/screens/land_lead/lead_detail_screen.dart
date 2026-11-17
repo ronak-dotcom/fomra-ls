@@ -52,6 +52,7 @@ import '../../widgets/lead_map_controls.dart';
 import '../../widgets/offline_status_banner.dart';
 import '../../widgets/portal_page_layout.dart';
 import '../../widgets/ui/app_components.dart';
+import '../../widgets/owner_profile_widgets.dart';
 import '../../widgets/who_we_met_card.dart';
 import '../../utils/phone_validation.dart';
 import '../market_intelligence/market_intelligence_screen.dart';
@@ -1282,6 +1283,14 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
           leadId: lead.leadId,
           ownerName: lead.ownerName,
           readOnly: viewOnly,
+          lead: lead,
+          onOwnerProfileSaved: (l) {
+            if (!mounted) return;
+            setState(() => lead = lead.copyWith(
+                ownerOccupation: l.ownerOccupation,
+                ownerLives: l.ownerLives,
+                ownerDecision: l.ownerDecision));
+          },
           onMeetingSaved: viewOnly
               ? null
               : () {
@@ -1530,6 +1539,16 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
       ),
     );
 
+    // Owner type / where they live / who decides — asked at the Land Owner
+    // meeting, correctable here.
+    final ownerStrip = OwnerProfileStrip(
+      lead: lead,
+      canEdit: !_viewOnly,
+      onSaved: (l) {
+        if (mounted) setState(() => lead = l);
+      },
+    );
+
     final reviewCard = PropertyReviewCard(
       collapsible: phone,
       latest: _reviews.isEmpty ? null : _reviews.first,
@@ -1612,6 +1631,10 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
                                           summary,
                                           const SizedBox(height: 12),
                                           whoWeMet,
+                                  const SizedBox(height: 12),
+                                  ownerStrip,
+                                          const SizedBox(height: 12),
+                                          ownerStrip,
                                           if (renameBanner != null) ...[
                                             const SizedBox(height: 12),
                                             renameBanner,
@@ -4166,7 +4189,6 @@ class _LeadInfoCards extends StatelessWidget {
         ],
       ),
       if (lead.numOwners.trim().isNotEmpty ||
-          lead.ownerOccupation.trim().isNotEmpty ||
           lead.ownerMeetingLocation.trim().isNotEmpty ||
           lead.locationRating != 'unknown' ||
           lead.brokerKnowsOwner != null ||
@@ -4177,8 +4199,6 @@ class _LeadInfoCards extends StatelessWidget {
           fields: [
             if (lead.numOwners.trim().isNotEmpty)
               _Field('Number of Owners', lead.numOwners.trim()),
-            if (lead.ownerOccupation.trim().isNotEmpty)
-              _Field('Owner Occupation', lead.ownerOccupation.trim()),
             if (lead.ownerMeetingLocation.trim().isNotEmpty)
               _Field('Owner Meeting Location',
                   lead.ownerMeetingLocation.trim()),

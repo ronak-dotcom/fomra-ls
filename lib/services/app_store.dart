@@ -72,6 +72,17 @@ class AppStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Updates just the owner profile of a stored lead (so a concurrent status
+  /// change made from an older copy can't undo it).
+  void patchOwnerProfile(String leadId,
+      {required String type, required String lives, required String decision}) {
+    final idx = leads.indexWhere((l) => l.leadId == leadId);
+    if (idx == -1) return;
+    leads[idx] = leads[idx].copyWith(
+        ownerOccupation: type, ownerLives: lives, ownerDecision: decision);
+    notifyListeners();
+  }
+
   void replaceLead(LandLead updated) {
     final idx = leads.indexWhere((l) => l.leadId == updated.leadId);
     if (idx == -1) {

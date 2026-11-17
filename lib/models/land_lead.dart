@@ -197,7 +197,12 @@ class LandLead {
   final DateTime? landownerMeetingCompletedAt;
 
   final String numOwners;
+  /// Owner type key (see OwnerProfile.types), e.g. 'farmer'.
   final String ownerOccupation;
+
+  /// Where the owner lives / who decides on selling (OwnerProfile keys).
+  final String ownerLives;
+  final String ownerDecision;
   /// unknown / poor / average / good
   final String locationRating;
   final bool? brokerKnowsOwner;
@@ -278,6 +283,8 @@ class LandLead {
     this.landownerMeetingCompletedAt,
     this.numOwners = '',
     this.ownerOccupation = '',
+    this.ownerLives = '',
+    this.ownerDecision = '',
     this.locationRating = 'unknown',
     this.brokerKnowsOwner,
     this.managementMetOwner,
@@ -354,6 +361,8 @@ class LandLead {
     DateTime? landownerMeetingCompletedAt,
     String? numOwners,
     String? ownerOccupation,
+    String? ownerLives,
+    String? ownerDecision,
     String? locationRating,
     bool? brokerKnowsOwner,
     bool? managementMetOwner,
@@ -432,6 +441,8 @@ class LandLead {
             landownerMeetingCompletedAt ?? this.landownerMeetingCompletedAt,
         numOwners: numOwners ?? this.numOwners,
         ownerOccupation: ownerOccupation ?? this.ownerOccupation,
+        ownerLives: ownerLives ?? this.ownerLives,
+        ownerDecision: ownerDecision ?? this.ownerDecision,
         locationRating: locationRating ?? this.locationRating,
         brokerKnowsOwner: brokerKnowsOwner ?? this.brokerKnowsOwner,
         managementMetOwner: managementMetOwner ?? this.managementMetOwner,

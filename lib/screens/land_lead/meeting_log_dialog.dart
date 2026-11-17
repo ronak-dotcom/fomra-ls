@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import '../../widgets/ui/app_components.dart';
 import 'package:flutter/services.dart';
 
+import '../../models/land_lead.dart';
 import '../../models/land_lead_meeting.dart';
+import '../../services/land_lead_service.dart';
+import '../../widgets/owner_profile_widgets.dart';
 import '../../services/app_store.dart';
 import '../../services/land_lead_meeting_service.dart';
 import '../../theme/app_theme.dart';
@@ -18,12 +21,22 @@ class MeetingLogDialog extends StatefulWidget {
   final VoidCallback? onMeetingSaved;
   final bool readOnly;
 
+  /// When given, meeting the Land Owner also asks for the owner profile
+  /// (type required; where they live and who decides optional), prefilled
+  /// from this lead.
+  final LandLead? lead;
+
+  /// Called with the lead's owner profile after it is saved.
+  final ValueChanged<LandLead>? onOwnerProfileSaved;
+
   const MeetingLogDialog({
     super.key,
     required this.leadId,
     this.ownerName = '',
     this.onMeetingSaved,
     this.readOnly = false,
+    this.lead,
+    this.onOwnerProfileSaved,
   });
 
   @override
@@ -41,6 +54,10 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
   final List<_PersonRow> _people = [_PersonRow()];
   static const _maxPeople = 6;
   bool _managementPresent = false;
+  late String _ownerType = widget.lead?.ownerOccupation.trim() ?? '';
+  late String _ownerLives = widget.lead?.ownerLives.trim() ?? '';
+  late String _ownerDecision = widget.lead?.ownerDecision.trim() ?? '';
+  String? _ownerTypeError;
   bool _saving = false;
   String? _formError;
   bool _loading = true;
@@ -104,6 +121,34 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
     );
   }
 
+  /// Whether the form currently says the Land Owner was met (ticked, or a
+  /// person whose relation is the owner).
+  bool get _ownerMet =>
+      _attendeeTypes.contains(MeetingAttendeeTypes.landOwner) ||
+      _people.any((p) =>
+          (p.relation ?? '').isNotEmpty &&
+          PersonMet.attendeeTypeFor(p.relation!) ==
+              MeetingAttendeeTypes.landOwner);
+
+  bool get _asksOwnerProfile => widget.lead != null && _ownerMet;
+
+  Future<void> _saveOwnerProfile() async {
+    final lead = widget.lead!;
+    if (_ownerType == lead.ownerOccupation.trim() &&
+        _ownerLives == lead.ownerLives.trim() &&
+        _ownerDecision == lead.ownerDecision.trim()) {
+      return;
+    }
+    await LandLeadService.updateOwnerProfile(lead.leadId,
+        type: _ownerType, lives: _ownerLives, decision: _ownerDecision);
+    AppStore.instance.patchOwnerProfile(lead.leadId,
+        type: _ownerType, lives: _ownerLives, decision: _ownerDecision);
+    widget.onOwnerProfileSaved?.call(lead.copyWith(
+        ownerOccupation: _ownerType,
+        ownerLives: _ownerLives,
+        ownerDecision: _ownerDecision));
+  }
+
   Future<void> _save() async {
     final duration = _durationCtrl.text.trim();
     if (duration.isEmpty) {
@@ -129,10 +174,18 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
       ..._attendeeTypes,
       for (final p in people) PersonMet.attendeeTypeFor(p.relation),
     };
+    if (_asksOwnerProfile && _ownerType.isEmpty) {
+      setState(() {
+        _ownerTypeError = 'Select what the land owner does';
+        _formError = 'Fill the owner profile — what the owner does';
+      });
+      return;
+    }
     if (_saving) return;
 
     setState(() {
       _formError = null;
+      _ownerTypeError = null;
       _saving = true;
     });
     try {
@@ -145,6 +198,16 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
         managementPresent: _managementPresent,
         peopleMet: people,
       );
+      if (_asksOwnerProfile) {
+        try {
+          await _saveOwnerProfile();
+        } catch (e) {
+          if (mounted) {
+            AppFeedback.error(
+                context, 'Meeting saved, but the owner profile was not: $e');
+          }
+        }
+      }
       if (!mounted) return;
       widget.onMeetingSaved?.call();
       AppFeedback.success(context, 'Meeting logged');
@@ -343,6 +406,42 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
               ),
           ],
         ),
+        if (_asksOwnerProfile) ...[
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.gold.withValues(alpha: 0.07),
+              borderRadius: BorderRadius.circular(12),
+              border:
+                  Border.all(color: AppColors.gold.withValues(alpha: 0.35)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Owner profile',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w800,
+                      color: context.fomraTextPrimary,
+                    )),
+                const SizedBox(height: 8),
+                OwnerProfileFields(
+                  type: _ownerType,
+                  lives: _ownerLives,
+                  decision: _ownerDecision,
+                  typeError: _ownerTypeError,
+                  onType: (v) => setState(() {
+                    _ownerType = v;
+                    _ownerTypeError = null;
+                  }),
+                  onLives: (v) => setState(() => _ownerLives = v),
+                  onDecision: (v) => setState(() => _ownerDecision = v),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 8),
         CheckboxListTile(
           value: _managementPresent,
