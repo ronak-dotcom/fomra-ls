@@ -1,28 +1,40 @@
-/// User-editable drop reason catalog item.
+/// A drop reason, managed by management in Settings (lead_drop_reasons).
+/// Hidden reasons ([active] false) are no longer offered when dropping a
+/// lead, but leads already dropped for them keep showing them.
 class LeadDropReason {
   final String id;
   final String label;
+  final bool active;
 
-  const LeadDropReason({required this.id, required this.label});
+  const LeadDropReason({
+    required this.id,
+    required this.label,
+    this.active = true,
+  });
 
-  Map<String, dynamic> toJson() => {'id': id, 'label': label};
+  Map<String, dynamic> toJson() => {'id': id, 'label': label, 'active': active};
 
   factory LeadDropReason.fromJson(Map<String, dynamic> json) => LeadDropReason(
         id: json['id']?.toString() ?? '',
         label: json['label']?.toString() ?? '',
+        active: json['active'] as bool? ?? true,
       );
 
-  LeadDropReason copyWith({String? label}) => LeadDropReason(
+  LeadDropReason copyWith({String? label, bool? active}) => LeadDropReason(
         id: id,
         label: label ?? this.label,
+        active: active ?? this.active,
       );
 
   @override
   bool operator ==(Object other) =>
-      other is LeadDropReason && other.id == id && other.label == label;
+      other is LeadDropReason &&
+      other.id == id &&
+      other.label == label &&
+      other.active == active;
 
   @override
-  int get hashCode => Object.hash(id, label);
+  int get hashCode => Object.hash(id, label, active);
 }
 
 const defaultLeadDropReasons = <LeadDropReason>[

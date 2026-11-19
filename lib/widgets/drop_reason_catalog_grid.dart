@@ -25,7 +25,14 @@ class DropReasonCatalogGrid extends StatefulWidget {
   /// already uses.
   final void Function(int oldIndex, int newIndex) onReorder;
   final void Function(LeadDropReason reason) onEdit;
+
+  /// Hides the reason from new drops (leads already dropped keep it).
   final void Function(LeadDropReason reason) onDelete;
+
+  /// Dropped leads using the reason; when given, shown on the card instead
+  /// of the internal id, and tapping it calls [onOpenLeads].
+  final int Function(LeadDropReason reason)? countOf;
+  final void Function(LeadDropReason reason)? onOpenLeads;
 
   const DropReasonCatalogGrid({
     super.key,
@@ -33,6 +40,8 @@ class DropReasonCatalogGrid extends StatefulWidget {
     required this.onReorder,
     required this.onEdit,
     required this.onDelete,
+    this.countOf,
+    this.onOpenLeads,
   });
 
   static const _gap = 14.0;
@@ -82,6 +91,10 @@ class _DropReasonCatalogGridState extends State<DropReasonCatalogGrid> {
                     isDragging: _draggingIndex == i,
                     onEdit: () => widget.onEdit(widget.reasons[i]),
                     onDelete: () => widget.onDelete(widget.reasons[i]),
+                    count: widget.countOf?.call(widget.reasons[i]),
+                    onOpenLeads: widget.onOpenLeads == null
+                        ? null
+                        : () => widget.onOpenLeads!(widget.reasons[i]),
                     onDragStarted: () => setState(() => _draggingIndex = i),
                     onDragEnded: () => setState(() => _draggingIndex = null),
                   ),
@@ -102,6 +115,8 @@ class _ReasonCard extends StatefulWidget {
   final bool isDragging;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final int? count;
+  final VoidCallback? onOpenLeads;
   final VoidCallback onDragStarted;
   final VoidCallback onDragEnded;
 
@@ -114,6 +129,8 @@ class _ReasonCard extends StatefulWidget {
     required this.isDragging,
     required this.onEdit,
     required this.onDelete,
+    this.count,
+    this.onOpenLeads,
     required this.onDragStarted,
     required this.onDragEnded,
   });
@@ -215,7 +232,10 @@ class _ReasonCardState extends State<_ReasonCard> {
           const SizedBox(height: 10),
           Row(
             children: [
-              Flexible(child: _slugChip(context)),
+              Flexible(
+                  child: widget.count == null
+                      ? _slugChip(context)
+                      : _countChip(context, widget.count!)),
               const Spacer(),
               _action(
                 context,
@@ -225,8 +245,8 @@ class _ReasonCardState extends State<_ReasonCard> {
               ),
               _action(
                 context,
-                icon: Icons.delete_outline_rounded,
-                tooltip: 'Delete',
+                icon: Icons.visibility_off_outlined,
+                tooltip: 'Hide from new drops',
                 color: AppColors.error,
                 onTap: widget.onDelete,
               ),
@@ -234,6 +254,39 @@ class _ReasonCardState extends State<_ReasonCard> {
           ),
         ],
       ),
+    );
+  }
+
+  /// "31 leads" — dropped leads with this reason; tap to open them.
+  Widget _countChip(BuildContext context, int count) {
+    final chip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: count == 0
+            ? context.fomraSurfaceVar
+            : AppColors.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+            color: count == 0
+                ? context.fomraBorder
+                : AppColors.error.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        count == 1 ? '1 dropped lead' : '$count dropped leads',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w700,
+          color: count == 0 ? context.fomraTextTertiary : AppColors.error,
+        ),
+      ),
+    );
+    if (count == 0 || widget.onOpenLeads == null) return chip;
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: widget.onOpenLeads,
+      child: chip,
     );
   }
 

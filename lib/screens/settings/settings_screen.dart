@@ -4,7 +4,10 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../../models/land_lead.dart';
 import '../../models/lead_drop_reason.dart';
+import '../../services/app_store.dart';
+import '../land_lead/filtered_leads_screen.dart';
 import '../../services/auth_service.dart';
 import '../../services/lead_drop_reason_catalog_service.dart';
 import '../../widgets/drop_reason_catalog_grid.dart';
@@ -306,15 +309,48 @@ class _DroppedReasonsPageState extends State<_DroppedReasonsPage> {
   void initState() {
     super.initState();
     _catalog.addListener(_rebuild);
+    AppStore.instance.addListener(_rebuild);
+    _catalog.load(force: true);
   }
 
   @override
   void dispose() {
     _catalog.removeListener(_rebuild);
+    AppStore.instance.removeListener(_rebuild);
     super.dispose();
   }
 
-  void _rebuild() => setState(() {});
+  void _rebuild() {
+    if (mounted) setState(() {});
+  }
+
+  /// Dropped leads per reason id (old labels matched to their reason).
+  Map<String, List<LandLead>> get _droppedByReason {
+    final map = <String, List<LandLead>>{};
+    for (final l in AppStore.instance.leads) {
+      if (l.status != LeadStatus.dropped) continue;
+      final r = _catalog.findByRaw(l.dropReason);
+      if (r != null) (map[r.id] ??= []).add(l);
+    }
+    return map;
+  }
+
+  /// Runs a list change, telling the user if the database refused it.
+  Future<void> _save(Future<void> Function() change, String done) async {
+    try {
+      await change();
+      if (mounted) AppFeedback.success(context, done);
+    } catch (e) {
+      if (mounted) {
+        AppFeedback.error(
+            context,
+            e is StateError
+                ? e.message
+                : 'Could not save — only management can change drop reasons. '
+                    '($e)');
+      }
+    }
+  }
 
   Future<void> _editReason({LeadDropReason? reason}) async {
     final controller = TextEditingController(text: reason?.label ?? '');
@@ -345,23 +381,25 @@ class _DroppedReasonsPageState extends State<_DroppedReasonsPage> {
     );
     if (saved == null || saved.trim().isEmpty) return;
     if (reason == null) {
-      await _catalog.addReason(saved);
+      await _save(() => _catalog.addReason(saved),
+          'Added "$saved" — it now shows for everyone when dropping a lead');
     } else {
-      await _catalog.updateReason(reason.id, saved);
+      await _save(() => _catalog.updateReason(reason.id, saved),
+          'Renamed to "$saved"');
     }
   }
 
-  /// Delete used to sit behind a two-step popup menu; on a card it's a single
-  /// tap, so confirm before removing a reason leads may already reference.
-  Future<void> _confirmDelete(LeadDropReason reason) async {
+  /// Hides a reason from the drop form; leads already dropped keep it.
+  Future<void> _confirmHide(LeadDropReason reason) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete drop reason?'),
+        title: const Text('Hide this drop reason?'),
         content: Text(
           '"${reason.label}" will no longer be offered when dropping a lead. '
-          'Leads already dropped for this reason keep it on their record.',
+          'Leads already dropped for this reason keep it, and you can show '
+          'it again any time.',
         ),
         actions: [
           TextButton(
@@ -371,17 +409,33 @@ class _DroppedReasonsPageState extends State<_DroppedReasonsPage> {
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('Delete'),
+            child: const Text('Hide'),
           ),
         ],
       ),
     );
-    if (confirmed == true) await _catalog.deleteReason(reason.id);
+    if (confirmed == true) {
+      await _save(() => _catalog.setActive(reason.id, false),
+          '"${reason.label}" hidden from new drops');
+    }
+  }
+
+  void _openLeads(LeadDropReason reason) {
+    final leads = _droppedByReason[reason.id] ?? const <LandLead>[];
+    if (leads.isEmpty) return;
+    FilteredLeadsScreen.openList(
+      context,
+      title: 'Dropped · ${reason.label}',
+      subtitle: '${leads.length} lead${leads.length == 1 ? '' : 's'}',
+      leads: leads,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final reasons = _catalog.current;
+    final hidden = _catalog.all.where((r) => !r.active).toList();
+    final counts = _droppedByReason;
     return FomraAppShell(
       currentRoute: '/settings',
       appBar: FomraSubPageAppBar(
@@ -394,7 +448,9 @@ class _DroppedReasonsPageState extends State<_DroppedReasonsPage> {
         children: [
           SectionHeader(
             title: 'Dropped Reasons',
-            subtitle: 'Add, edit, delete, and reorder the drop catalog used everywhere.',
+            subtitle: 'The reasons everyone picks from when dropping a lead. '
+                'Add, rename, drag to reorder, or hide one — changes show on '
+                'every phone straight away.',
             icon: Icons.cancel_schedule_send_outlined,
             trailing: TextButton.icon(
               onPressed: () => _editReason(),
@@ -405,10 +461,45 @@ class _DroppedReasonsPageState extends State<_DroppedReasonsPage> {
           const SizedBox(height: 16),
           DropReasonCatalogGrid(
             reasons: reasons,
-            onReorder: _catalog.reorder,
+            onReorder: (from, to) =>
+                _save(() => _catalog.reorder(from, to), 'Order saved'),
             onEdit: (reason) => _editReason(reason: reason),
-            onDelete: _confirmDelete,
+            onDelete: _confirmHide,
+            countOf: (r) => counts[r.id]?.length ?? 0,
+            onOpenLeads: _openLeads,
           ),
+          if (hidden.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Text(
+              'HIDDEN — not offered when dropping a lead',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.6,
+                color: context.fomraTextTertiary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            for (final r in hidden)
+              Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  leading: const Icon(Icons.visibility_off_outlined),
+                  title: Text(r.label),
+                  subtitle: Text(
+                      '${counts[r.id]?.length ?? 0} dropped lead(s) keep it'),
+                  onTap: (counts[r.id]?.isNotEmpty ?? false)
+                      ? () => _openLeads(r)
+                      : null,
+                  trailing: TextButton.icon(
+                    onPressed: () => _save(() => _catalog.setActive(r.id, true),
+                        '"${r.label}" offered again'),
+                    icon: const Icon(Icons.visibility_outlined, size: 18),
+                    label: const Text('Show again'),
+                  ),
+                ),
+              ),
+          ],
         ],
       ),
     );

@@ -31,6 +31,13 @@ class LeadDropReasonDialog extends StatefulWidget {
 }
 
 class _LeadDropReasonDialogState extends State<LeadDropReasonDialog> {
+  @override
+  void initState() {
+    super.initState();
+    // Pick up reasons management added since the app opened.
+    LeadDropReasonCatalogService.instance.load(force: true);
+  }
+
   LeadDropReason? _reason;
   final _notesCtrl = TextEditingController();
 
