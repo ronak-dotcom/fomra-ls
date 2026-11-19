@@ -46,7 +46,9 @@ void main() {
         ),
       ),
     ));
-    expect(find.text('All clear'), findsWidgets); // no approvals
+    // Zero lines share one "All clear" line instead of a box each.
+    expect(find.text('Approvals waiting on you'), findsNothing);
+    expect(find.text('All clear: approvals · reviews'), findsOneWidget);
     Text countOf(String title) => t.widget<Text>(find.descendant(
         of: find.ancestor(of: find.text(title), matching: find.byType(Row)).first,
         matching: find.byWidgetPredicate(
@@ -56,6 +58,25 @@ void main() {
     expect(countOf('Open over 90 days').data, '2');
     expect(countOf('In legal').data, '1');
     expect(countOf('No next step planned').data, '1');
+  });
+
+  testWidgets('All clear when nothing is waiting', (t) async {
+    await t.pumpWidget(const MaterialApp(
+      home: Scaffold(
+        body: AttentionList(items: [
+          AttentionItem(
+            icon: Icons.gavel_rounded,
+            color: Colors.purple,
+            title: 'In legal',
+            subtitle: '',
+            count: 0,
+            clearLabel: 'legal',
+          ),
+        ]),
+      ),
+    ));
+    expect(find.text('In legal'), findsNothing);
+    expect(find.text('All clear — nothing is waiting right now'), findsOneWidget);
   });
 
   testWidgets('Property pipeline: stages with acres, on hold / dropped',

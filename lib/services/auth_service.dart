@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../utils/name_case.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/employee_profile.dart';
 import '../models/user.dart';
@@ -85,7 +86,7 @@ class AuthService {
       return AppUser(
         id: imp.email,
         email: imp.email,
-        fullName: imp.fullName,
+        fullName: capWords(imp.fullName),
         role: 'employee',
         createdAt: imp.joinedOn,
       );
@@ -96,9 +97,9 @@ class AuthService {
       return AppUser(
         id: u.id,
         email: email,
-        fullName: _loginDisplayName ??
+        fullName: capWords(_loginDisplayName ??
             u.userMetadata?['full_name'] as String? ??
-            _defaultNameForEmail(email),
+            _defaultNameForEmail(email)),
         phone: u.userMetadata?['phone'] as String?,
         role: u.userMetadata?['role'] as String? ??
             (_portal == LoginPortal.management ? 'management' : 'employee'),
@@ -110,7 +111,7 @@ class AuthService {
       return AppUser(
         id: 'local-${_portal!.name}',
         email: email,
-        fullName: _loginDisplayName ?? _defaultNameForEmail(email),
+        fullName: capWords(_loginDisplayName ?? _defaultNameForEmail(email)),
         role: _portal == LoginPortal.management ? 'management' : 'employee',
         createdAt: DateTime.now(),
       );

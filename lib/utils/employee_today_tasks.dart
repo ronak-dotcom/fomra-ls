@@ -53,7 +53,7 @@ List<EmployeeTodayTaskItem> buildEmployeeTodayTasks({
   required List<Task> tasks,
   DateTime? now,
 }) {
-  final me = employeeName.trim();
+  final me = employeeName.trim().toLowerCase();
   if (me.isEmpty) return [];
 
   final clock = (now ?? DateTime.now()).toLocal();
@@ -73,7 +73,8 @@ List<EmployeeTodayTaskItem> buildEmployeeTodayTasks({
   }
 
   final myActiveLeads = leads
-      .where((l) => l.createdByName.trim() == me && l.status.isActive)
+      .where((l) =>
+          l.createdByName.trim().toLowerCase() == me && l.status.isActive)
       .toList();
 
   final items = <EmployeeTodayTaskItem>[];

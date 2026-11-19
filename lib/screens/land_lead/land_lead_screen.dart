@@ -205,7 +205,8 @@ class _LandLeadScreenState extends State<LandLeadScreen> {
   void _assignLeadsTo(List<String> leadIds, String name) {
     final all = AppStore.instance.leads;
     final employee = AppStore.instance.employees
-        .where((e) => e.fullName.trim() == name.trim())
+        .where((e) =>
+            e.fullName.trim().toLowerCase() == name.trim().toLowerCase())
         .cast<EmployeeProfile?>()
         .firstOrNull;
     for (final id in leadIds) {

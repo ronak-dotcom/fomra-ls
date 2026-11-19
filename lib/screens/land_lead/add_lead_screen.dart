@@ -27,6 +27,7 @@ import '../../services/offline_sync_service.dart';
 import '../../services/api_client.dart';
 import '../../utils/image_compressor.dart';
 import '../../utils/lead_location_parser.dart';
+import '../../utils/name_case.dart';
 import '../../utils/phone_validation.dart';
 import '../../utils/reverse_geocode.dart';
 import '../../utils/tngis_parcel_lookup.dart';
@@ -1182,15 +1183,23 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
     final landExtent = extentValue.isEmpty
         ? ''
         : (_extentUnit == null ? extentValue : '$extentValue ${_extentUnit!.label}');
+    final savedOwnerNames = {
+      for (final o in existing?.additionalOwners ?? const <OwnerContact>[])
+        o.name.trim(),
+    };
     final additionalOwners = _owners
         .skip(1)
         .where((o) =>
             o.nameCtrl.text.trim().isNotEmpty ||
             o.contactCtrl.text.trim().isNotEmpty)
-        .map((o) => OwnerContact(
-              name: o.nameCtrl.text.trim(),
-              contact: o.contactCtrl.text.trim(),
-            ))
+        .map((o) {
+          final name = o.nameCtrl.text.trim();
+          return OwnerContact(
+            // Untouched saved names stay exactly as they are.
+            name: savedOwnerNames.contains(name) ? name : capWords(name),
+            contact: o.contactCtrl.text.trim(),
+          );
+        })
         .toList();
     final additionalSurveyNumbers = _extraSurveys
         .where((s) =>
@@ -1204,18 +1213,21 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
     final lead = LandLead(
       leadId: existing?.leadId ?? '',
       inputSource: _inputSource!,
-      location: _locationCtrl.text.trim(),
+      location: capWordsIfChanged(_locationCtrl.text.trim(), existing?.location),
       gpsCoordinates: gpsStorage,
-      village: _villageCtrl.text.trim(),
-      taluk: _talukCtrl.text.trim(),
-      district: _districtCtrl.text.trim(),
+      village: capWordsIfChanged(_villageCtrl.text.trim(), existing?.village),
+      taluk: capWordsIfChanged(_talukCtrl.text.trim(), existing?.taluk),
+      district: capWordsIfChanged(_districtCtrl.text.trim(), existing?.district),
       pincode: _pincodeCtrl.text.trim(),
       surveyNumber: _surveyCtrl.text.trim(),
       subDivision: _subDivCtrl.text.trim(),
       additionalSurveyNumbers: additionalSurveyNumbers,
       landExtent: landExtent,
-      ownerName: _owners[0].nameCtrl.text.trim(),
-      leadName: existing == null ? _leadNameCtrl.text.trim() : existing.leadName,
+      ownerName: capWordsIfChanged(
+          _owners[0].nameCtrl.text.trim(), existing?.ownerName),
+      leadName: existing == null
+          ? capWords(_leadNameCtrl.text.trim())
+          : existing.leadName,
       leadNameLocked: existing == null
           ? _leadNameCtrl.text.trim().isNotEmpty
           : existing.leadNameLocked,
@@ -1225,10 +1237,13 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
           ? (_contactRelation ?? '')
           : '',
       additionalOwners: additionalOwners,
-      brokerName: _isBrokerSource ? _brokerNameCtrl.text.trim() : '',
+      brokerName: _isBrokerSource
+          ? capWordsIfChanged(_brokerNameCtrl.text.trim(), existing?.brokerName)
+          : '',
       brokerContact: _isBrokerSource ? _brokerContactCtrl.text.trim() : '',
       sourceContactName: (_needsSourceContact && !_isBrokerSource)
-          ? _sourceContactNameCtrl.text.trim()
+          ? capWordsIfChanged(_sourceContactNameCtrl.text.trim(),
+              existing?.sourceContactName)
           : '',
       sourceContactNumber: (_needsSourceContact && !_isBrokerSource)
           ? _sourceContactNumberCtrl.text.trim()
@@ -1423,6 +1438,7 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
                                     key: ValueKey('source-name-$_inputSource'),
                                     ctrl: _activeSourceNameCtrl,
                                     label: _sourceContactNameLabel,
+                                    textCapitalization: TextCapitalization.words,
                                     hint: 'Full name',
                                     icon: Icons.person_outline_rounded,
                                     required: true,
@@ -1478,6 +1494,7 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
                                 _Field(
                                   ctrl: _leadNameCtrl,
                                   label: 'Lead Name',
+                                  textCapitalization: TextCapitalization.words,
                                   hint: 'e.g. Kottamedu 2.15 acres',
                                   icon: Icons.badge_outlined,
                                 ),
@@ -1645,6 +1662,7 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
                               _Field(
                                 ctrl: _locationCtrl,
                                 label: 'Location',
+                                textCapitalization: TextCapitalization.words,
                                 hint: _locationMode == _LocationMode.live
                                     ? 'Auto-filled after capture'
                                     : 'Pin on map or type manually',
@@ -1657,12 +1675,14 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
                                 _Field(
                                   ctrl: _villageCtrl,
                                   label: 'Village',
+                                  textCapitalization: TextCapitalization.words,
                                   hint: 'Village name',
                                   icon: Icons.home_outlined,
                                 ),
                                 _Field(
                                   ctrl: _talukCtrl,
                                   label: 'Taluk',
+                                  textCapitalization: TextCapitalization.words,
                                   hint: 'Taluk',
                                   icon: Icons.account_balance_outlined,
                                 ),
@@ -1673,6 +1693,7 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
                                 _Field(
                                   ctrl: _districtCtrl,
                                   label: 'District',
+                                  textCapitalization: TextCapitalization.words,
                                   hint: 'e.g. Bangalore Rural',
                                   icon: Icons.map_outlined,
                                 ),
@@ -2111,6 +2132,7 @@ class _Field extends StatelessWidget {
   final int maxLines;
   final int? maxLength;
   final TextInputType keyboardType;
+  final TextCapitalization textCapitalization;
   final List<TextInputFormatter>? inputFormatters;
   final bool light;
   final bool readOnly;
@@ -2127,6 +2149,7 @@ class _Field extends StatelessWidget {
     required this.icon,
     this.required = false,
     this.keyboardType = TextInputType.text,
+    this.textCapitalization = TextCapitalization.none,
     this.inputFormatters,
     this.readOnly = false,
     this.validator,
@@ -2149,6 +2172,7 @@ class _Field extends StatelessWidget {
       maxLines: maxLines,
       maxLength: maxLength,
       keyboardType: keyboardType,
+      textCapitalization: textCapitalization,
       inputFormatters: inputFormatters,
       readOnly: readOnly,
       onFieldSubmitted: onFieldSubmitted,
@@ -2560,6 +2584,7 @@ class _OwnerFields extends StatelessWidget {
       _Field(
         ctrl: entry.nameCtrl,
         label: index == 0 ? 'Owner Name' : 'Owner ${index + 1} Name',
+        textCapitalization: TextCapitalization.words,
         hint: 'Full name of the land owner',
         icon: Icons.person_outline_rounded,
       ),

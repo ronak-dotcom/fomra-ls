@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fomra_ls/analytics/monthly_target_progress.dart';
 import 'package:fomra_ls/analytics/team_performance.dart';
 import 'package:fomra_ls/models/land_lead.dart';
 import 'package:fomra_ls/models/land_lead_meeting.dart';
@@ -147,5 +148,55 @@ void main() {
     expect(find.text('Devaraj'), findsOneWidget);
     expect(find.text('Saurabh'), findsNothing);
     expect(find.textContaining('#'), findsNothing);
+  });
+
+  testWidgets('team on a phone: compact block with targets', (t) async {
+    t.view.physicalSize = const Size(400, 900);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: TeamPerformanceCard(
+              leads: _leads, meetings: _meetings, targets: _targets, now: _now),
+        ),
+      ),
+    ));
+    // Three numbers side by side per person, not one line each.
+    expect(find.text('Self mtgs'), findsWidgets);
+    expect(find.text('Self meetings'), findsNothing);
+  });
+
+  testWidgets('My month: extra target lines and a note', (t) async {
+    t.view.physicalSize = const Size(400, 1200);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: TeamPerformanceCard(
+            leads: _leads,
+            meetings: _meetings,
+            targets: _targets,
+            now: _now,
+            onlyExecutive: 'Devaraj',
+            extraLines: [
+              (
+                'Broker meetings',
+                TargetLine(
+                    MonthlyTargetProgress.forMonth(
+                        target: 20, now: _now, completedOn: [_now]),
+                    const []),
+              ),
+            ],
+            note: const Text('No target set for November.'),
+          ),
+        ),
+      ),
+    ));
+    expect(find.text('Self meetings'), findsOneWidget); // full lines
+    expect(find.text('Broker meetings'), findsOneWidget);
+    expect(find.text('1 / 20', findRichText: true), findsOneWidget);
+    expect(find.text('No target set for November.'), findsOneWidget);
   });
 }
