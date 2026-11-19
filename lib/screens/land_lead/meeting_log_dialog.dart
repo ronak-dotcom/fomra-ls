@@ -17,6 +17,7 @@ import '../../widgets/log_dialog_tabs.dart';
 import '../../widgets/separate_date_time_fields.dart';
 import '../../widgets/ui/app_feedback.dart';
 import '../../widgets/ui/dialog_error_banner.dart';
+import '../../widgets/dictation_bar.dart';
 
 class MeetingLogDialog extends StatefulWidget {
   final String leadId;
@@ -534,14 +535,16 @@ class _MeetingLogDialogState extends State<MeetingLogDialog> {
         TextField(
           controller: _notesCtrl,
           minLines: 3,
-          maxLines: 5,
-          maxLength: 500,
+          maxLines: 10,
+          maxLength: kNotesMaxLength,
+          textCapitalization: TextCapitalization.sentences,
           decoration: _fieldDecoration(
             context,
             'Meeting notes (optional)',
-            hint: 'What was discussed?',
+            hint: 'What was discussed? Type or tap the mic and speak',
           ).copyWith(alignLabelWithHint: true),
         ),
+        DictationBar(controller: _notesCtrl),
       ],
     );
   }

@@ -9,6 +9,7 @@ import '../../theme/fomra_theme_context.dart';
 import '../../widgets/log_dialog_tabs.dart';
 import '../../widgets/ui/app_feedback.dart';
 import '../../widgets/ui/dialog_error_banner.dart';
+import '../../widgets/dictation_bar.dart';
 
 class NotesLogDialog extends StatefulWidget {
   final LandLead lead;
@@ -248,16 +249,23 @@ class _NotesLogDialogState extends State<NotesLogDialog> {
   }
 
   Widget _buildNewForm(BuildContext context) {
-    return TextField(
-      controller: _noteCtrl,
-      minLines: 4,
-      maxLines: 8,
-      maxLength: 500,
-      decoration: _fieldDecoration(
-        context,
-        'Your note',
-        hint: 'Type your note here…',
-      ).copyWith(alignLabelWithHint: true),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _noteCtrl,
+          minLines: 4,
+          maxLines: 12,
+          maxLength: kNotesMaxLength,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: _fieldDecoration(
+            context,
+            'Your note',
+            hint: 'Type or tap the mic and speak…',
+          ).copyWith(alignLabelWithHint: true),
+        ),
+        DictationBar(controller: _noteCtrl),
+      ],
     );
   }
 
