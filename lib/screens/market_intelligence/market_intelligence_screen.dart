@@ -783,13 +783,14 @@ class _MarketIntelligenceScreenState extends State<MarketIntelligenceScreen> {
       }
     });
 
+    // A lead's score is saved once loaded (and filled in the background for
+    // every lead with GPS), so it shows instantly and doesn't depend on the
+    // public map servers being free.
+    final leadId = widget.lead?.leadId;
     try {
       final roadFt = parseRoadWidthFt(widget.lead?.roadWidth ?? '') ??
           double.tryParse(_roadWidthCtrl.text);
 
-      // A lead's score is saved once loaded, so it shows instantly next time
-      // and doesn't depend on the public map servers being free.
-      final leadId = widget.lead?.leadId;
       Map<String, dynamic>? data = leadId == null
           ? null
           : await InfraScoreStore.load(
@@ -847,10 +848,17 @@ class _MarketIntelligenceScreenState extends State<MarketIntelligenceScreen> {
       });
     } on ApiException catch (e) {
       if (!mounted || fetchSeq != _poiFetchSeq) return;
+      if (e.statusCode >= 502 && e.statusCode <= 504) {
+        setState(() => _poiError = _mapServersBusy(leadId != null));
+        return;
+      }
       final hint = e.statusCode == 404
           ? ' Restart the backend (npm start in backend/) and hard-refresh the page.'
           : '';
       setState(() => _poiError = 'Infrastructure fetch failed: ${e.message}.$hint');
+    } on TimeoutException {
+      if (!mounted || fetchSeq != _poiFetchSeq) return;
+      setState(() => _poiError = _mapServersBusy(leadId != null));
     } catch (e) {
       if (!mounted || fetchSeq != _poiFetchSeq) return;
       setState(() => _poiError =
@@ -862,6 +870,12 @@ class _MarketIntelligenceScreenState extends State<MarketIntelligenceScreen> {
       }
     }
   }
+
+  /// When the free public map servers don't answer in time.
+  static String _mapServersBusy(bool forLead) => forLead
+      ? 'The map data servers are busy right now. This land\'s score is being '
+          'prepared in the background — open it again in a little while.'
+      : 'The map data servers are busy right now — try again in a minute.';
 
   Map<String, double> get _infraScores =>
       _poisCollected ? _infraScoreMap : {};

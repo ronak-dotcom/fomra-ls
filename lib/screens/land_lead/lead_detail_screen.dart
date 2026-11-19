@@ -343,7 +343,11 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
     final at = parseLeadGps(lead.gpsCoordinates);
     if (at == null) return;
     try {
-      final nearby = await NearbyFeaturesService.fetch(at);
+      final nearby = await NearbyFeaturesService.fetch(
+        at,
+        leadId: lead.leadId,
+        roadWidthFt: parseRoadWidthFt(lead.roadWidth),
+      );
       if (!mounted) return;
       final merged = LeadAutoNotes.mergeInto(
         lead.notes,
