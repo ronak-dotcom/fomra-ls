@@ -62,7 +62,7 @@ void main() {
     expect(_columns(tester), 1);
   });
 
-  testWidgets('each card shows title, slug, edit, delete and a drag handle',
+  testWidgets('each card shows title, slug, edit, hide and a drag handle',
       (tester) async {
     await _pumpAt(tester, 1200);
 
@@ -70,7 +70,7 @@ void main() {
     expect(find.text('a'), findsOneWidget); // slug
     expect(find.byIcon(Icons.label_off_outlined), findsNWidgets(3));
     expect(find.byIcon(Icons.edit_outlined), findsNWidgets(3));
-    expect(find.byIcon(Icons.delete_outline_rounded), findsNWidgets(3));
+    expect(find.byIcon(Icons.visibility_off_outlined), findsNWidgets(3));
     expect(find.byIcon(Icons.drag_indicator_rounded), findsNWidgets(3));
   });
 }
