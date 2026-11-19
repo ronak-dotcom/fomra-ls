@@ -164,6 +164,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
                           controller: _nameCtrl,
                           label: 'Employee Name',
                           icon: Icons.person_outline,
+                          capitalization: TextCapitalization.words,
                           required: true,
                         ),
                         const SizedBox(height: 16),
@@ -264,12 +265,14 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
     required String label,
     required IconData icon,
     TextInputType? keyboard,
+    TextCapitalization capitalization = TextCapitalization.none,
     bool required = false,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboard,
+      textCapitalization: capitalization,
       validator: validator ??
           (required
               ? (v) =>

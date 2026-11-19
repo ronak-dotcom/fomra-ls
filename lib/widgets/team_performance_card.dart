@@ -23,6 +23,13 @@ class TeamPerformanceCard extends StatefulWidget {
   final List<LandLead> leads;
   final String? onlyExecutive;
 
+  /// More target lines under a single person's row (e.g. broker targets),
+  /// as (label, line).
+  final List<(String, TargetLine)> extraLines;
+
+  /// Shown under the rows, e.g. "No target set for November".
+  final Widget? note;
+
   /// Tests: data and clock. When [meetings] / [targets] are given nothing is
   /// loaded.
   final List<LandLeadMeeting>? meetings;
@@ -33,6 +40,8 @@ class TeamPerformanceCard extends StatefulWidget {
     super.key,
     required this.leads,
     this.onlyExecutive,
+    this.extraLines = const [],
+    this.note,
     this.meetings,
     this.targets,
     this.now,
@@ -99,12 +108,19 @@ class _TeamPerformanceCardState extends State<TeamPerformanceCard> {
       now: widget.now,
     ).where((r) => only == null || r.executive.toLowerCase() == only).toList();
     if (rows.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Text(
-          'No site visits or targets this month yet.',
-          style: TextStyle(fontSize: 13.5, color: context.fomraTextSecondary),
-        ),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'No site visits or targets this month yet.',
+              style:
+                  TextStyle(fontSize: 13.5, color: context.fomraTextSecondary),
+            ),
+          ),
+          if (widget.note != null) widget.note!,
+        ],
       );
     }
     final showRank = rows.length > 1;
@@ -116,6 +132,18 @@ class _TeamPerformanceCardState extends State<TeamPerformanceCard> {
           if (wide) _header(context) else if (showRank) _teamLine(rows),
           for (final r in rows)
             wide ? _wideRow(r, showRank) : _phoneRow(r, showRank),
+          if (!showRank && widget.extraLines.isNotEmpty)
+            Padding(
+              padding: EdgeInsets.fromLTRB(wide ? 40 : 14, 4, wide ? 28 : 14, 0),
+              child: Column(children: [
+                for (final (label, line) in widget.extraLines)
+                  _phoneLine(rows.first, label, line),
+              ]),
+            ),
+          if (widget.note != null) ...[
+            const SizedBox(height: 10),
+            widget.note!,
+          ],
           const SizedBox(height: 10),
           Text(
             '${showRank ? 'Ranked by site visits this month (new Lead IDs). ' : ''}'
@@ -295,10 +323,27 @@ class _TeamPerformanceCardState extends State<TeamPerformanceCard> {
                 stat('TODAY', r.today, AppColors.success, 'Today'),
                 stat('WEEK', r.week, AppColors.info, 'This week'),
               ]),
-              _phoneLine(r, 'Site visits', r.siteVisits),
-              _phoneLine(r, 'Self meetings', r.selfMeetings),
-              _phoneLine(r, 'Mgmt meetings', r.managementMeetings,
-                  listLabel: 'Management meetings'),
+              // A team: one compact block per person (three numbers side
+              // by side); your own row: a full line each.
+              if (showRank)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Row(children: [
+                    _cell(r, 'Site visits', r.siteVisits),
+                    const SizedBox(width: 10),
+                    _cell(r, 'Self mtgs', r.selfMeetings,
+                        listLabel: 'Self meetings'),
+                    const SizedBox(width: 10),
+                    _cell(r, 'Mgmt mtgs', r.managementMeetings,
+                        listLabel: 'Management meetings'),
+                  ]),
+                )
+              else ...[
+                _phoneLine(r, 'Site visits', r.siteVisits),
+                _phoneLine(r, 'Self meetings', r.selfMeetings),
+                _phoneLine(r, 'Mgmt meetings', r.managementMeetings,
+                    listLabel: 'Management meetings'),
+              ],
               if (open) ...[
                 const SizedBox(height: 12),
                 Divider(height: 1, color: context.fomraDivider),
@@ -311,6 +356,36 @@ class _TeamPerformanceCardState extends State<TeamPerformanceCard> {
       ),
     );
   }
+
+  /// One of three side-by-side numbers in a team member's compact block.
+  Widget _cell(TeamPerformanceRow r, String label, TargetLine t,
+          {String? listLabel}) =>
+      Expanded(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => _openLine(r, listLabel ?? label, t),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: context.fomraTextSecondary,
+                    )),
+                const SizedBox(height: 2),
+                _fraction(t, align: TextAlign.left),
+                const SizedBox(height: 5),
+                _Bar(t.progress),
+              ],
+            ),
+          ),
+        ),
+      );
 
   Widget _phoneLine(TeamPerformanceRow r, String label, TargetLine t,
       {String? listLabel}) {

@@ -916,7 +916,8 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
     if (name == null || !mounted) return;
 
     final employee = AppStore.instance.employees
-        .where((e) => e.fullName.trim() == name.trim())
+        .where((e) =>
+            e.fullName.trim().toLowerCase() == name.trim().toLowerCase())
         .cast<EmployeeProfile?>()
         .firstOrNull;
     final previousAssignee = lead.assignedToName;
@@ -1018,6 +1019,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
             TextField(
               controller: ctrl,
               autofocus: true,
+              textCapitalization: TextCapitalization.words,
               decoration: const InputDecoration(
                 labelText: 'Lead name',
                 border: OutlineInputBorder(),

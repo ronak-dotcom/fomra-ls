@@ -11,7 +11,6 @@ import '../../services/management_bi_activity_service.dart';
 import '../land_lead/add_lead_screen.dart';
 import '../../models/lead_list_filter.dart';
 import '../land_lead/filtered_leads_screen.dart';
-import '../land_lead/lead_detail_screen.dart';
 import '../land_lead/leads_map_screen.dart';
 import '../land_lead/management_visit_review_dialog.dart';
 import '../../services/approval_chain.dart';
@@ -45,11 +44,11 @@ import '../../widgets/ui/app_feedback.dart';
 import '../../widgets/management_home_cards.dart';
 import '../../analytics/management_bi_metrics.dart';
 import '../../widgets/offline_status_banner.dart';
-import '../../widgets/monthly_target_progress_card.dart';
 import '../../widgets/portal_home_sections.dart';
 import '../../widgets/broker_energy_summary.dart';
 import '../../widgets/property_review_summary.dart';
 import '../../widgets/team_performance_card.dart';
+import '../../analytics/team_performance.dart';
 import '../../widgets/ui/app_components.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -71,13 +70,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// Meeting history behind the management "No Future Activity" quick action.
   List<LandLeadMeeting> _meetings = const [];
 
-  /// This employee's progress against their monthly target. Null until the
-  /// first load lands; management never loads it.
-  MonthlyTargetProgress? _monthlyProgress;
+  /// True once this employee's monthly target has been looked up (management
+  /// never loads it).
+  bool _targetsLoaded = false;
 
-  /// The resolved target number (from an approved employee submission when
-  /// present, otherwise the management-set common/personal target). Cached so
-  /// progress can be recomputed locally from visibleLeads without re-fetching.
+  /// A management-set target (sites added this month) — only used when the
+  /// employee has no approved target of their own.
   int _monthlyTargetCount = 0;
 
   /// True when the resolved target came from the employee's own approved
@@ -85,16 +83,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _monthlyTargetFromEmployee = false;
 
   /// True when the employee has submitted this month but it is still pending
-  /// approval (so the card can explain why no target is active yet).
+  /// approval (so My month can explain why no target is active yet).
   bool _monthlyTargetPendingApproval = false;
 
-  /// Approved per-category targets (leads / site_visits / meetings) when the
-  /// active target is the employee's own approved submission — drives the
-  /// per-category boxes and lines on the progress card.
+  /// Approved per-category targets when the active target is the employee's
+  /// own approved submission.
   Map<String, int> _approvedTargetValues = const {};
   List<LandLeadMeeting> _targetMeetings = const [];
   List<LeadFollowUp> _overdueFollowUps = const [];
-  List<MonthlyTargetCategoryProgress> _monthlyCategories = const [];
+  /// Target lines My month adds under the site visit / meeting lines: broker
+  /// targets when set, or a management-set "sites added" target.
+  List<(String, MonthlyTargetProgress)> _extraTargets = const [];
 
   List<LandLead> get _noFutureActivityLeads => NoFutureActivityAnalytics.select(
         AppStore.instance.visibleLeads,
@@ -249,108 +248,62 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _recomputeMonthlyProgress();
   }
 
-  /// Recompute the card from the cached target and the CURRENT visibleLeads —
-  /// cheap and local, so it can run on every store/scope change.
-  ///
-  /// Achieved = sites SOURCED (leads added) this month in the current scope.
-  /// visibleLeads is the single scoping rule (role + Team/Individual toggle), so
-  /// a manager in Team view gets the whole team's sites and an executive gets
-  /// their own. Each lead counts on the day it was added; forMonth keeps only
-  /// the ones added this month.
+  /// Recompute My month's extra target lines from the cached target and the
+  /// CURRENT visibleLeads — cheap and local, so it can run on every store /
+  /// scope change. Site visits and meetings against target come from the
+  /// Team Performance card itself.
   void _recomputeMonthlyProgress() {
     if (_isManagement) return;
     final now = DateTime.now();
     final visible = AppStore.instance.visibleLeads;
     final visibleIds = {for (final l in visible) l.leadId};
-    final leadDates = [for (final l in visible) l.addedOn];
-
-    final overall = MonthlyTargetProgress.forMonth(
-      target: _monthlyTargetCount,
-      now: now,
-      completedOn: leadDates,
-    );
-
-    // Per-category boxes/lines only when the target is the employee's approved
-    // submission. New Brokers / Broker Meetings only appear when the
-    // executive actually targeted them — they're optional, so an untouched
-    // category shouldn't clutter the card with a permanent "0/0".
-    var categories = const <MonthlyTargetCategoryProgress>[];
+    final extra = <(String, MonthlyTargetProgress)>[];
     final tv = _approvedTargetValues;
     if (_monthlyTargetFromEmployee && tv.isNotEmpty) {
-      final myName =
-          (AuthService.instance.currentUser?.fullName ?? '').trim().toLowerCase();
-      final visitDates = SiteVisitTarget.datesFor(visible, myName);
-      // Self vs Management Meetings is a real distinction, not a relabeling —
-      // it's exactly what land_lead_meetings.management_present already
-      // records (see meeting_log_dialog.dart's "Management present" toggle).
-      // Each land counts once per kind — its first Self / Management /
-      // Broker meeting — so a repeat meeting on the same land doesn't add.
+      // New Brokers / Broker Meetings are optional: only when targeted.
       final firsts = FirstMeetings.of(_targetMeetings);
-      final selfMeetingDates = [
-        for (final m in firsts.self)
-          if (visibleIds.contains(m.leadId)) m.metAt,
-      ];
-      final managementMeetingDates = [
-        for (final m in firsts.management)
-          if (visibleIds.contains(m.leadId)) m.metAt,
-      ];
-      categories = [
-        MonthlyTargetCategoryProgress(
-          label: 'Site Visits',
-          color: AppColors.primary,
-          progress: MonthlyTargetProgress.forMonth(
-              target: tv[TargetCategory.siteVisits.key] ?? 0,
-              now: now,
-              completedOn: visitDates),
-        ),
-        MonthlyTargetCategoryProgress(
-          label: 'Self Meetings',
-          color: AppColors.success,
-          progress: MonthlyTargetProgress.forMonth(
-              target: tv[TargetCategory.selfMeetings.key] ?? 0,
-              now: now,
-              completedOn: selfMeetingDates),
-        ),
-        MonthlyTargetCategoryProgress(
-          label: 'Management Meetings',
-          color: AppColors.warning,
-          progress: MonthlyTargetProgress.forMonth(
-              target: tv[TargetCategory.managementMeetings.key] ?? 0,
-              now: now,
-              completedOn: managementMeetingDates),
-        ),
-        if (tv.containsKey(TargetCategory.brokerMeetings.key))
-          MonthlyTargetCategoryProgress(
-            label: 'Broker Meetings',
-            color: AppColors.purple,
-            progress: MonthlyTargetProgress.forMonth(
-              target: tv[TargetCategory.brokerMeetings.key] ?? 0,
-              now: now,
-              completedOn: [
-                for (final m in firsts.broker)
-                  if (visibleIds.contains(m.leadId)) m.metAt,
-              ],
-            ),
+      final brokerMeetings = tv[TargetCategory.brokerMeetings.key] ?? 0;
+      if (brokerMeetings > 0) {
+        extra.add((
+          'Broker meetings',
+          MonthlyTargetProgress.forMonth(
+            target: brokerMeetings,
+            now: now,
+            completedOn: [
+              for (final m in firsts.broker)
+                if (visibleIds.contains(m.leadId)) m.metAt,
+            ],
           ),
-        if (tv.containsKey(TargetCategory.newBrokers.key))
-          MonthlyTargetCategoryProgress(
-            label: 'New Brokers',
-            color: AppColors.cyan,
-            progress: MonthlyTargetProgress.forMonth(
-              target: tv[TargetCategory.newBrokers.key] ?? 0,
-              now: now,
-              // A broker counts as "new" the first time their name appears
-              // on one of this executive's leads — i.e. never seen on any
-              // lead added before that one.
-              completedOn: _newBrokerDatesThisMonth(visible, now),
-            ),
+        ));
+      }
+      final newBrokers = tv[TargetCategory.newBrokers.key] ?? 0;
+      if (newBrokers > 0) {
+        extra.add((
+          'New brokers',
+          MonthlyTargetProgress.forMonth(
+            target: newBrokers,
+            now: now,
+            // A broker counts as "new" the first time they appear on one of
+            // this executive's leads.
+            completedOn: _newBrokerDatesThisMonth(visible, now),
           ),
-      ];
+        ));
+      }
+    } else if (!_monthlyTargetPendingApproval && _monthlyTargetCount > 0) {
+      // Management-set target: sites added this month.
+      extra.add((
+        'Sites added',
+        MonthlyTargetProgress.forMonth(
+          target: _monthlyTargetCount,
+          now: now,
+          completedOn: [for (final l in visible) l.addedOn],
+        ),
+      ));
     }
 
     setState(() {
-      _monthlyProgress = overall;
-      _monthlyCategories = categories;
+      _targetsLoaded = true;
+      _extraTargets = extra;
     });
   }
 
@@ -423,8 +376,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<LandLead> get _homeSummaryLeads =>
       _isManagement ? AppStore.instance.leads : _myLeads;
 
-  int get _myLeadCount => _myLeads.length;
-
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -438,7 +389,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Leads just changed in the store — refresh the Monthly Target's signed
     // count from the new visibleLeads (recompute calls setState). Management
     // doesn't show the card, so a plain rebuild is enough for it.
-    if (!_isManagement && _monthlyProgress != null) {
+    if (!_isManagement && _targetsLoaded) {
       _recomputeMonthlyProgress();
     } else {
       setState(() {});
@@ -750,22 +701,114 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return PortalFadeSection(index: 1, child: body);
   }
 
-  /// Employee home: Today's tasks (left) + Quick actions 2×2 (right) on wide
-  /// screens; stacked on narrow phones.
+  /// What is waiting on an executive / manager: their sites by stage, overdue
+  /// follow-ups, sites with no next step, and (for managers) approvals. Only
+  /// lines with something waiting get a box; the rest share one "All clear".
+  List<AttentionItem> _myAttentionItems(int approvalCount) {
+    final active = [
+      for (final l in _homeSummaryLeads)
+        if (l.status.isActive) l
+    ];
+    List<LandLead> at(LeadStatus s) => [
+          for (final l in active)
+            if (l.status == s) l
+        ];
+    VoidCallback open(String title, String subtitle, List<LandLead> leads) =>
+        () => FilteredLeadsScreen.openList(context,
+            title: title, subtitle: subtitle, leads: leads);
+    final followUps = _leadsFor(_overdueFollowUps);
+    final ownerPending = at(LeadStatus.prospectMeetingPending);
+    final visitToPlan = at(LeadStatus.prospectMeetingCompleted);
+    final negotiation = at(LeadStatus.negotiation);
+    final legal = at(LeadStatus.legal);
+    final noNextStep = _noFutureActivityLeads;
+    return [
+      if (_canApprove)
+        AttentionItem(
+          icon: Icons.approval_outlined,
+          color: AppColors.warning,
+          title: 'Approvals waiting on you',
+          subtitle: 'Site visit, signed, drop and target requests',
+          count: approvalCount,
+          clearLabel: 'approvals',
+          onTap: _openApprovalsList,
+        ),
+      AttentionItem(
+        icon: Icons.notifications_active_outlined,
+        color: AppColors.error,
+        title: 'Overdue follow-ups',
+        subtitle: 'The follow-up date has passed',
+        count: followUps.length,
+        clearLabel: 'follow-ups',
+        onTap: open('Overdue follow-ups', 'Follow-up date has passed',
+            followUps),
+      ),
+      AttentionItem(
+        icon: Icons.person_search_outlined,
+        color: AppColors.error,
+        title: 'Owner not met yet',
+        subtitle: 'The land owner meeting is still pending',
+        count: ownerPending.length,
+        clearLabel: 'owner meetings',
+        onTap: open('Owner not met yet', 'Land owner meeting pending',
+            ownerPending),
+      ),
+      AttentionItem(
+        icon: Icons.location_on_outlined,
+        color: AppColors.info,
+        title: 'Site visit to plan',
+        subtitle: 'Owner met · schedule the site visit',
+        count: visitToPlan.length,
+        clearLabel: 'site visits',
+        onTap: open('Site visit to plan', 'Owner met · site visit next',
+            visitToPlan),
+      ),
+      AttentionItem(
+        icon: Icons.handshake_outlined,
+        color: AppColors.info,
+        title: 'In negotiation',
+        subtitle: 'Follow up on terms',
+        count: negotiation.length,
+        clearLabel: 'negotiation',
+        onTap: open('In negotiation', 'Follow up on terms', negotiation),
+      ),
+      AttentionItem(
+        icon: Icons.gavel_rounded,
+        color: AppColors.purple,
+        title: 'In legal',
+        subtitle: 'Waiting on title / legal clearance',
+        count: legal.length,
+        clearLabel: 'legal',
+        onTap: open('In legal', 'Waiting on legal clearance', legal),
+      ),
+      AttentionItem(
+        icon: Icons.event_busy_outlined,
+        color: AppColors.warning,
+        title: 'No next step planned',
+        subtitle: 'No owner meeting planned and none in '
+            '${NoFutureActivityAnalytics.staleDays} days',
+        count: noNextStep.length,
+        clearLabel: 'next steps',
+        onTap: open(
+            'No next step planned',
+            'Active sites with no Land Owner Meeting scheduled and none in '
+                'the last ${NoFutureActivityAnalytics.staleDays} days',
+            noNextStep),
+      ),
+    ];
+  }
+
+  /// Employee home: Needs attention (left) + Quick actions 2×2 (right) on
+  /// wide screens; stacked on narrow phones.
   Widget _employeeTasksAndQuickActions({
-    required String employeeName,
+    required int approvalCount,
     required List<PortalQuickAction> quickActions,
   }) {
-    final todayTasks = _EmployeeTodayTasksSection(
-      employeeName: employeeName,
-      overdueFollowUpLeads: _leadsFor(_overdueFollowUps),
-      staleLeads: _noFutureActivityLeads,
-      onOpenLead: (lead) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => LeadDetailScreen(lead: lead)),
-        );
-      },
+    final todayTasks = PortalSectionCard(
+      title: 'Needs attention',
+      subtitle: 'Only what has something waiting · tap a line for the sites',
+      icon: Icons.flag_outlined,
+      child: AttentionList(items: _myAttentionItems(approvalCount)),
     );
     final quick = _quickActionsSection(
       quickActions,
@@ -794,8 +837,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         }
         // Top-aligned: the two boxes size to their own content. Equalising
         // their heights isn't safe here — stretch throws in this scrollable
-        // (unbounded-height) Row, and IntrinsicHeight throws because Today's
-        // tasks uses a LayoutBuilder.
+        // (unbounded-height) Row, and IntrinsicHeight throws because Needs
+        // attention uses a LayoutBuilder.
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -873,6 +916,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           );
         },
       ),
+    );
+  }
+
+  static const _months = [
+    'January', 'February', 'March', 'April', 'May', 'June', 'July',
+    'August', 'September', 'October', 'November', 'December',
+  ];
+  static String _monthName(DateTime d) => _months[d.month - 1];
+
+  /// My month: one line when there is no approved target this month (or it
+  /// is waiting for approval) instead of a whole empty card.
+  Widget? _targetNote() {
+    if (!_targetsLoaded) return null;
+    final month = _monthName(_clock);
+    if (_monthlyTargetPendingApproval) {
+      return _NoteLine(
+        icon: Icons.hourglass_top_rounded,
+        text: 'Your $month targets are waiting for approval.',
+      );
+    }
+    if (_monthlyTargetFromEmployee) return null;
+    return _NoteLine(
+      icon: Icons.flag_outlined,
+      text: 'No target set for $month.',
+      action: 'Set my targets',
+      onTap: _openMyMonthlyTargets,
     );
   }
 
@@ -1051,23 +1120,44 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 const _HomeGroupLabel(number: 2, text: 'People'),
+              ] else ...[
+                // Executives / managers: what is waiting on them, next to
+                // Quick actions on wide screens.
+                _employeeTasksAndQuickActions(
+                  approvalCount: approvalCount,
+                  quickActions: quickActions,
+                ),
+                const SizedBox(height: AppSpacing.lg),
               ],
               // Team Performance: site visits today / week / month and
               // meetings against the month's target, ranked; tap a name for
               // the pipeline. Management and managers see each executive in
-              // their scope; an executive sees their own row.
+              // their scope; an executive sees their own row ("My month",
+              // which also carries their target status and broker targets).
               PortalFadeSection(
                 index: 1,
                 child: PortalSectionCard(
-                  title: 'Team this month',
-                  subtitle: 'Site visits & meetings against target · tap a '
-                      'name for the pipeline and site age',
+                  title: _canApprove
+                      ? 'Team this month'
+                      : 'My month · ${_monthName(_clock)}',
+                  subtitle: _canApprove
+                      ? 'Site visits & meetings against target · tap a '
+                          'name for the pipeline and site age'
+                      : 'Against your approved target · tap a number for '
+                          'the sites',
                   icon: Icons.emoji_events_outlined,
                   child: TeamPerformanceCard(
                     leads: _homeSummaryLeads,
                     onlyExecutive: _canApprove
                         ? null
                         : AuthService.instance.currentUser?.fullName,
+                    extraLines: _isManagement
+                        ? const []
+                        : [
+                            for (final (label, p) in _extraTargets)
+                              (label, TargetLine(p, const [])),
+                          ],
+                    note: _isManagement ? null : _targetNote(),
                   ),
                 ),
               ),
@@ -1110,51 +1200,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     child: PropertyPipelineCard(leads: _homeSummaryLeads),
                   ),
                 ),
-              ] else ...[
-                // Employee: Today's tasks (left) + Quick actions 2×2 (right).
-                _employeeTasksAndQuickActions(
-                  employeeName: userName,
-                  quickActions: quickActions,
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                if (_monthlyProgress != null) ...[
-                  PortalFadeSection(
-                    index: 2,
-                    child: PortalSectionCard(
-                      title: 'Monthly Target Progress',
-                      subtitle: canManageTeam && ViewScope.instance.isTeam
-                          ? "Your team's sites this month against the target"
-                          : (_monthlyTargetFromEmployee
-                              ? 'Your approved targets · sites this month'
-                              : 'Your sites this month against the target'),
-                      icon: Icons.flag_outlined,
-                      child: MonthlyTargetProgressCard(
-                        progress: _monthlyProgress!,
-                        month: DateTime.now(),
-                        pendingApproval: _monthlyTargetPendingApproval,
-                        onSetTarget: _openMyMonthlyTargets,
-                        categories: _monthlyCategories,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                ],
-                PortalFadeSection(
-                  index: 3,
-                  child: PortalSectionCard(
-                    title: canManageTeam ? 'Performance' : 'My performance',
-                    subtitle: canManageTeam
-                        ? 'Use the Team / Individual switch in the header to '
-                            'change what this covers'
-                        : 'Your site contribution this period',
-                    icon: Icons.groups_rounded,
-                    child: _RolePerformanceCard(
-                      isTeamLead: canManageTeam,
-                      count: _myLeadCount,
-                      onTap: () => _goTo('/land-lead'),
-                    ),
-                  ),
-                ),
               ],
               const SizedBox(height: 88),
             ],
@@ -1168,305 +1213,54 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 }
 
-/// Sites added, for whatever the header's Team / Individual toggle currently
-/// covers — [count] is already scoped by [LeadVisibility], so this only picks
-/// the wording.
-class _RolePerformanceCard extends StatelessWidget {
-  final bool isTeamLead;
-  final int count;
-  final VoidCallback? onTap;
-
-  const _RolePerformanceCard({
-    required this.isTeamLead,
-    required this.count,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final showTeam = isTeamLead && ViewScope.instance.isTeam;
-    return AppCard(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      radius: AppColors.radiusMd,
-      interactive: onTap != null,
-      onTap: onTap,
-      child: Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                alignment: Alignment.center,
-                child: const Icon(
-                  Icons.emoji_events_outlined,
-                  size: 17,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      showTeam ? 'Team Sites Added' : 'Sites Added',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: context.fomraTextPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 1),
-                    Text(
-                      showTeam
-                          ? "Your team's total contribution to the pipeline"
-                          : 'Your total contribution to the pipeline',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        color: context.fomraTextSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              AnimatedCounter(
-                value: count,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.primary,
-                      fontSize: 18,
-                    ),
-              ),
-            ],
-      ),
-    );
-  }
-}
-
-class _EmployeeTodayTasksSection extends StatelessWidget {
-  final String employeeName;
-  final ValueChanged<LandLead> onOpenLead;
-  final List<LandLead> overdueFollowUpLeads;
-  final List<LandLead> staleLeads;
-
-  const _EmployeeTodayTasksSection({
-    required this.employeeName,
-    required this.onOpenLead,
-    this.overdueFollowUpLeads = const [],
-    this.staleLeads = const [],
-  });
-
-  List<LandLead> get _myActiveLeads => AppStore.instance.leads
-      .where((l) =>
-          l.createdByName.trim() == employeeName.trim() && l.status.isActive)
-      .toList();
-
-  void _openCategory(
-    BuildContext context,
-    String title,
-    Color color,
-    List<LandLead> leads,
-  ) {
-    if (leads.isEmpty) return;
-    FilteredLeadsScreen.openList(
-      context,
-      title: title,
-      subtitle: '$title follow-up queue',
-      leads: leads,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final mine = _myActiveLeads;
-    final categories = <
-        ({String label, IconData icon, Color color, List<LandLead> leads})>[
-      if (overdueFollowUpLeads.isNotEmpty)
-        (
-          label: 'Overdue Follow-ups',
-          icon: Icons.notifications_active_outlined,
-          color: AppColors.error,
-          leads: overdueFollowUpLeads,
-        ),
-      if (staleLeads.isNotEmpty)
-        (
-          label: 'No Recent Activity',
-          icon: Icons.event_busy_outlined,
-          color: AppColors.warning,
-          leads: staleLeads,
-        ),
-      (
-        label: 'In negotiation',
-        icon: Icons.handshake_outlined,
-        color: AppColors.info,
-        leads: mine
-            .where((l) => l.status == LeadStatus.negotiation)
-            .toList(),
-      ),
-      (
-        label: 'Meeting Pending',
-        icon: Icons.groups_outlined,
-        color: LeadStatus.prospectMeetingPending.color,
-        leads: mine
-            .where((l) => l.status == LeadStatus.prospectMeetingPending)
-            .toList(),
-      ),
-      (
-        label: 'Site Visit Pending',
-        icon: Icons.location_on_outlined,
-        color: LeadStatus.prospectMeetingCompleted.color,
-        leads: mine
-            .where((l) => l.status == LeadStatus.prospectMeetingCompleted)
-            .toList(),
-      ),
-      (
-        label: 'Legal Pending',
-        icon: Icons.gavel_outlined,
-        color: LeadStatus.legal.color,
-        leads: mine.where((l) => l.status == LeadStatus.legal).toList(),
-      ),
-    ];
-    final total = categories.fold<int>(0, (s, c) => s + c.leads.length);
-
-    return PortalSectionCard(
-      title: "Today's tasks",
-      subtitle: 'What needs your attention today',
-      icon: Icons.today_rounded,
-      child: total == 0
-          ? const EmptyState(
-              icon: Icons.task_alt_outlined,
-              title: 'No pending tasks',
-              message:
-                  'Active leads you add will show pending follow-ups here.',
-            )
-          : LayoutBuilder(
-              builder: (context, constraints) {
-                // Mobile: a 2×2 grid of square tiles. Wider screens keep the
-                // 2-up row cards (single column only when truly narrow).
-                final mobile = FomraLayout.isMobile(context);
-                // Match the Quick actions 2-col grid (gap 12, card height 100)
-                // exactly, so the two side-by-side boxes end at the same height
-                // without stretch/IntrinsicHeight (both crash with this Wrap).
-                const gap = 12.0;
-                final twoCols = mobile || constraints.maxWidth >= 360;
-                final cardWidth = twoCols
-                    ? (constraints.maxWidth - gap) / 2
-                    : constraints.maxWidth;
-                // The Quick actions grid wraps its cards in vertical:4 padding —
-                // match it so the two side-by-side boxes are exactly equal.
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Wrap(
-                  spacing: gap,
-                  runSpacing: gap,
-                  children: [
-                    for (final c in categories)
-                      SizedBox(
-                        width: cardWidth,
-                        height: mobile ? cardWidth : 110,
-                        child: _TaskSummaryCard(
-                          label: c.label,
-                          count: c.leads.length,
-                          icon: c.icon,
-                          color: c.color,
-                          subtitle: switch (c.label) {
-                            'Overdue Follow-ups' => 'Follow-up date has passed',
-                            'No Recent Activity' => 'Nothing logged lately',
-                            'In negotiation' => 'Follow up on terms',
-                            'Meeting Pending' => 'Land owner meeting due',
-                            'Site Visit Pending' => 'Schedule the site visit',
-                            _ => 'Legal verification pending',
-                          },
-                          onTap: c.leads.isEmpty
-                              ? null
-                              : () => _openCategory(context, c.label, c.color, c.leads),
-                        ),
-                      ),
-                  ],
-                  ),
-                );
-              },
-            ),
-    );
-  }
-}
-
-class _TaskSummaryCard extends StatelessWidget {
-  final String label;
-  final String subtitle;
-  final int count;
+/// A one-line note with an optional link, e.g. "No target set for
+/// November · Set my targets ›".
+class _NoteLine extends StatelessWidget {
   final IconData icon;
-  final Color color;
+  final String text;
+  final String? action;
   final VoidCallback? onTap;
 
-  const _TaskSummaryCard({
-    required this.label,
-    required this.subtitle,
-    required this.count,
+  const _NoteLine({
     required this.icon,
-    required this.color,
+    required this.text,
+    this.action,
     this.onTap,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      padding: const EdgeInsets.all(12),
-      radius: AppColors.radiusMd,
-      interactive: onTap != null,
-      onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                alignment: Alignment.center,
-                child: Icon(icon, color: color, size: 18),
+  Widget build(BuildContext context) => Material(
+        color: context.fomraSurfaceVar,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(children: [
+              Icon(icon, size: 18, color: context.fomraTextSecondary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(text,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: context.fomraTextSecondary,
+                    )),
               ),
-              const Spacer(),
-              Text(
-                '$count',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.8,
-                  color: color,
-                  height: 1,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ],
+              if (action != null)
+                Text('$action ›',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    )),
+            ]),
           ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              color: context.fomraTextPrimary,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(subtitle,
-              style: TextStyle(fontSize: 10.5, color: context.fomraTextSecondary)),
-        ],
-      ),
-    );
-  }
+        ),
+      );
 }
 
-/// A small numbered group heading on the management Home
-/// ("1 · Act on these", "2 · People", "3 · Properties").
 class _HomeGroupLabel extends StatelessWidget {
   final int number;
   final String text;

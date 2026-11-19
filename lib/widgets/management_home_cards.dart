@@ -9,7 +9,7 @@ import '../theme/app_theme.dart';
 import '../theme/fomra_theme_context.dart';
 import 'terms_deal_selector.dart';
 
-/// One line of the management "Needs attention" card.
+/// One line of a "Needs attention" card.
 class AttentionItem {
   final IconData icon;
   final Color color;
@@ -18,14 +18,95 @@ class AttentionItem {
   final int count;
   final VoidCallback? onTap;
 
+  /// Short name for the "All clear: …" line when [count] is 0.
+  final String clearLabel;
+
   const AttentionItem({
     required this.icon,
     required this.color,
     required this.title,
     required this.subtitle,
     required this.count,
+    required this.clearLabel,
     this.onTap,
   });
+}
+
+/// The lines with something waiting (two columns on wide screens), then one
+/// "All clear: …" line for everything at zero, so empty items don't take a
+/// full box each.
+class AttentionList extends StatelessWidget {
+  final List<AttentionItem> items;
+  const AttentionList({super.key, required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    final waiting = [for (final i in items) if (i.count > 0) i];
+    final clear = [for (final i in items) if (i.count == 0) i.clearLabel];
+    return LayoutBuilder(builder: (context, c) {
+      final wide = c.maxWidth >= 640;
+      final rows = [for (final i in waiting) _AttentionRow(item: i)];
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!wide)
+            for (final r in rows)
+              Padding(padding: const EdgeInsets.only(bottom: 8), child: r)
+          else
+            for (var i = 0; i < rows.length; i += 2)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(child: rows[i]),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: i + 1 < rows.length
+                              ? rows[i + 1]
+                              : const SizedBox()),
+                    ],
+                  ),
+                ),
+              ),
+          if (clear.isNotEmpty) _AllClearLine(waiting.isEmpty ? null : clear),
+        ],
+      );
+    });
+  }
+}
+
+class _AllClearLine extends StatelessWidget {
+  /// What is at zero; null when nothing at all is waiting.
+  final List<String>? labels;
+  const _AllClearLine(this.labels);
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.success.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(children: [
+          const Icon(Icons.check_circle_outline_rounded,
+              size: 18, color: AppColors.success),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              labels == null
+                  ? 'All clear — nothing is waiting right now'
+                  : 'All clear: ${labels!.join(' · ')}',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.success,
+              ),
+            ),
+          ),
+        ]),
+      );
 }
 
 /// Management Home: everything waiting on someone, one tappable line each.
@@ -113,6 +194,7 @@ class _NeedsAttentionCardState extends State<NeedsAttentionCard> {
         icon: Icons.approval_outlined,
         color: AppColors.warning,
         title: 'Approvals waiting on you',
+        clearLabel: 'approvals',
         subtitle: 'Site visit, signed, drop and target requests',
         count: widget.approvalCount,
         onTap: widget.onOpenApprovals,
@@ -121,6 +203,7 @@ class _NeedsAttentionCardState extends State<NeedsAttentionCard> {
         icon: Icons.person_search_outlined,
         color: AppColors.error,
         title: 'Owner not met yet',
+        clearLabel: 'owner meetings',
         subtitle: 'The land owner meeting is still pending',
         count: ownerPending.length,
         onTap: _list(
@@ -130,6 +213,7 @@ class _NeedsAttentionCardState extends State<NeedsAttentionCard> {
         icon: Icons.hourglass_bottom_rounded,
         color: AppColors.error,
         title: 'Open over 90 days',
+        clearLabel: '90+ days',
         subtitle: 'Added more than 90 days ago and not yet closed',
         count: stuck.length,
         onTap: _list('Open over 90 days',
@@ -139,6 +223,7 @@ class _NeedsAttentionCardState extends State<NeedsAttentionCard> {
         icon: Icons.gavel_rounded,
         color: AppColors.purple,
         title: 'In legal',
+        clearLabel: 'legal',
         subtitle: 'Waiting on title / legal clearance',
         count: legal.length,
         onTap: _list('In legal', 'Waiting on legal clearance', legal),
@@ -147,6 +232,7 @@ class _NeedsAttentionCardState extends State<NeedsAttentionCard> {
         icon: Icons.event_note_outlined,
         color: AppColors.warning,
         title: 'Reviews overdue',
+        clearLabel: 'reviews',
         subtitle: 'The next review date has passed',
         count: overdue.length,
         onTap: _list('Reviews overdue', 'Next review date has passed', overdue),
@@ -155,6 +241,7 @@ class _NeedsAttentionCardState extends State<NeedsAttentionCard> {
         icon: Icons.event_busy_outlined,
         color: AppColors.info,
         title: 'No next step planned',
+        clearLabel: 'next steps',
         subtitle: 'No owner meeting planned and none in '
             '${widget.noNextStepDays} days',
         count: widget.noNextStep.length,
@@ -166,34 +253,7 @@ class _NeedsAttentionCardState extends State<NeedsAttentionCard> {
       ),
     ];
 
-    return LayoutBuilder(builder: (context, c) {
-      final wide = c.maxWidth >= 640;
-      final rows = [for (final i in items) _AttentionRow(item: i)];
-      if (!wide) {
-        return Column(children: [
-          for (final r in rows)
-            Padding(padding: const EdgeInsets.only(bottom: 8), child: r),
-        ]);
-      }
-      return Column(children: [
-        for (var i = 0; i < rows.length; i += 2)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(child: rows[i]),
-                  const SizedBox(width: 10),
-                  Expanded(
-                      child:
-                          i + 1 < rows.length ? rows[i + 1] : const SizedBox()),
-                ],
-              ),
-            ),
-          ),
-      ]);
-    });
+    return AttentionList(items: items);
   }
 }
 
@@ -203,27 +263,20 @@ class _AttentionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final clear = item.count == 0;
-    final color = clear ? context.fomraTextTertiary : item.color;
     return Material(
-      color:
-          clear ? context.fomraSurfaceVar : item.color.withValues(alpha: 0.07),
+      color: item.color.withValues(alpha: 0.07),
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: clear ? null : item.onTap,
+        onTap: item.onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: clear
-                  ? context.fomraBorder
-                  : item.color.withValues(alpha: 0.30),
-            ),
+            border: Border.all(color: item.color.withValues(alpha: 0.30)),
           ),
           child: Row(children: [
-            Icon(item.icon, color: color, size: 22),
+            Icon(item.icon, color: item.color, size: 22),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -246,18 +299,15 @@ class _AttentionRow extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              clear ? 'All clear' : '${item.count}',
+              '${item.count}',
               style: TextStyle(
-                fontSize: clear ? 13 : 22,
+                fontSize: 22,
                 fontWeight: FontWeight.w800,
-                color: clear ? AppColors.success : item.color,
+                color: item.color,
               ),
             ),
-            if (!clear) ...[
-              const SizedBox(width: 4),
-              Icon(Icons.chevron_right_rounded,
-                  color: context.fomraTextTertiary),
-            ],
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right_rounded, color: context.fomraTextTertiary),
           ]),
         ),
       ),
