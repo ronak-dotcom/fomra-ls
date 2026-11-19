@@ -6,6 +6,9 @@ const {
   parseInfrastructureElements,
   computeInfrastructureScores,
 } = require('../lib/overpassInfrastructure');
+const { fillNext } = require('../lib/infraScoreFill');
+
+const INFRA_SCORE_VERSION = 2;
 
 // Public Overpass servers, tried together; the first good answer wins.
 // (overpass.kumi.systems and overpass.openstreetmap.ru stopped answering
@@ -40,9 +43,10 @@ function setCachedInfrastructure(lat, lon, radiusKm, payload) {
   infraCache.set(infraCacheKey(lat, lon, radiusKm), { at: Date.now(), payload });
 }
 
-function queryMirror(mirror, body) {
+function queryMirror(mirror, body, signal) {
   return new Promise((resolve, reject) => {
     const options = {
+      signal,
       hostname: mirror.hostname,
       path:     mirror.path,
       method:   'POST',
@@ -109,7 +113,9 @@ router.post('/', async (req, res) => {
 
 async function runOverpassQuery(query) {
   const body = `data=${encodeURIComponent(query)}`;
-  const attempts = MIRRORS.map((mirror) => queryMirror(mirror, body));
+  // Once one server answers, stop waiting on the others (spares them load).
+  const ac = new AbortController();
+  const attempts = MIRRORS.map((mirror) => queryMirror(mirror, body, ac.signal));
 
   try {
     return await Promise.any(attempts);
@@ -120,7 +126,44 @@ async function runOverpassQuery(query) {
       `Map data servers are busy — try again in a minute (${reasons || 'no answer'})`);
     err.status = 502;
     throw err;
+  } finally {
+    ac.abort();
   }
+}
+
+/**
+ * The infrastructure payload for a point: what /infrastructure returns, and
+ * what lead_infra_scores saves. `v` marks the scoring version, so saved
+ * scores from an older formula are refreshed by the background fill.
+ */
+async function fetchInfrastructure(lat, lon, radiusKm, roadWidthFt) {
+  const width = Number.isFinite(roadWidthFt) ? roadWidthFt : undefined;
+  const query = buildInfrastructureQuery(lat, lon, radiusKm * 1000);
+  const data = await runOverpassQuery(query);
+  const elements = data.elements || [];
+
+  if (data.remark && elements.length === 0) {
+    const err = new Error(String(data.remark));
+    err.status = 502;
+    throw err;
+  }
+
+  const { counts, places, roadCounts, roadNearest } = parseInfrastructureElements(elements, lat, lon);
+  const scores = computeInfrastructureScores(
+    counts, places, roadCounts, roadNearest, radiusKm, width);
+
+  return {
+    source:      'OpenStreetMap Overpass API',
+    v:           INFRA_SCORE_VERSION,
+    lat,
+    lon,
+    radiusKm,
+    roadWidthFt: width ?? null,
+    counts,
+    places,
+    roadCounts,
+    scores,
+  };
 }
 
 // POST /api/poi/infrastructure
@@ -140,44 +183,31 @@ router.post('/infrastructure', async (req, res) => {
 
   try {
     const cached = getCachedInfrastructure(lat, lon, radiusKm);
-    if (cached) {
+    if (cached && cached.roadWidthFt === (Number.isFinite(roadWidthFt) ? roadWidthFt : null)) {
       return res.json({ ...cached, cached: true });
     }
 
-    const radiusMeters = radiusKm * 1000;
-    const query = buildInfrastructureQuery(lat, lon, radiusMeters);
-    const data = await runOverpassQuery(query);
-    const elements = data.elements || [];
-
-    if (data.remark && elements.length === 0) {
-      return res.status(502).json({ error: String(data.remark) });
-    }
-
-    const { counts, places, roadCounts, roadNearest } = parseInfrastructureElements(elements, lat, lon);
-    const scores = computeInfrastructureScores(
-      counts,
-      places,
-      roadCounts,
-      roadNearest,
-      radiusKm,
-      Number.isFinite(roadWidthFt) ? roadWidthFt : undefined,
-    );
-
-    const payload = {
-      source:    'OpenStreetMap Overpass API',
-      lat,
-      lon,
-      radiusKm,
-      counts,
-      places,
-      roadCounts,
-      scores,
-    };
-
+    const payload = await fetchInfrastructure(lat, lon, radiusKm, roadWidthFt);
     setCachedInfrastructure(lat, lon, radiusKm, payload);
     return res.json(payload);
   } catch (err) {
     return res.status(err.status || 502).json({ error: err.message });
+  }
+});
+
+// POST /api/poi/fill-next  (header x-fill-secret)
+// Called every couple of minutes by the database scheduler: fills the saved
+// infrastructure score of the next lead that has none (or an old one), so
+// people see it instantly instead of waiting on the public map servers.
+router.post('/fill-next', async (req, res) => {
+  try {
+    const result = await fillNext({
+      secret: req.get('x-fill-secret') || '',
+      fetchInfrastructure,
+    });
+    return res.json(result);
+  } catch (err) {
+    return res.status(err.status || 500).json({ error: err.message });
   }
 });
 
