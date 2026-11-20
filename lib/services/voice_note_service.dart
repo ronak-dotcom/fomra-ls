@@ -19,12 +19,41 @@ class VoiceNoteService {
   static SupabaseClient get _db => Supabase.instance.client;
   static const bucket = 'land-lead-voice-notes';
 
+  /// What a voice note is about, as (key, label). The label is also what the
+  /// notes line and the timeline show.
+  static const topics = [
+    ('follow_up', 'Follow-up'),
+    ('owner_meeting', 'Land owner meeting'),
+    ('site_visit', 'Site visit'),
+    ('management', 'Management discussion'),
+    ('other', 'Other'),
+  ];
+
+  static String topicLabel(String key) {
+    for (final (k, label) in topics) {
+      if (k == key) return label;
+    }
+    return '';
+  }
+
+  /// The topic label in a notes line, or null (older voice notes).
+  static String? topicOf(String line) {
+    for (final part in line.split(' · ')) {
+      final p = part.trim();
+      for (final (_, label) in topics) {
+        if (p == label) return label;
+      }
+    }
+    return null;
+  }
+
   /// Uploads the audio, records it, and adds the line to the lead's notes.
   static Future<void> uploadAndAttach({
     required String leadId,
     required Uint8List bytes,
     required int durationMs,
     String transcript = '',
+    String topic = '',
     String ext = 'm4a',
   }) async {
     final userId = _db.auth.currentUser?.id;
@@ -49,6 +78,7 @@ class VoiceNoteService {
         'storage_path': path,
         'duration_ms': durationMs,
         'transcript': text,
+        'topic': topic,
         if (loggedBy.isNotEmpty) 'logged_by_name': loggedBy,
         if (userId != null) 'logged_by': userId,
       });
@@ -65,6 +95,7 @@ class VoiceNoteService {
         durationMs: durationMs,
         loggedBy: loggedBy,
         transcript: text,
+        topic: topic,
       );
       final notes = _withoutQueuedLine(lead.notes);
       final updated = await LandLeadService.update(lead.copyWith(
@@ -80,6 +111,7 @@ class VoiceNoteService {
     required int durationMs,
     String loggedBy = '',
     String transcript = '',
+    String topic = '',
     bool queued = false,
   }) {
     final stamp = DateFormat('d MMM yyyy, HH:mm').format(at);
@@ -88,6 +120,7 @@ class VoiceNoteService {
     return [
       '[$stamp] [Voice Note]${audioRef == null ? '' : ' audio:$audioRef'}',
       if (queued) 'waiting to upload',
+      if (topicLabel(topic).isNotEmpty) topicLabel(topic),
       '${secs}s',
       if (loggedBy.isNotEmpty) loggedBy,
       if (text.isNotEmpty) '"$text"',
@@ -108,6 +141,7 @@ class VoiceNoteService {
     required Uint8List bytes,
     required int durationMs,
     String transcript = '',
+    String topic = '',
     String ext = 'm4a',
   }) async {
     final sync = OfflineSyncService.instance;
@@ -117,6 +151,7 @@ class VoiceNoteService {
         bytes: bytes,
         durationMs: durationMs,
         transcript: transcript,
+        topic: topic,
         ext: ext,
       );
       final lead =
@@ -128,6 +163,7 @@ class VoiceNoteService {
           durationMs: durationMs,
           loggedBy: AuthService.instance.currentUser?.fullName ?? '',
           transcript: transcript,
+          topic: topic,
           queued: true,
         );
         final notes =
@@ -141,6 +177,7 @@ class VoiceNoteService {
       bytes: bytes,
       durationMs: durationMs,
       transcript: transcript,
+      topic: topic,
       ext: ext,
     );
   }

@@ -191,6 +191,7 @@ class OfflineSyncService extends ChangeNotifier {
     required Uint8List bytes,
     required int durationMs,
     String transcript = '',
+    String topic = '',
     String ext = 'm4a',
   }) async {
     final blobId = await OfflineQueueStore.putBlob(bytes, ext: ext);
@@ -202,6 +203,7 @@ class OfflineSyncService extends ChangeNotifier {
         'lead_id': leadId,
         'duration_ms': durationMs,
         'transcript': transcript,
+        'topic': topic,
         'ext': ext,
       },
       blobIds: [blobId],
@@ -393,6 +395,7 @@ class OfflineSyncService extends ChangeNotifier {
       bytes: bytes,
       durationMs: durationMs,
       transcript: op.payload['transcript'] as String? ?? '',
+      topic: op.payload['topic'] as String? ?? '',
       ext: op.payload['ext'] as String? ?? 'm4a',
     );
   }
