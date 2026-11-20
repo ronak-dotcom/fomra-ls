@@ -37,6 +37,7 @@ import '../../utils/lead_auto_notes.dart';
 import '../../utils/lead_location_parser.dart';
 import '../../services/land_lead_site_visit_service.dart';
 import '../../services/voice_note_service.dart';
+import '../../widgets/voice_note_recorder_dialog.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/fomra_layout.dart';
 import '../../theme/fomra_theme_context.dart';
@@ -1247,6 +1248,26 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
         ),
       );
       await _loadActivityData();
+      return;
+    }
+
+    if (label == 'Voice note') {
+      if (viewOnly) {
+        AppFeedback.info(context,
+            _isLocked
+                ? 'This lead is ${lead.status.label} and locked.'
+                : 'Management view is read-only. Sign in as employee to record.');
+        return;
+      }
+      final saved =
+          await showVoiceNoteRecorderDialog(context, leadId: lead.leadId);
+      if (saved == true && mounted) {
+        final fresh = AppStore.instance.leads
+            .where((l) => l.leadId == lead.leadId)
+            .firstOrNull;
+        setState(() => lead = fresh ?? lead);
+        AppFeedback.success(context, 'Voice note saved');
+      }
       return;
     }
 
@@ -2627,6 +2648,7 @@ class _ActionToolbar extends StatelessWidget {
   Widget build(BuildContext context) {
     final actions = [
       (Icons.sticky_note_2_outlined, 'Notes', AppColors.purple),
+      (Icons.mic_none_rounded, 'Voice note', AppColors.purple),
       (Icons.location_on_outlined, 'Site visit', AppColors.purple),
       (Icons.apartment_outlined, 'Management site visit', AppColors.purple),
       (Icons.groups_outlined, 'Meeting', AppColors.purple),
@@ -2741,7 +2763,7 @@ class _ActionToolbar extends StatelessWidget {
 }
 
 /// Shown directly on phones; everything else sits under "More".
-const _primaryOnPhone = ['Meeting', 'Site visit', 'Notes'];
+const _primaryOnPhone = ['Meeting', 'Site visit', 'Notes', 'Voice note'];
 
 /// The "More" sheet's groups, in order. Labels match _ActionToolbar's.
 const _moreActionGroups = <(String, List<String>)>[
@@ -3256,7 +3278,7 @@ class _ActivityTimeline extends StatelessWidget {
       final isVoice = entry.contains('[Voice Note]');
       final isGps = entry.contains('[GPS Check-in]');
       final audioUrl =
-          isVoice ? VoiceNoteService.audioUrlFromNotesLine(entry) : null;
+          isVoice ? VoiceNoteService.audioRefFromNotesLine(entry) : null;
       events.add((
         at: lead.addedOn,
         title: isVoice
@@ -3264,7 +3286,7 @@ class _ActivityTimeline extends StatelessWidget {
             : (isGps
                 ? 'GPS check-in'
                 : (isAuto ? 'Location Intelligence' : 'Note')),
-        subtitle: entry,
+        subtitle: isVoice ? VoiceNoteService.displayLine(entry) : entry,
         icon: isVoice
             ? Icons.mic_none_rounded
             : (isGps
@@ -3406,8 +3428,18 @@ class _ActivityTimeline extends StatelessWidget {
                       tooltip: 'Play voice note',
                       icon: const Icon(Icons.play_circle_outline, size: 22),
                       onPressed: () async {
+                        // Private audio plays through a short-lived link.
+                        final url =
+                            await VoiceNoteService.playableUrl(e.audioUrl!);
+                        if (url == null) {
+                          if (context.mounted) {
+                            AppFeedback.error(
+                                context, 'Could not open this voice note.');
+                          }
+                          return;
+                        }
                         final player = AudioPlayer();
-                        await player.play(UrlSource(e.audioUrl!));
+                        await player.play(UrlSource(url));
                       },
                     ),
                 ],

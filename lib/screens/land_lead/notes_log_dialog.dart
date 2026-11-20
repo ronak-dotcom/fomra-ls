@@ -10,6 +10,7 @@ import '../../widgets/log_dialog_tabs.dart';
 import '../../widgets/ui/app_feedback.dart';
 import '../../widgets/ui/dialog_error_banner.dart';
 import '../../widgets/dictation_bar.dart';
+import '../../services/voice_note_service.dart';
 
 class NotesLogDialog extends StatefulWidget {
   final LandLead lead;
@@ -53,7 +54,12 @@ class _NotesLogDialogState extends State<NotesLogDialog> {
   /// doesn't bury the manual history under a tile per category.
   List<String> _parseNotes(String raw) {
     if (raw.trim().isEmpty) return [];
-    return LeadAutoNotes.splitEntries(raw).reversed.toList();
+    return [
+      for (final e in LeadAutoNotes.splitEntries(raw).reversed)
+        e.contains('[Voice Note]')
+            ? '🎙 ${VoiceNoteService.displayLine(e)}'
+            : e,
+    ];
   }
 
   InputDecoration _fieldDecoration(BuildContext context, String label,
