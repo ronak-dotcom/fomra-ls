@@ -4,6 +4,7 @@ import '../../models/lead_drop_reason.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/fomra_theme_context.dart';
 import '../../services/lead_drop_reason_catalog_service.dart';
+import '../../widgets/dictation_bar.dart';
 
 class LeadDropReasonResult {
   final LeadDropReason reason;
@@ -180,7 +181,10 @@ class _LeadDropReasonDialogState extends State<LeadDropReasonDialog> {
                 const SizedBox(height: 14),
                 TextField(
                   controller: _notesCtrl,
-                  maxLines: 4,
+                  minLines: 2,
+                  maxLines: 8,
+                  maxLength: kNotesMaxLength,
+                  textCapitalization: TextCapitalization.sentences,
                   decoration: InputDecoration(
                     labelText: 'Notes',
                     hintText: 'Add details for management review…',
@@ -190,6 +194,7 @@ class _LeadDropReasonDialogState extends State<LeadDropReasonDialog> {
                     ),
                   ),
                 ),
+                DictationBar(controller: _notesCtrl),
               ],
               const SizedBox(height: 18),
               Row(

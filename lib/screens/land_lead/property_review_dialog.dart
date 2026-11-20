@@ -8,6 +8,7 @@ import '../../theme/app_theme.dart';
 import '../../theme/fomra_theme_context.dart';
 import '../../widgets/ui/app_components.dart';
 import '../../widgets/ui/app_feedback.dart';
+import '../../widgets/dictation_bar.dart';
 
 /// Opens the Property Review window for a lead: record a review (Reporting
 /// Manager / Head / Management only, and never on a locked lead) and see the
@@ -220,7 +221,9 @@ class _PropertyReviewDialogState extends State<_PropertyReviewDialog> {
         TextField(
           controller: _notesCtrl,
           minLines: 3,
-          maxLines: 6,
+          maxLines: 10,
+          maxLength: kNotesMaxLength,
+          textCapitalization: TextCapitalization.sentences,
           onChanged: (_) {
             if (_error != null) setState(() => _error = null);
           },
@@ -236,6 +239,7 @@ class _PropertyReviewDialogState extends State<_PropertyReviewDialog> {
             enabledBorder: border,
           ),
         ),
+        DictationBar(controller: _notesCtrl),
         const SizedBox(height: 12),
         InkWell(
           onTap: _pickNextDate,

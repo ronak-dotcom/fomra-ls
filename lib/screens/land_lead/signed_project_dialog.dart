@@ -12,6 +12,7 @@ import '../../theme/fomra_theme_context.dart';
 import '../../utils/image_compressor.dart';
 import '../../widgets/ui/app_components.dart';
 import '../../widgets/ui/app_feedback.dart';
+import '../../widgets/dictation_bar.dart';
 
 /// "Project Signed" submission window: attach supporting photos/documents,
 /// add a note, and submit for management approval. Images are compressed
@@ -316,8 +317,9 @@ class _SignedProjectDialogState extends State<SignedProjectDialog> {
                       TextField(
                         controller: _noteCtrl,
                         minLines: 3,
-                        maxLines: 5,
-                        maxLength: 500,
+                        maxLines: 10,
+                        maxLength: kNotesMaxLength,
+                        textCapitalization: TextCapitalization.sentences,
                         decoration: InputDecoration(
                           labelText: 'Note (optional)',
                           alignLabelWithHint: true,
@@ -334,6 +336,7 @@ class _SignedProjectDialogState extends State<SignedProjectDialog> {
                           ),
                         ),
                       ),
+                      DictationBar(controller: _noteCtrl),
                     ],
                   ),
                 ),

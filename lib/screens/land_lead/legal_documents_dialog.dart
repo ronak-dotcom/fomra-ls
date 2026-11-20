@@ -6,6 +6,7 @@ import '../../services/land_lead_legal_service.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/fomra_theme_context.dart';
 import '../../widgets/ui/app_feedback.dart';
+import '../../widgets/dictation_bar.dart';
 
 /// Legal action window: capture Legal Queries and Legal Notes for a lead.
 /// Document upload has been removed; both fields are persisted in the existing
@@ -253,24 +254,30 @@ class _LegalDocumentsDialogState extends State<LegalDocumentsDialog> {
                               TextField(
                                 controller: _queriesCtrl,
                                 minLines: 3,
-                                maxLines: 5,
-                                maxLength: 500,
+                                maxLines: 10,
+                                maxLength: kNotesMaxLength,
+                                textCapitalization:
+                                    TextCapitalization.sentences,
                                 decoration: _fieldDecoration(
                                   'Legal Queries',
                                   'Raise queries for legal review…',
                                 ),
                               ),
+                              DictationBar(controller: _queriesCtrl),
                               const SizedBox(height: 8),
                               TextField(
                                 controller: _notesCtrl,
                                 minLines: 3,
-                                maxLines: 5,
-                                maxLength: 500,
+                                maxLines: 10,
+                                maxLength: kNotesMaxLength,
+                                textCapitalization:
+                                    TextCapitalization.sentences,
                                 decoration: _fieldDecoration(
                                   'Legal Notes',
                                   'Add legal notes / reference…',
                                 ),
                               ),
+                              DictationBar(controller: _notesCtrl),
                             ],
                           ],
                         ),
