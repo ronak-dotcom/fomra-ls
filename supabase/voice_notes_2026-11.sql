@@ -41,3 +41,8 @@ create policy "authenticated read voice notes"
 drop policy if exists "authenticated add voice notes" on public.land_lead_voice_notes;
 create policy "authenticated add voice notes"
   on public.land_lead_voice_notes for insert to authenticated with check (true);
+
+-- What a voice note is about: follow_up, owner_meeting, site_visit,
+-- management, other ('' for notes recorded before this existed).
+alter table public.land_lead_voice_notes
+  add column if not exists topic text not null default '';

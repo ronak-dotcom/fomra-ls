@@ -45,6 +45,8 @@ class _VoiceNoteRecorderDialogState extends State<_VoiceNoteRecorderDialog> {
   bool _recording = false;
   bool _saving = false;
   bool _liveTextFailed = false;
+  String? _topic;
+  bool _topicMissing = false;
   String? _error;
   String? _filePath;
   Uint8List? _bytes;
@@ -159,6 +161,10 @@ class _VoiceNoteRecorderDialogState extends State<_VoiceNoteRecorderDialog> {
       setState(() => _error = 'No recording to save.');
       return;
     }
+    if (_topic == null) {
+      setState(() => _topicMissing = true);
+      return;
+    }
     setState(() => _saving = true);
     try {
       await VoiceNoteService.saveOfflineOrUpload(
@@ -166,6 +172,7 @@ class _VoiceNoteRecorderDialogState extends State<_VoiceNoteRecorderDialog> {
         bytes: bytes,
         durationMs: _elapsed.inMilliseconds.clamp(500, 3600000),
         transcript: _text.text,
+        topic: _topic!,
         ext: _ext,
       );
       if (!mounted) return;
@@ -198,6 +205,35 @@ class _VoiceNoteRecorderDialogState extends State<_VoiceNoteRecorderDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Text('What is this voice note about?',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: _topicMissing
+                        ? AppColors.error
+                        : context.fomraTextSecondary,
+                  )),
+              const SizedBox(height: 6),
+              Wrap(spacing: 6, runSpacing: 6, children: [
+                for (final (key, label) in VoiceNoteService.topics)
+                  ChoiceChip(
+                    label: Text(label, style: const TextStyle(fontSize: 12.5)),
+                    selected: _topic == key,
+                    onSelected: _saving
+                        ? null
+                        : (on) => setState(() {
+                              _topic = on ? key : null;
+                              _topicMissing = false;
+                            }),
+                  ),
+              ]),
+              if (_topicMissing)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text('Choose one before saving.',
+                      style: TextStyle(fontSize: 12, color: AppColors.error)),
+                ),
+              const SizedBox(height: 16),
               Row(children: [
                 Material(
                   color: _recording ? AppColors.error : AppColors.primary,

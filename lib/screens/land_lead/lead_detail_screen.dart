@@ -35,6 +35,7 @@ import '../../services/lead_review_service.dart';
 import '../../services/nearby_features_service.dart';
 import '../../utils/lead_auto_notes.dart';
 import '../../utils/lead_location_parser.dart';
+import '../../utils/note_time.dart';
 import '../../services/land_lead_site_visit_service.dart';
 import '../../services/voice_note_service.dart';
 import '../../widgets/voice_note_recorder_dialog.dart';
@@ -3279,10 +3280,13 @@ class _ActivityTimeline extends StatelessWidget {
       final isGps = entry.contains('[GPS Check-in]');
       final audioUrl =
           isVoice ? VoiceNoteService.audioRefFromNotesLine(entry) : null;
+      final topic = isVoice ? VoiceNoteService.topicOf(entry) : null;
       events.add((
-        at: lead.addedOn,
+        // At the time it was written; lines without a stamp (the nearby
+        // places block) stay at the lead's creation.
+        at: noteEntryTime(entry) ?? lead.addedOn,
         title: isVoice
-            ? 'Voice note'
+            ? (topic == null ? 'Voice note' : 'Voice note · $topic')
             : (isGps
                 ? 'GPS check-in'
                 : (isAuto ? 'Location Intelligence' : 'Note')),
