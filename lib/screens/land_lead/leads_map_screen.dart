@@ -286,6 +286,7 @@ class _LeadsMapScreenState extends State<LeadsMapScreen> {
               urlTemplate: MapTilerTiles.urlFor(satelliteLayer: _satelliteLayer),
               satelliteLayer: _satelliteLayer,
             ),
+            MapTilerTiles.googleCredit(satelliteLayer: _satelliteLayer),
             MarkerLayer(
               markers: [
                 ...plotted.map((p) {

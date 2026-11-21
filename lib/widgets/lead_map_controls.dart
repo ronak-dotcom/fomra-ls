@@ -151,6 +151,7 @@ class _FullscreenLeadMapState extends State<_FullscreenLeadMap> {
                     MapTilerTiles.urlFor(satelliteLayer: _satelliteLayer),
                 satelliteLayer: _satelliteLayer,
               ),
+              MapTilerTiles.googleCredit(satelliteLayer: _satelliteLayer),
               if (_pinnedPoint != null)
                 MarkerLayer(markers: [
                   Marker(

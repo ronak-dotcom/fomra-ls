@@ -156,7 +156,12 @@ if (process.env.VERCEL_RUN_TESTS === '1') {
 const appBuild = (process.env.VERCEL_GIT_COMMIT_SHA || 'local')
   .slice(0, 7)
   .replace(/[^A-Za-z0-9]/g, '');
-run(`flutter build web --release --dart-define=APP_BUILD=${appBuild}`);
+// Google satellite imagery: only when the GOOGLE_MAPS_KEY env var is set in
+// Vercel (a browser key restricted to the app's address and the Map Tiles
+// API). Without it the app keeps MapTiler's satellite.
+const googleMapsKey = (process.env.GOOGLE_MAPS_KEY || '').replace(/[^A-Za-z0-9_-]/g, '');
+run(`flutter build web --release --dart-define=APP_BUILD=${appBuild}` +
+  (googleMapsKey ? ` --dart-define=GOOGLE_MAPS_KEY=${googleMapsKey}` : ''));
 
 const index = path.join(repoRoot, 'build', 'web', 'index.html');
 if (!fs.existsSync(index)) {

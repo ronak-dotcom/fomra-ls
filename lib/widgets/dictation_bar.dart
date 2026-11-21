@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/dictation.dart';
 import '../theme/app_theme.dart';
@@ -9,10 +8,10 @@ import '../theme/fomra_theme_context.dart';
 /// legal notes, reviews, drop notes).
 const kNotesMaxLength = 5000;
 
-/// Speak-to-type under a notes box: a mic, an EN | தமிழ் switch (remembered
-/// per person on this device) and, while listening, the words being heard.
-/// Finished phrases go into [controller] where the cursor is. Hidden where
-/// the browser has no speech recognition.
+/// Speak-to-type under a notes box: a mic and, while listening, the words
+/// being heard. English only — notes are kept in English. Finished phrases
+/// go into [controller] where the cursor is. Hidden where the browser has no
+/// speech recognition.
 class DictationBar extends StatefulWidget {
   final TextEditingController controller;
   final int maxLength;
@@ -38,11 +37,7 @@ class DictationBar extends StatefulWidget {
 }
 
 class DictationBarState extends State<DictationBar> {
-  static const _prefKey = 'dictation_lang';
-  static String? _savedLang;
-
   DictationSession? _session;
-  String _lang = _savedLang ?? Dictation.languages.first.$1;
   String _interim = '';
   String? _error;
 
@@ -51,34 +46,11 @@ class DictationBarState extends State<DictationBar> {
   @override
   void initState() {
     super.initState();
-    _loadLang();
     if (widget.autoStart) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) start();
       });
     }
-  }
-
-  Future<void> _loadLang() async {
-    if (_savedLang != null) return;
-    try {
-      final p = await SharedPreferences.getInstance();
-      final saved = p.getString(_prefKey);
-      if (saved != null &&
-          Dictation.languages.any((l) => l.$1 == saved) &&
-          mounted) {
-        setState(() => _lang = _savedLang = saved);
-      }
-    } catch (_) {/* default language */}
-  }
-
-  Future<void> _setLang(String lang) async {
-    final wasListening = listening;
-    if (wasListening) stop();
-    setState(() => _lang = _savedLang = lang);
-    try {
-      (await SharedPreferences.getInstance()).setString(_prefKey, lang);
-    } catch (_) {}
   }
 
   void start() {
@@ -88,7 +60,7 @@ class DictationBarState extends State<DictationBar> {
       _interim = '';
     });
     _session = Dictation.start(
-      lang: _lang,
+      lang: Dictation.language,
       onFinal: _insert,
       onInterim: (t) {
         if (mounted) setState(() => _interim = t);
@@ -185,16 +157,13 @@ class DictationBarState extends State<DictationBar> {
                   ),
                 ),
               )
-            else ...[
-              _LangSwitch(value: _lang, onChanged: _setLang),
-              const SizedBox(width: 8),
+            else
               Flexible(
-                child: Text('Tap the mic and speak',
+                child: Text('Tap the mic and speak in English',
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                         fontSize: 12, color: context.fomraTextTertiary)),
               ),
-            ],
           ]),
           if (_error != null)
             Padding(
@@ -206,43 +175,4 @@ class DictationBarState extends State<DictationBar> {
       ),
     );
   }
-}
-
-class _LangSwitch extends StatelessWidget {
-  final String value;
-  final ValueChanged<String> onChanged;
-  const _LangSwitch({required this.value, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: context.fomraBorder),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          for (final (code, label) in Dictation.languages)
-            InkWell(
-              borderRadius: BorderRadius.circular(999),
-              onTap: () => onChanged(code),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: code == value
-                      ? context.fomraTextPrimary
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(label,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: code == value
-                          ? context.fomraSurface
-                          : context.fomraTextSecondary,
-                    )),
-              ),
-            ),
-        ]),
-      );
 }

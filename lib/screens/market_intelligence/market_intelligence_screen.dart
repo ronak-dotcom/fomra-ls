@@ -2661,9 +2661,10 @@ class _MarketIntelligenceScreenState extends State<MarketIntelligenceScreen> {
               color: Colors.white.withValues(alpha: 0.88),
               borderRadius: BorderRadius.circular(4),
             ),
-            child: const Text(
-              MapTilerTiles.attribution,
-              style: TextStyle(fontSize: 9, color: Colors.black87),
+            child: Text(
+              MapTilerTiles.attributionFor(
+                  satelliteLayer: _mapLayer == _MarketMapLayer.satellite),
+              style: const TextStyle(fontSize: 9, color: Colors.black87),
             ),
           ),
         ),
