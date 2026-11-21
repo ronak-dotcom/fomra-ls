@@ -974,6 +974,7 @@ class _AddLeadMapPickerState extends State<AddLeadMapPicker> {
                       MapTilerTiles.urlFor(satelliteLayer: _satelliteLayer),
                   satelliteLayer: _satelliteLayer,
                 ),
+                MapTilerTiles.googleCredit(satelliteLayer: _satelliteLayer),
                 if (pinnedPoint != null)
                   MarkerLayer(markers: [
                     Marker(

@@ -1,3 +1,4 @@
+import 'config/google_satellite_tiles.dart';
 import 'dart:async';
 import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/material.dart';
@@ -196,6 +197,8 @@ class _StartupScreenState extends State<_StartupScreen> {
     } catch (e) {
       error = e.toString();
     }
+    // Google satellite imagery session (only when its key is built in).
+    GoogleSatelliteTiles.warmUp();
     // Bring up Firebase push in the background — fully guarded, never blocks or
     // crashes startup if Firebase isn't configured on this platform.
     if (error == null) unawaited(PushService.init());

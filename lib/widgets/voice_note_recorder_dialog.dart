@@ -230,17 +230,29 @@ class _VoiceNoteRecorderDialogState extends State<_VoiceNoteRecorderDialog> {
               if (_topicMissing)
                 const Padding(
                   padding: EdgeInsets.only(top: 4),
-                  child: Text('Choose one before saving.',
+                  child: Text('Choose one before recording.',
                       style: TextStyle(fontSize: 12, color: AppColors.error)),
                 ),
               const SizedBox(height: 16),
               Row(children: [
                 Material(
-                  color: _recording ? AppColors.error : AppColors.primary,
+                  color: _recording
+                      ? AppColors.error
+                      : (_topic == null
+                          ? context.fomraBorder
+                          : AppColors.primary),
                   shape: const CircleBorder(),
                   child: InkWell(
                     customBorder: const CircleBorder(),
-                    onTap: _saving ? null : (_recording ? _stop : _start),
+                    // The type is chosen first, so no note is ever saved
+                    // without one.
+                    onTap: _saving
+                        ? null
+                        : (_recording
+                            ? _stop
+                            : (_topic == null
+                                ? () => setState(() => _topicMissing = true)
+                                : _start)),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Icon(
@@ -266,9 +278,11 @@ class _VoiceNoteRecorderDialogState extends State<_VoiceNoteRecorderDialog> {
                       Text(
                         _recording
                             ? 'Recording… tap to stop'
-                            : hasTake
-                                ? 'Recorded · tap the mic to record again'
-                                : 'Tap the mic to record (up to 10 min)',
+                            : _topic == null
+                                ? 'Choose what it is about first'
+                                : hasTake
+                                    ? 'Recorded · tap the mic to record again'
+                                    : 'Tap the mic to record (up to 10 min)',
                         style: TextStyle(
                             fontSize: 12.5,
                             color: context.fomraTextSecondary),
@@ -292,7 +306,8 @@ class _VoiceNoteRecorderDialogState extends State<_VoiceNoteRecorderDialog> {
                 textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(
                   labelText: 'What was said',
-                  hintText: 'Written as you speak — correct it if needed',
+                  hintText: 'Written in English as you speak — correct it if '
+                      'needed',
                   alignLabelWithHint: true,
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12)),

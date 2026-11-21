@@ -7,13 +7,14 @@ abstract interface class DictationSession {
   void stop();
 }
 
-/// Speak-to-type with the browser's own speech recognition (Chrome on
-/// Android / desktop, Safari on iPhone): free, needs internet, keeps no
-/// audio. Unsupported browsers report [isSupported] false and the mic is
+/// Speak-to-type in English with the browser's own speech recognition
+/// (Chrome on Android / desktop, Safari on iPhone): free, needs internet,
+/// keeps no audio. Unsupported browsers report [isSupported] false and the mic is
 /// hidden.
 abstract final class Dictation {
-  /// Languages offered on the mic, as (BCP-47 code, short label).
-  static const languages = [('en-IN', 'EN'), ('ta-IN', 'தமிழ்')];
+  /// Notes are kept in English only: the mic always listens for English
+  /// (Indian accent). Voice note audio itself can be in any language.
+  static const language = 'en-IN';
 
   static bool get isSupported => impl.dictationSupported();
 
@@ -41,7 +42,7 @@ abstract final class Dictation {
         'network' => 'Speak-to-type needs an internet connection.',
         'audio-capture' => 'The microphone is busy or not available.',
         'language-not-supported' =>
-          "This phone's speech service doesn't support that language.",
+          "This phone's speech service doesn't support English (India).",
         'unsupported' => "This browser doesn't support speak-to-type.",
         _ => 'Speak-to-type stopped ($error). Tap the mic to try again.',
       };
