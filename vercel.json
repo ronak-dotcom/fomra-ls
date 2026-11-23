@@ -69,6 +69,7 @@
     { "source": "/health", "destination": "/api/health" },
     { "source": "/api/tnlands/(.*)", "destination": "/api/tnlands" },
     { "source": "/api/poi/(.*)", "destination": "/api/poi" },
+    { "source": "/api/competitors/(.*)", "destination": "/api/competitors" },
     { "source": "/api/tnrera/(.*)", "destination": "/api/tnrera" },
     { "source": "/((?!api/)(?!health$).*)", "destination": "/index.html" }
   ]
