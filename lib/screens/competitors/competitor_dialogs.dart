@@ -174,22 +174,24 @@ class _CheckDialogState extends State<_CheckDialog> {
   }
 }
 
-/// Picks one lead (search by number, name or village).
-Future<LandLead?> pickLead(
+/// Picks leads to link (tick several; search by number, name or village).
+Future<List<LandLead>> pickLeads(
   BuildContext context, {
   required List<LandLead> leads,
   Set<String> exclude = const {},
-  String title = 'Link to a lead',
-}) =>
-    showFomraDialog<LandLead>(
+  String title = 'Link to leads',
+}) async =>
+    await showFomraDialog<List<LandLead>>(
       context: context,
-      builder: (_) => _PickerDialog<LandLead>(
+      builder: (_) => _MultiPickerDialog<LandLead>(
         title: title,
         hint: 'Search lead no., name or village…',
+        noun: 'lead',
         items: [
           for (final l in leads)
             if (!exclude.contains(l.leadId)) l,
         ],
+        keyOf: (l) => l.leadId,
         titleOf: (l) => '#${l.leadId} · ${l.displayName}',
         subtitleOf: (l) => [l.village, l.taluk]
             .where((s) => s.trim().isNotEmpty)
@@ -200,22 +202,26 @@ Future<LandLead?> pickLead(
             l.village.toLowerCase().contains(q) ||
             l.taluk.toLowerCase().contains(q),
       ),
-    );
+    ) ??
+    const [];
 
-/// Picks one competitor project (search by code, name, builder or village).
-Future<CompetitorProject?> pickCompetitor(
+/// Picks competitor projects to link (tick several; search by code, name,
+/// builder or village).
+Future<List<CompetitorProject>> pickCompetitors(
   BuildContext context, {
   Set<String> exclude = const {},
-}) =>
-    showFomraDialog<CompetitorProject>(
+}) async =>
+    await showFomraDialog<List<CompetitorProject>>(
       context: context,
-      builder: (_) => _PickerDialog<CompetitorProject>(
-        title: 'Link a competitor project',
+      builder: (_) => _MultiPickerDialog<CompetitorProject>(
+        title: 'Link competitor projects',
         hint: 'Search code, project, builder or village…',
+        noun: 'project',
         items: [
           for (final p in CompetitorService.instance.all)
             if (!exclude.contains(p.id)) p,
         ],
+        keyOf: (p) => p.id,
         titleOf: (p) => '${p.code} · ${p.name}',
         subtitleOf: (p) => [p.builder, p.placeLabel]
             .where((s) => s.trim().isNotEmpty)
@@ -226,32 +232,38 @@ Future<CompetitorProject?> pickCompetitor(
             p.builder.toLowerCase().contains(q) ||
             p.village.toLowerCase().contains(q),
       ),
-    );
+    ) ??
+    const [];
 
-class _PickerDialog<T> extends StatefulWidget {
+class _MultiPickerDialog<T> extends StatefulWidget {
   final String title;
   final String hint;
+  final String noun;
   final List<T> items;
+  final String Function(T) keyOf;
   final String Function(T) titleOf;
   final String Function(T) subtitleOf;
   final bool Function(T, String) matches;
 
-  const _PickerDialog({
+  const _MultiPickerDialog({
     super.key,
     required this.title,
     required this.hint,
+    required this.noun,
     required this.items,
+    required this.keyOf,
     required this.titleOf,
     required this.subtitleOf,
     required this.matches,
   });
 
   @override
-  State<_PickerDialog<T>> createState() => _PickerDialogState<T>();
+  State<_MultiPickerDialog<T>> createState() => _MultiPickerDialogState<T>();
 }
 
-class _PickerDialogState<T> extends State<_PickerDialog<T>> {
+class _MultiPickerDialogState<T> extends State<_MultiPickerDialog<T>> {
   String _q = '';
+  final Set<String> _picked = {};
 
   @override
   Widget build(BuildContext context) {
@@ -260,6 +272,7 @@ class _PickerDialogState<T> extends State<_PickerDialog<T>> {
       for (final i in widget.items)
         if (q.isEmpty || widget.matches(i, q)) i,
     ];
+    final n = _picked.length;
     return AlertDialog(
       insetPadding: fomraDialogInset(context),
       title: Text(widget.title),
@@ -279,19 +292,26 @@ class _PickerDialogState<T> extends State<_PickerDialog<T>> {
           Expanded(
             child: shown.isEmpty
                 ? Center(
-                    child: Text('Nothing matches.',
+                    child: Text(
+                        widget.items.isEmpty
+                            ? 'Already linked to everything.'
+                            : 'Nothing matches.',
                         style: TextStyle(color: context.fomraTextSecondary)))
                 : ListView.separated(
                     itemCount: shown.length,
                     separatorBuilder: (_, __) => const Divider(height: 1),
                     itemBuilder: (_, i) {
                       final item = shown[i];
+                      final key = widget.keyOf(item);
                       final sub = widget.subtitleOf(item);
-                      return ListTile(
+                      return CheckboxListTile(
                         dense: true,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        value: _picked.contains(key),
                         title: Text(widget.titleOf(item)),
                         subtitle: sub.isEmpty ? null : Text(sub),
-                        onTap: () => Navigator.of(context).pop(item),
+                        onChanged: (v) => setState(
+                            () => v == true ? _picked.add(key) : _picked.remove(key)),
                       );
                     },
                   ),
@@ -302,6 +322,114 @@ class _PickerDialogState<T> extends State<_PickerDialog<T>> {
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: n == 0
+              ? null
+              : () => Navigator.of(context).pop([
+                    for (final i in widget.items)
+                      if (_picked.contains(widget.keyOf(i))) i,
+                  ]),
+          child: Text(n == 0
+              ? 'Link'
+              : 'Link $n ${widget.noun}${n == 1 ? '' : 's'}'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Add or edit one sales contact. Returns the contact (null: cancelled).
+Future<CompetitorContact?> showContactDialog(
+  BuildContext context, {
+  CompetitorContact? existing,
+}) =>
+    showFomraDialog<CompetitorContact>(
+      context: context,
+      builder: (_) => _ContactDialog(existing: existing),
+    );
+
+class _ContactDialog extends StatefulWidget {
+  final CompetitorContact? existing;
+  const _ContactDialog({this.existing});
+
+  @override
+  State<_ContactDialog> createState() => _ContactDialogState();
+}
+
+class _ContactDialogState extends State<_ContactDialog> {
+  late final _name = TextEditingController(text: widget.existing?.name ?? '');
+  late final _phone = TextEditingController(text: widget.existing?.phone ?? '');
+  late CompetitorContactRole _role =
+      widget.existing?.role ?? CompetitorContactRole.sales;
+  late bool _main = widget.existing?.isMain ?? false;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _phone.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (_name.text.trim().isEmpty && _phone.text.trim().isEmpty) {
+      AppFeedback.warning(context, 'Type a name or a phone number.');
+      return;
+    }
+    Navigator.of(context).pop(CompetitorContact(
+      id: widget.existing?.id ?? '',
+      name: _name.text.trim(),
+      phone: _phone.text.trim(),
+      role: _role,
+      isMain: _main,
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      insetPadding: fomraDialogInset(context),
+      title: Text(widget.existing == null ? 'Add sales contact' : 'Edit contact'),
+      content: SizedBox(
+        width: 460,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppFormField(controller: _name, label: 'Name', autofocus: true),
+              const SizedBox(height: 12),
+              AppFormField(
+                  controller: _phone,
+                  label: 'Phone',
+                  keyboardType: TextInputType.phone),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<CompetitorContactRole>(
+                initialValue: _role,
+                decoration: const InputDecoration(labelText: 'Role'),
+                items: [
+                  for (final r in CompetitorContactRole.values)
+                    DropdownMenuItem(value: r, child: Text(r.label)),
+                ],
+                onChanged: (r) => setState(() => _role = r ?? _role),
+              ),
+              const SizedBox(height: 8),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                value: _main,
+                onChanged: (v) => setState(() => _main = v ?? false),
+                title: const Text('Main contact'),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        FormActionBar(
+          submitLabel: 'Save',
+          onSubmit: _save,
+          onCancel: () => Navigator.of(context).pop(),
         ),
       ],
     );

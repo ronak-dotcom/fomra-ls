@@ -43,6 +43,10 @@ class _CompetitorMapState extends State<CompetitorMap> {
   bool _satellite = true;
   CompetitorProject? _selected;
 
+  /// Stages switched off in the legend, and whether our lead pins show.
+  final Set<CompetitorStage> _hidden = {};
+  bool _showLeads = true;
+
   LatLng? get _focus =>
       widget.focusLead == null ? null : parseLeadGps(widget.focusLead!.gpsCoordinates);
 
@@ -83,16 +87,25 @@ class _CompetitorMapState extends State<CompetitorMap> {
   Widget build(BuildContext context) {
     final view = _initialView();
     final focus = _focus;
-    final plotted = [
+    final pinned = [
       for (final p in widget.projects)
         if (p.point != null) p,
     ];
-    final leadPins = [
-      for (final l in widget.leads)
-        if (l.leadId != widget.focusLead?.leadId &&
-            parseLeadGps(l.gpsCoordinates) != null)
-          (l, parseLeadGps(l.gpsCoordinates)!),
+    final plotted = [
+      for (final p in pinned)
+        if (!_hidden.contains(p.stage)) p,
     ];
+    final leadPins = [
+      if (_showLeads)
+        for (final l in widget.leads)
+          if (l.leadId != widget.focusLead?.leadId &&
+              parseLeadGps(l.gpsCoordinates) != null)
+            (l, parseLeadGps(l.gpsCoordinates)!),
+    ];
+    final stageCounts = {
+      for (final s in CompetitorStage.values)
+        s: pinned.where((p) => p.stage == s).length,
+    };
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: Stack(children: [
@@ -169,7 +182,20 @@ class _CompetitorMapState extends State<CompetitorMap> {
         Positioned(
           right: 10,
           top: 10,
-          child: _Legend(showFocus: focus != null),
+          child: _Legend(
+            showFocus: focus != null,
+            counts: stageCounts,
+            hidden: _hidden,
+            showLeads: _showLeads,
+            hasLeads: widget.leads.any((l) => l.leadId != widget.focusLead?.leadId),
+            onToggleStage: (s) => setState(() {
+              if (!_hidden.remove(s)) _hidden.add(s);
+              if (_selected != null && _hidden.contains(_selected!.stage)) {
+                _selected = null;
+              }
+            }),
+            onToggleLeads: () => setState(() => _showLeads = !_showLeads),
+          ),
         ),
         if (_selected != null)
           Positioned(
@@ -196,34 +222,79 @@ class _CompetitorMapState extends State<CompetitorMap> {
   }
 }
 
+/// The map key, which is also the on / off switches: tap a stage or
+/// "Our leads" to hide or show those pins.
 class _Legend extends StatelessWidget {
   final bool showFocus;
-  const _Legend({required this.showFocus});
+  final Map<CompetitorStage, int> counts;
+  final Set<CompetitorStage> hidden;
+  final bool showLeads;
+  final bool hasLeads;
+  final ValueChanged<CompetitorStage> onToggleStage;
+  final VoidCallback onToggleLeads;
+
+  const _Legend({
+    required this.showFocus,
+    required this.counts,
+    required this.hidden,
+    required this.showLeads,
+    required this.hasLeads,
+    required this.onToggleStage,
+    required this.onToggleLeads,
+  });
 
   @override
   Widget build(BuildContext context) {
-    Widget dot(Color c, String t) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 1.5),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Container(
-                width: 9,
-                height: 9,
-                decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
-            const SizedBox(width: 5),
-            Text(t,
-                style: TextStyle(fontSize: 10.5, color: context.fomraTextPrimary)),
-          ]),
+    Widget row(Color c, String t, bool on, VoidCallback? onTap) => InkWell(
+          borderRadius: BorderRadius.circular(6),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(
+                onTap == null
+                    ? Icons.circle
+                    : on
+                        ? Icons.check_box_rounded
+                        : Icons.check_box_outline_blank_rounded,
+                size: onTap == null ? 10 : 17,
+                color: on ? c : context.fomraTextSecondary,
+              ),
+              const SizedBox(width: 5),
+              Text(t,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: on ? FontWeight.w600 : FontWeight.w400,
+                    color: on
+                        ? context.fomraTextPrimary
+                        : context.fomraTextSecondary,
+                    decoration: on ? null : TextDecoration.lineThrough,
+                  )),
+            ]),
+          ),
         );
     return Material(
-      color: context.fomraSurface.withValues(alpha: 0.93),
+      color: context.fomraSurface.withValues(alpha: 0.95),
       borderRadius: BorderRadius.circular(10),
       elevation: 1,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        padding: const EdgeInsets.fromLTRB(6, 6, 8, 6),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          for (final s in CompetitorStage.values) dot(s.color, s.label),
-          dot(const Color(0xFF0EA5E9), 'Our leads'),
-          if (showFocus) dot(AppColors.error, 'This lead'),
+          Padding(
+            padding: const EdgeInsets.only(left: 2, bottom: 2),
+            child: Text('Show',
+                style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    color: context.fomraTextSecondary)),
+          ),
+          for (final s in CompetitorStage.values)
+            if ((counts[s] ?? 0) > 0)
+              row(s.color, '${s.label} ${counts[s]}', !hidden.contains(s),
+                  () => onToggleStage(s)),
+          if (hasLeads)
+            row(const Color(0xFF0EA5E9), 'Our leads', showLeads, onToggleLeads),
+          if (showFocus) row(AppColors.error, 'This lead', true, null),
         ]),
       ),
     );

@@ -5,6 +5,7 @@ import 'package:fomra_ls/models/competitor_project.dart';
 import 'package:fomra_ls/models/land_lead.dart';
 import 'package:fomra_ls/utils/competitor_analysis.dart';
 import 'package:fomra_ls/utils/maps_link_pin.dart';
+import 'package:fomra_ls/services/competitor_service.dart';
 
 LandLead lead(String id, {String gps = '', String village = '', String extent = ''}) =>
     LandLead(
@@ -243,5 +244,55 @@ void main() {
     expect(p.linkedLeadIds, ['135']);
     expect(p.dealPrice, 2100);
     expect(p.recheckDue!.isAfter(DateTime(2027, 3, 1)), isTrue);
+  });
+
+  group('sales contacts', () {
+    test('main contact first; old single sales person as a fallback', () {
+      final p = CompetitorProject.fromJson({
+        'id': 'x', 'name': 'Aloka', 'sales_person': 'Armstrong', 'sales_phone': '7448944448',
+        'competitor_contacts': [
+          {'id': 'b', 'name': 'Ramesh', 'phone': '98400', 'role': 'site_incharge', 'sort': 1},
+          {'id': 'a', 'name': 'Armstrong', 'phone': '7448944448', 'role': 'sales', 'is_main': true, 'sort': 0},
+          {'id': 'c', 'name': 'Priya', 'phone': '', 'role': 'channel_partner', 'sort': 2},
+        ],
+      });
+      expect(p.contacts.map((c) => c.name), ['Armstrong', 'Ramesh', 'Priya']);
+      expect(p.mainContact!.name, 'Armstrong');
+      expect(p.contacts[1].role, CompetitorContactRole.siteIncharge);
+      expect(p.contacts[1].label, 'Ramesh (Site in-charge)');
+
+      final legacy = CompetitorProject(name: 'Old', salesPerson: 'Vijay', salesPhone: '95666');
+      expect(legacy.allContacts.single.name, 'Vijay');
+      expect(legacy.mainContact!.isMain, isTrue);
+      expect(CompetitorProject(name: 'None').allContacts, isEmpty);
+    });
+
+    test('exactly one main contact; blank rows dropped', () {
+      final out = CompetitorService.withMain(const [
+        CompetitorContact(name: ''),
+        CompetitorContact(name: 'A', phone: '1'),
+        CompetitorContact(name: 'B', phone: '2', isMain: true),
+        CompetitorContact(name: 'C', isMain: true),
+      ]);
+      expect(out.map((c) => c.name), ['A', 'B', 'C']);
+      expect(out.where((c) => c.isMain).map((c) => c.name), ['B']);
+      final none = CompetitorService.withMain(const [
+        CompetitorContact(name: 'A'),
+        CompetitorContact(name: 'B'),
+      ]);
+      expect(none.first.isMain, isTrue);
+      expect(none.last.isMain, isFalse);
+    });
+
+    test('comparison row lists every contact and phone', () {
+      final p = CompetitorProject(name: 'Aloka', contacts: const [
+        CompetitorContact(name: 'Armstrong', phone: '7448944448', isMain: true),
+        CompetitorContact(name: 'Ramesh', phone: '98400', role: CompetitorContactRole.siteIncharge),
+      ]);
+      final row = comparisonRow(0, NearbyCompetitor(project: p, km: null, sameVillage: false, linked: true));
+      final h = comparisonHeaders;
+      expect(row[h.indexOf('Sales contacts')], 'Armstrong (Sales); Ramesh (Site in-charge)');
+      expect(row[h.indexOf('Phones')], '7448944448; 98400');
+    });
   });
 }
