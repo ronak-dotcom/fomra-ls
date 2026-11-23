@@ -43,6 +43,13 @@ class FomraSideNav extends StatefulWidget {
         Icons.space_dashboard,
         'Workspace',
       ),
+      // Nearby developer projects: everyone adds and updates them.
+      const FomraSideNavItem(
+        '/competitors',
+        Icons.apartment_outlined,
+        Icons.apartment_rounded,
+        'Competitors',
+      ),
     ];
     // Reports are available to everyone; the report data is role-scoped
     // (an executive only ever sees their own leads via visibleLeads).

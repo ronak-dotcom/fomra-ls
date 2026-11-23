@@ -3,6 +3,7 @@ const squareYardsRouter = require('./squareyards');
 const nobrokerRouter    = require('./nobroker');
 const { applyRadiusFilter } = require('../lib/listingRadius');
 const { geocodeListings } = require('../lib/listingGeocode');
+const { resolveMapsLink } = require('../lib/mapsLink');
 
 const router = express.Router();
 
@@ -124,6 +125,18 @@ function computePriceStats(listings) {
     pricedCount: rates.length,
   };
 }
+
+// GET /api/competitors/resolve-map?url=<Google Maps link>
+// → { lat, lng, url } — the pin a (short) Google Maps link points at.
+router.get('/resolve-map', async (req, res) => {
+  try {
+    const pin = await resolveMapsLink(req.query.url);
+    if (!pin) return res.status(404).json({ error: 'No pin found in that link.' });
+    return res.json(pin);
+  } catch (e) {
+    return res.status(e.status || 502).json({ error: e.message || 'Could not read the link.' });
+  }
+});
 
 // GET /api/competitors?city=Chennai&lat=&lng=&radius=
 router.get('/', async (req, res) => {

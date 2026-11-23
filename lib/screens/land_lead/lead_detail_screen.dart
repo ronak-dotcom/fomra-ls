@@ -57,6 +57,7 @@ import '../../widgets/owner_profile_widgets.dart';
 import '../../widgets/who_we_met_card.dart';
 import '../../utils/phone_validation.dart';
 import '../market_intelligence/market_intelligence_screen.dart';
+import '../competitors/lead_competitors_tab.dart';
 import '../task_management/task_management_screen.dart';
 import 'add_lead_screen.dart';
 import 'follow_up_dialog.dart';
@@ -207,14 +208,14 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
   final GlobalKey _timelineKey = GlobalKey();
   final ScrollController _scrollController = ScrollController();
 
-  /// Competitor Projects sits beside Land Records, but only management may see
-  /// it — an executive, RM or Head never gets the tab at all.
-  static List<String> get _tabs => [
+  /// Competitors is for everyone (nearby projects the team tracks); inside
+  /// it, the price analysis and portal listings are management only.
+  static List<String> get _tabs => const [
         'Activity',
         'Photos',
         'Infrastructure',
         'Land Records',
-        if (AuthService.instance.isManagement) 'Competitor Projects',
+        'Competitors',
       ];
 
   static const _miTabStart = 2;
@@ -2617,13 +2618,18 @@ class _WorkspacePanel extends StatelessWidget {
                         scrollable: false,
                       );
                     default:
-                      // Only reachable for management: the tab isn't built for
-                      // anyone else.
-                      return _LazyMarketIntelTab(
-                        active: shouldLoadMiTab(4),
+                      return LeadCompetitorsTab(
                         lead: lead,
-                        section: MarketIntelLeadSection.competitorProjects,
-                        scrollable: false,
+                        // Property-portal listings stay management only.
+                        portalListings: AuthService.instance.isManagement
+                            ? _LazyMarketIntelTab(
+                                active: shouldLoadMiTab(4),
+                                lead: lead,
+                                section:
+                                    MarketIntelLeadSection.competitorProjects,
+                                scrollable: false,
+                              )
+                            : null,
                       );
                   }
                 },

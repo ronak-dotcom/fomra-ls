@@ -48,7 +48,8 @@ void main() {
     ));
     // Zero lines share one "All clear" line instead of a box each.
     expect(find.text('Approvals waiting on you'), findsNothing);
-    expect(find.text('All clear: approvals · reviews'), findsOneWidget);
+    expect(find.text('All clear: approvals · reviews · competitor checks'),
+        findsOneWidget);
     Text countOf(String title) => t.widget<Text>(find.descendant(
         of: find.ancestor(of: find.text(title), matching: find.byType(Row)).first,
         matching: find.byWidgetPredicate(

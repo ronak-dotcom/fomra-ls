@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../analytics/management_bi_metrics.dart';
+import '../models/competitor_project.dart';
 import '../models/land_lead.dart';
 import '../models/lead_review.dart';
+import '../screens/competitors/competitors_screen.dart';
 import '../screens/land_lead/filtered_leads_screen.dart';
+import '../services/competitor_service.dart';
 import '../services/lead_review_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/fomra_theme_context.dart';
@@ -146,11 +149,14 @@ class _NeedsAttentionCardState extends State<NeedsAttentionCard> {
     super.initState();
     LeadReviewIndex.instance.addListener(_rebuild);
     LeadReviewIndex.instance.ensureLoaded(force: true);
+    CompetitorService.instance.addListener(_rebuild);
+    CompetitorService.instance.ensureLoaded();
   }
 
   @override
   void dispose() {
     LeadReviewIndex.instance.removeListener(_rebuild);
+    CompetitorService.instance.removeListener(_rebuild);
     super.dispose();
   }
 
@@ -188,6 +194,11 @@ class _NeedsAttentionCardState extends State<NeedsAttentionCard> {
               if (ReviewFilter.overdue.matches(index.latestFor(l.leadId))) l,
           ]
         : const <LandLead>[];
+
+    final recheckDue = [
+      for (final p in CompetitorService.instance.all)
+        if (p.recheckIsDue(now)) p,
+    ].length;
 
     final items = [
       AttentionItem(
@@ -250,6 +261,18 @@ class _NeedsAttentionCardState extends State<NeedsAttentionCard> {
             'Active sites with no Land Owner Meeting scheduled and none in '
                 'the last ${widget.noNextStepDays} days',
             widget.noNextStep),
+      ),
+      AttentionItem(
+        icon: Icons.apartment_outlined,
+        color: AppColors.warning,
+        title: 'Competitor re-checks due',
+        clearLabel: 'competitor checks',
+        subtitle: 'Prices not checked in '
+            '${CompetitorProject.recheckDays} days',
+        count: recheckDue,
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => const CompetitorsScreen(initialDueOnly: true),
+        )),
       ),
     ];
 
