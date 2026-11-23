@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/competitor_project.dart';
 import '../../models/land_lead.dart';
+import '../../services/app_store.dart';
 import '../../services/auth_service.dart';
 import '../../services/competitor_service.dart';
 import '../../services/csv_saver_stub.dart'
@@ -15,6 +16,7 @@ import '../../utils/competitor_analysis.dart';
 import '../../utils/lead_location_parser.dart';
 import '../../widgets/ui/app_components.dart';
 import '../../widgets/ui/app_feedback.dart';
+import '../land_lead/lead_detail_screen.dart';
 import 'competitor_detail_screen.dart';
 import 'competitor_dialogs.dart';
 import 'competitor_form_screen.dart';
@@ -64,20 +66,41 @@ class _LeadCompetitorsTabState extends State<LeadCompetitorsTab> {
         builder: (_) => CompetitorDetailScreen(projectId: p.id),
       ));
 
+  /// Another lead the project is linked to (this lead's own number does
+  /// nothing).
+  void _openOtherLead(String id) {
+    if (id == lead.leadId) return;
+    final l = AppStore.instance.visibleLeads.where((l) => l.leadId == id).firstOrNull;
+    if (l == null) {
+      AppFeedback.info(context, 'Lead #$id is not in your list.');
+      return;
+    }
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => LeadDetailScreen(lead: l),
+    ));
+  }
+
   Future<void> _add() async {
     await CompetitorFormScreen.open(context,
         linkLeadId: lead.leadId, initialVillage: lead.village);
   }
 
   Future<void> _linkExisting(List<NearbyCompetitor> shown) async {
-    final p = await pickCompetitor(context, exclude: {
+    final picked = await pickCompetitors(context, exclude: {
       for (final c in CompetitorService.instance.all)
         if (c.linkedLeadIds.contains(lead.leadId)) c.id,
     });
-    if (p == null) return;
+    if (picked.isEmpty) return;
     try {
-      await CompetitorService.instance.link(p.id, lead.leadId);
-      if (mounted) AppFeedback.success(context, 'Linked ${p.code} ${p.name}.');
+      await CompetitorService.instance
+          .linkProjects(lead.leadId, [for (final p in picked) p.id]);
+      if (mounted) {
+        AppFeedback.success(
+            context,
+            picked.length == 1
+                ? 'Linked ${picked.first.code} ${picked.first.name}.'
+                : 'Linked ${picked.length} projects.');
+      }
     } catch (e) {
       if (mounted) AppFeedback.error(context, 'Could not link: $e');
     }
@@ -201,6 +224,7 @@ class _LeadCompetitorsTabState extends State<LeadCompetitorsTab> {
                 project: n.project,
                 trailingNote: n.reason,
                 onTap: () => _open(n.project),
+                onOpenLead: _openOtherLead,
               ),
               const SizedBox(height: 10),
             ],

@@ -11,6 +11,7 @@ import '../../utils/competitor_analysis.dart';
 import '../../widgets/fomra_app_bar.dart';
 import '../../widgets/fomra_app_shell.dart';
 import '../../widgets/ui/app_components.dart';
+import '../../widgets/ui/app_feedback.dart';
 import '../land_lead/lead_detail_screen.dart';
 import 'competitor_detail_screen.dart';
 import 'competitor_form_screen.dart';
@@ -91,6 +92,15 @@ class _CompetitorsScreenState extends State<CompetitorsScreen> {
   void _open(CompetitorProject p) => Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => CompetitorDetailScreen(projectId: p.id),
       ));
+
+  void _openLeadId(String id) {
+    final l = AppStore.instance.visibleLeads.where((l) => l.leadId == id).firstOrNull;
+    if (l == null) {
+      AppFeedback.info(context, 'Lead #$id is not in your list.');
+      return;
+    }
+    _openLead(l);
+  }
 
   void _openLead(LandLead l) => Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => LeadDetailScreen(lead: l),
@@ -267,6 +277,7 @@ class _CompetitorsScreenState extends State<CompetitorsScreen> {
                   ? null
                   : '${near.$2.toStringAsFixed(1)} km from #${near.$1.leadId}',
               onTap: () => _open(p),
+              onOpenLead: _openLeadId,
             );
           },
         ),

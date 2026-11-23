@@ -68,11 +68,16 @@ class CompetitorTile extends StatelessWidget {
   final String? trailingNote;
   final VoidCallback? onTap;
 
+  /// Opens a linked lead when its number is tapped (null: not tappable,
+  /// e.g. a lead this person can't see).
+  final void Function(String leadId)? onOpenLead;
+
   const CompetitorTile({
     super.key,
     required this.project,
     this.trailingNote,
     this.onTap,
+    this.onOpenLead,
   });
 
   @override
@@ -151,6 +156,10 @@ class CompetitorTile extends StatelessWidget {
           if (p.point == null)
             _fact(context, Icons.location_off_outlined, 'No pin'),
         ]),
+        if (p.linkedLeadIds.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          _LinkedLeads(ids: p.linkedLeadIds, onOpenLead: onOpenLead),
+        ],
         const SizedBox(height: 8),
         CompetitorFreshness(project: p),
       ]),
@@ -248,5 +257,51 @@ class OurLeadPin extends StatelessWidget {
       ),
       Icon(Icons.location_on, color: color, size: highlight ? 32 : 26),
     ]);
+  }
+}
+
+/// "Linked: #135, #36" — each number opens that lead.
+class _LinkedLeads extends StatelessWidget {
+  final List<String> ids;
+  final void Function(String leadId)? onOpenLead;
+
+  const _LinkedLeads({required this.ids, this.onOpenLead});
+
+  @override
+  Widget build(BuildContext context) {
+    final sorted = [...ids]..sort((a, b) {
+        final x = int.tryParse(a), y = int.tryParse(b);
+        return x != null && y != null ? x.compareTo(y) : a.compareTo(b);
+      });
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 6,
+      runSpacing: 4,
+      children: [
+        const Icon(Icons.link_rounded, size: 15, color: AppColors.purple),
+        Text('Linked:',
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: context.fomraTextSecondary)),
+        for (final id in sorted)
+          InkWell(
+            borderRadius: BorderRadius.circular(6),
+            onTap: onOpenLead == null ? null : () => onOpenLead!(id),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.purple.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text('#$id',
+                  style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.purple)),
+            ),
+          ),
+      ],
+    );
   }
 }

@@ -96,13 +96,18 @@ class _CompetitorDetailScreenState extends State<CompetitorDetailScreen> {
   }
 
   Future<void> _linkLead(CompetitorProject p) async {
-    final lead = await pickLead(context,
+    final leads = await pickLeads(context,
+        title: 'Link ${p.name} to leads',
         leads: AppStore.instance.visibleLeads,
         exclude: p.linkedLeadIds.toSet());
-    if (lead == null) return;
+    if (leads.isEmpty) return;
     try {
-      await CompetitorService.instance.link(p.id, lead.leadId);
-      if (mounted) AppFeedback.success(context, 'Linked to #${lead.leadId}.');
+      await CompetitorService.instance
+          .linkLeads(p.id, [for (final l in leads) l.leadId]);
+      if (mounted) {
+        AppFeedback.success(context,
+            'Linked to ${leads.map((l) => '#${l.leadId}').join(', ')}.');
+      }
     } catch (e) {
       if (mounted) AppFeedback.error(context, 'Could not link: $e');
     }
@@ -481,34 +486,119 @@ class _CompetitorDetailScreenState extends State<CompetitorDetailScreen> {
         ]),
       ]);
 
-  Widget _salesCard(CompetitorProject p) => _card('Sales contact & amenities', Icons.support_agent_outlined, [
-        if (p.salesPerson.isNotEmpty || p.salesPhone.isNotEmpty)
-          Row(children: [
-            Expanded(
-              child: Text(
-                [p.salesPerson, p.salesPhone].where((s) => s.isNotEmpty).join(' · '),
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: context.fomraTextPrimary),
-              ),
-            ),
-            ContactCallWhatsApp(contact: p.salesPhone, accent: AppColors.primary),
-          ])
-        else
+  Future<void> _saveContacts(CompetitorProject p, List<CompetitorContact> list,
+      String done) async {
+    try {
+      await CompetitorService.instance.saveContacts(p, list);
+      if (mounted) AppFeedback.success(context, done);
+    } catch (e) {
+      if (mounted) AppFeedback.error(context, 'Could not save: $e');
+    }
+  }
+
+  Future<void> _addContact(CompetitorProject p) async {
+    final c = await showContactDialog(context);
+    if (c == null) return;
+    final list = [
+      for (final x in p.allContacts) c.isMain ? x.copyWith(isMain: false) : x,
+      c,
+    ];
+    await _saveContacts(p, list, 'Added ${c.name.isEmpty ? c.phone : c.name}.');
+  }
+
+  Future<void> _contactAction(CompetitorProject p, int i, String action) async {
+    final list = [...p.allContacts];
+    if (i < 0 || i >= list.length) return;
+    final c = list[i];
+    switch (action) {
+      case 'edit':
+        final edited = await showContactDialog(context, existing: c);
+        if (edited == null) return;
+        list[i] = edited;
+        if (edited.isMain) {
+          for (var j = 0; j < list.length; j++) {
+            if (j != i) list[j] = list[j].copyWith(isMain: false);
+          }
+        }
+        await _saveContacts(p, list, 'Saved.');
+      case 'main':
+        await _saveContacts(
+            p,
+            [for (var j = 0; j < list.length; j++) list[j].copyWith(isMain: j == i)],
+            '${c.name} is now the main contact.');
+      case 'remove':
+        list.removeAt(i);
+        await _saveContacts(p, list, 'Removed ${c.name}.');
+    }
+  }
+
+  Widget _salesCard(CompetitorProject p) {
+    final contacts = p.allContacts;
+    return _card(
+      'Sales contacts',
+      Icons.support_agent_outlined,
+      [
+        if (contacts.isEmpty)
           Text('No sales contact yet.',
               style: TextStyle(fontSize: 13, color: context.fomraTextSecondary)),
-        if (p.amenities.isNotEmpty) ...[
-          const SizedBox(height: 12),
+        for (final (i, c) in contacts.indexed)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(children: [
+              Icon(c.isMain ? Icons.star_rounded : Icons.person_outline_rounded,
+                  size: 18,
+                  color: c.isMain ? AppColors.warning : context.fomraTextSecondary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(c.name.isEmpty ? 'No name' : c.name,
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: context.fomraTextPrimary)),
+                    Text(
+                      [c.role.label, if (c.phone.isNotEmpty) c.phone,
+                        if (c.isMain) 'main contact'].join(' · '),
+                      style: TextStyle(
+                          fontSize: 12.5, color: context.fomraTextSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              ContactCallWhatsApp(
+                  contact: c.phone, accent: AppColors.primary, size: 32, iconSize: 16),
+              PopupMenuButton<String>(
+                  tooltip: 'More',
+                  onSelected: (a) => _contactAction(p, i, a),
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                    if (!c.isMain)
+                      const PopupMenuItem(
+                          value: 'main', child: Text('Make main contact')),
+                    const PopupMenuItem(value: 'remove', child: Text('Remove')),
+                  ],
+                ),
+            ]),
+          ),
+        if (p.amenities.isNotEmpty || p.notes.isNotEmpty) const Divider(height: 18),
+        if (p.amenities.isNotEmpty)
           Text(p.amenities,
               style: TextStyle(fontSize: 13.5, height: 1.4, color: context.fomraTextPrimary)),
-        ],
         if (p.notes.isNotEmpty) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Text(p.notes,
               style: TextStyle(fontSize: 13, height: 1.4, color: context.fomraTextSecondary)),
         ],
-      ]);
+      ],
+      trailing: TextButton.icon(
+        onPressed: () => _addContact(p),
+        icon: const Icon(Icons.person_add_alt_1_outlined, size: 18),
+        label: const Text('Add'),
+      ),
+    );
+  }
 
   Widget _leadsCard(CompetitorProject p) {
     final leads = AppStore.instance.visibleLeads;

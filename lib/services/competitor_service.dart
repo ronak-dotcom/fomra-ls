@@ -13,7 +13,8 @@ class CompetitorService extends ChangeNotifier {
 
   static SupabaseClient get _db => Supabase.instance.client;
   static const bucket = 'competitor-media';
-  static const _select = '*, competitor_phases(*), competitor_lead_links(lead_id)';
+  static const _select =
+      '*, competitor_phases(*), competitor_lead_links(lead_id), competitor_contacts(*)';
 
   final List<CompetitorProject> _all = [];
   bool _loaded = false;
@@ -91,15 +92,19 @@ class CompetitorService extends ChangeNotifier {
   Future<CompetitorProject> create(
     CompetitorProject p, {
     List<CompetitorPhase> phases = const [],
+    List<CompetitorContact> contacts = const [],
     String? linkLeadId,
     Uint8List? photo,
     String photoName = 'photo.jpg',
   }) async {
     final now = DateTime.now().toUtc().toIso8601String();
+    final main = withMain(contacts).where((c) => c.isMain).firstOrNull;
     final row = await _db
         .from('competitor_projects')
         .insert({
           ...p.toRow(),
+          'sales_person': main?.name.trim() ?? '',
+          'sales_phone': main?.phone.trim() ?? '',
           'owner_name': _me,
           'owner_email': _myEmail,
           'created_by_name': _me,
@@ -130,8 +135,9 @@ class CompetitorService extends ChangeNotifier {
       'available': sum((x) => x.available),
       'notes': 'Added',
     });
+    await _insertContacts(id, contacts);
     if (linkLeadId != null && linkLeadId.trim().isNotEmpty) {
-      await link(id, linkLeadId, reload: false);
+      await linkLeads(id, [linkLeadId], reload: false);
     }
     if (photo != null) {
       try {
@@ -148,8 +154,19 @@ class CompetitorService extends ChangeNotifier {
   Future<CompetitorProject> update(
     CompetitorProject p, {
     List<CompetitorPhase>? phases,
+    List<CompetitorContact>? contacts,
   }) async {
-    await _db.from('competitor_projects').update(p.toRow()).eq('id', p.id);
+    final row = p.toRow();
+    if (contacts != null) {
+      final main = withMain(contacts).where((c) => c.isMain).firstOrNull;
+      row['sales_person'] = main?.name.trim() ?? '';
+      row['sales_phone'] = main?.phone.trim() ?? '';
+    }
+    await _db.from('competitor_projects').update(row).eq('id', p.id);
+    if (contacts != null) {
+      await _db.from('competitor_contacts').delete().eq('project_id', p.id);
+      await _insertContacts(p.id, contacts);
+    }
     if (phases != null) {
       await _db.from('competitor_phases').delete().eq('project_id', p.id);
       if (phases.isNotEmpty) {
@@ -216,13 +233,68 @@ class CompetitorService extends ChangeNotifier {
     ];
   }
 
-  Future<void> link(String projectId, String leadId, {bool reload = true}) async {
-    await _db.from('competitor_lead_links').upsert({
-      'project_id': projectId,
-      'lead_id': leadId.trim(),
-      'linked_by_name': _me,
-    }, onConflict: 'project_id,lead_id');
+  /// Links one project to several leads.
+  Future<void> linkLeads(String projectId, List<String> leadIds,
+      {bool reload = true}) async {
+    final ids = {for (final l in leadIds) if (l.trim().isNotEmpty) l.trim()};
+    if (ids.isEmpty) return;
+    await _db.from('competitor_lead_links').upsert([
+      for (final l in ids)
+        {'project_id': projectId, 'lead_id': l, 'linked_by_name': _me},
+    ], onConflict: 'project_id,lead_id');
     if (reload) await _reload(projectId);
+  }
+
+  /// Links several projects to one lead.
+  Future<void> linkProjects(String leadId, List<String> projectIds) async {
+    final ids = projectIds.toSet();
+    if (ids.isEmpty) return;
+    await _db.from('competitor_lead_links').upsert([
+      for (final p in ids)
+        {'project_id': p, 'lead_id': leadId.trim(), 'linked_by_name': _me},
+    ], onConflict: 'project_id,lead_id');
+    for (final p in ids) {
+      await _reload(p);
+    }
+  }
+
+  // ── Sales contacts ────────────────────────────────────────────────────
+
+  /// Exactly one main contact (the first when none is marked); blank rows
+  /// dropped.
+  @visibleForTesting
+  static List<CompetitorContact> withMain(List<CompetitorContact> contacts) {
+    final kept = [for (final c in contacts) if (!c.isEmpty) c];
+    if (kept.isEmpty) return kept;
+    var mainAt = kept.indexWhere((c) => c.isMain);
+    if (mainAt < 0) mainAt = 0;
+    return [
+      for (var i = 0; i < kept.length; i++) kept[i].copyWith(isMain: i == mainAt),
+    ];
+  }
+
+  Future<void> _insertContacts(String projectId, List<CompetitorContact> contacts) async {
+    final rows = withMain(contacts);
+    if (rows.isEmpty) return;
+    await _db.from('competitor_contacts').insert([
+      for (var i = 0; i < rows.length; i++)
+        {...rows[i].toRow(projectId, i), 'created_by_name': _me},
+    ]);
+  }
+
+  /// Replaces the project's contacts (add / edit / remove / main from the
+  /// project page) and keeps its main sales person in step.
+  Future<CompetitorProject> saveContacts(
+      CompetitorProject p, List<CompetitorContact> contacts) async {
+    final rows = withMain(contacts);
+    final main = rows.where((c) => c.isMain).firstOrNull;
+    await _db.from('competitor_contacts').delete().eq('project_id', p.id);
+    await _insertContacts(p.id, rows);
+    await _db.from('competitor_projects').update({
+      'sales_person': main?.name.trim() ?? '',
+      'sales_phone': main?.phone.trim() ?? '',
+    }).eq('id', p.id);
+    return _reload(p.id);
   }
 
   Future<void> unlink(String projectId, String leadId) async {

@@ -141,6 +141,76 @@ class CompetitorCheck {
       );
 }
 
+/// What a sales contact does at the project.
+enum CompetitorContactRole {
+  sales('sales', 'Sales'),
+  salesManager('sales_manager', 'Sales manager'),
+  siteIncharge('site_incharge', 'Site in-charge'),
+  channelPartner('channel_partner', 'Channel partner'),
+  other('other', 'Other');
+
+  const CompetitorContactRole(this.key, this.label);
+  final String key;
+  final String label;
+
+  static CompetitorContactRole from(String? key) =>
+      values.firstWhere((r) => r.key == key, orElse: () => sales);
+}
+
+/// One of the project's sales contacts; one of them is the main contact.
+class CompetitorContact {
+  final String id;
+  final String name;
+  final String phone;
+  final CompetitorContactRole role;
+  final bool isMain;
+  final int sort;
+
+  const CompetitorContact({
+    this.id = '',
+    this.name = '',
+    this.phone = '',
+    this.role = CompetitorContactRole.sales,
+    this.isMain = false,
+    this.sort = 0,
+  });
+
+  bool get isEmpty => name.trim().isEmpty && phone.trim().isEmpty;
+
+  /// "Armstrong (Sales)".
+  String get label => [
+        if (name.trim().isNotEmpty) name.trim() else 'No name',
+        '(${role.label})',
+      ].join(' ');
+
+  CompetitorContact copyWith({bool? isMain}) => CompetitorContact(
+        id: id,
+        name: name,
+        phone: phone,
+        role: role,
+        isMain: isMain ?? this.isMain,
+        sort: sort,
+      );
+
+  factory CompetitorContact.fromJson(Map<String, dynamic> j) => CompetitorContact(
+        id: _str(j['id']),
+        name: _str(j['name']),
+        phone: _str(j['phone']),
+        role: CompetitorContactRole.from(j['role']?.toString()),
+        isMain: j['is_main'] == true,
+        sort: _int(j['sort']) ?? 0,
+      );
+
+  Map<String, dynamic> toRow(String projectId, int sort) => {
+        'project_id': projectId,
+        'name': name.trim(),
+        'phone': phone.trim(),
+        'role': role.key,
+        'is_main': isMain,
+        'sort': sort,
+      };
+}
+
 /// A photo or document on a project (private storage).
 class CompetitorMedia {
   final String id;
@@ -228,6 +298,9 @@ class CompetitorProject {
   /// Leads this project was linked to by hand.
   final List<String> linkedLeadIds;
 
+  /// Sales contacts, main contact first.
+  final List<CompetitorContact> contacts;
+
   CompetitorProject({
     this.id = '',
     this.code = '',
@@ -274,6 +347,7 @@ class CompetitorProject {
     DateTime? updatedAt,
     this.phases = const [],
     this.linkedLeadIds = const [],
+    this.contacts = const [],
   })  : createdAt = createdAt ?? _epoch,
         updatedAt = updatedAt ?? _epoch;
 
@@ -284,6 +358,19 @@ class CompetitorProject {
 
   LatLng? get point =>
       lat != null && lng != null ? LatLng(lat!, lng!) : null;
+
+  /// The main sales contact (else the first; else the old single fields).
+  CompetitorContact? get mainContact {
+    if (contacts.isNotEmpty) {
+      return contacts.firstWhere((c) => c.isMain, orElse: () => contacts.first);
+    }
+    if (salesPerson.trim().isEmpty && salesPhone.trim().isEmpty) return null;
+    return CompetitorContact(name: salesPerson, phone: salesPhone, isMain: true);
+  }
+
+  /// All contacts, or the old single sales person as one contact.
+  List<CompetitorContact> get allContacts =>
+      contacts.isNotEmpty ? contacts : [if (mainContact != null) mainContact!];
 
   /// Total plots across phases (null when no phase has a count).
   int? get totalPlots => _sum((p) => p.plots);
@@ -347,6 +434,13 @@ class CompetitorProject {
       for (final p in (j['competitor_phases'] as List? ?? const []))
         CompetitorPhase.fromJson(Map<String, dynamic>.from(p as Map)),
     ]..sort((a, b) => a.sort.compareTo(b.sort));
+    final contacts = [
+      for (final c in (j['competitor_contacts'] as List? ?? const []))
+        CompetitorContact.fromJson(Map<String, dynamic>.from(c as Map)),
+    ]..sort((a, b) {
+        if (a.isMain != b.isMain) return a.isMain ? -1 : 1;
+        return a.sort.compareTo(b.sort);
+      });
     final links = [
       for (final l in (j['competitor_lead_links'] as List? ?? const []))
         _str((l as Map)['lead_id']),
@@ -397,6 +491,7 @@ class CompetitorProject {
       updatedAt: _date(j['updated_at']),
       phases: phases,
       linkedLeadIds: links,
+      contacts: contacts,
     );
   }
 

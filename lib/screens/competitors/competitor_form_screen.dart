@@ -100,6 +100,35 @@ class _PhaseDraft {
   }
 }
 
+class _ContactDraft {
+  final String id;
+  final TextEditingController name;
+  final TextEditingController phone;
+  CompetitorContactRole role;
+  bool isMain;
+
+  _ContactDraft({CompetitorContact? from, this.isMain = false})
+      : id = from?.id ?? '',
+        name = TextEditingController(text: from?.name ?? ''),
+        phone = TextEditingController(text: from?.phone ?? ''),
+        role = from?.role ?? CompetitorContactRole.sales {
+    if (from != null) isMain = from.isMain;
+  }
+
+  CompetitorContact toContact() => CompetitorContact(
+        id: id,
+        name: name.text.trim(),
+        phone: phone.text.trim(),
+        role: role,
+        isMain: isMain,
+      );
+
+  void dispose() {
+    name.dispose();
+    phone.dispose();
+  }
+}
+
 String _n(num? v) {
   if (v == null) return '';
   return v == v.roundToDouble() ? v.round().toString() : v.toString();
@@ -143,8 +172,12 @@ class _CompetitorFormScreenState extends State<CompetitorFormScreen> {
   late final _maintenance = TextEditingController(text: _n(_e?.maintenanceCharge));
   late final _corpus = TextEditingController(text: _n(_e?.corpus));
   late final _otherCharges = TextEditingController(text: _e?.otherCharges ?? '');
-  late final _salesPerson = TextEditingController(text: _e?.salesPerson ?? '');
-  late final _salesPhone = TextEditingController(text: _e?.salesPhone ?? '');
+  late final List<_ContactDraft> _contacts = [
+    if (_e != null && _e.allContacts.isNotEmpty)
+      for (final c in _e.allContacts) _ContactDraft(from: c)
+    else
+      _ContactDraft(isMain: true),
+  ];
   late final _amenities = TextEditingController(text: _e?.amenities ?? '');
   late final _notes = TextEditingController(text: _e?.notes ?? '');
   late DateTime? _launch = _e?.launchDate;
@@ -168,13 +201,15 @@ class _CompetitorFormScreenState extends State<CompetitorFormScreen> {
       _name, _builder, _village, _taluk, _district, _mapsLink, _extent,
       _minSqft, _maxSqft, _pre, _quoted, _negotiated, _plcCorner, _plcFacing,
       _plcRoad, _road, _glv, _authority, _approvalNo, _rera, _docs,
-      _maintenance, _corpus, _otherCharges, _salesPerson, _salesPhone,
-      _amenities, _notes,
+      _maintenance, _corpus, _otherCharges, _amenities, _notes,
     ]) {
       c.dispose();
     }
     for (final p in _phases) {
       p.dispose();
+    }
+    for (final c in _contacts) {
+      c.dispose();
     }
     super.dispose();
   }
@@ -292,8 +327,6 @@ class _CompetitorFormScreenState extends State<CompetitorFormScreen> {
       maintenanceCharge: _num(_maintenance.text),
       corpus: _num(_corpus.text),
       otherCharges: _otherCharges.text.trim(),
-      salesPerson: _salesPerson.text.trim(),
-      salesPhone: _salesPhone.text.trim(),
       amenities: _amenities.text.trim(),
       launchDate: _launch,
       notes: _notes.text.trim(),
@@ -340,11 +373,13 @@ class _CompetitorFormScreenState extends State<CompetitorFormScreen> {
     setState(() => _saving = true);
     try {
       final svc = CompetitorService.instance;
+      final contacts = [for (final c in _contacts) c.toContact()];
       final saved = _isEdit
-          ? await svc.update(_build(), phases: phases)
+          ? await svc.update(_build(), phases: phases, contacts: contacts)
           : await svc.create(
               _build(),
               phases: phases,
+              contacts: contacts,
               linkLeadId: widget.linkLeadId,
               photo: _photo,
               photoName: _photoName,
@@ -508,6 +543,57 @@ class _CompetitorFormScreenState extends State<CompetitorFormScreen> {
                   : const Text('Set pin'),
             ),
           ),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _contactEditor(int i) {
+    final c = _contacts[i];
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(
+            child: _row([
+              _text(c.name, 'Name'),
+              _text(c.phone, 'Phone', keyboard: TextInputType.phone),
+            ]),
+          ),
+          IconButton(
+            tooltip: c.isMain ? 'Main contact' : 'Make main contact',
+            icon: Icon(c.isMain ? Icons.star_rounded : Icons.star_outline_rounded,
+                color: c.isMain ? AppColors.warning : context.fomraTextSecondary),
+            onPressed: () => setState(() {
+              for (final x in _contacts) {
+                x.isMain = identical(x, c);
+              }
+            }),
+          ),
+        ]),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(
+            child: DropdownButtonFormField<CompetitorContactRole>(
+              initialValue: c.role,
+              decoration: const InputDecoration(labelText: 'Role', isDense: true),
+              items: [
+                for (final r in CompetitorContactRole.values)
+                  DropdownMenuItem(value: r, child: Text(r.label)),
+              ],
+              onChanged: (r) => setState(() => c.role = r ?? c.role),
+            ),
+          ),
+          if (_contacts.length > 1)
+            IconButton(
+              tooltip: 'Remove contact',
+              icon: const Icon(Icons.delete_outline_rounded),
+              onPressed: () => setState(() {
+                final wasMain = c.isMain;
+                _contacts.removeAt(i).dispose();
+                if (wasMain && _contacts.isNotEmpty) _contacts.first.isMain = true;
+              }),
+            ),
         ]),
       ]),
     );
@@ -692,7 +778,7 @@ class _CompetitorFormScreenState extends State<CompetitorFormScreen> {
                   onPressed: () => setState(() => _more = true),
                   icon: const Icon(Icons.expand_more_rounded),
                   label: const Text(
-                      'More details: approvals, PLC, charges, sales contact, phases'),
+                      'More details: approvals, PLC, charges, sales contacts, phases'),
                 )
               else ...[
                 AppFormSection(
@@ -722,13 +808,27 @@ class _CompetitorFormScreenState extends State<CompetitorFormScreen> {
                 ),
                 section,
                 AppFormSection(
-                  title: 'Sales contact & amenities',
+                  title: 'Sales contacts',
+                  subtitle: 'Everyone we speak to there. Star the main contact.',
                   icon: Icons.support_agent_outlined,
                   children: [
-                    _row([
-                      _text(_salesPerson, 'Sales person'),
-                      _text(_salesPhone, 'Phone', keyboard: TextInputType.phone),
-                    ]),
+                    for (var i = 0; i < _contacts.length; i++) _contactEditor(i),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () => setState(() => _contacts.add(
+                            _ContactDraft(isMain: _contacts.isEmpty))),
+                        icon: const Icon(Icons.person_add_alt_1_outlined),
+                        label: const Text('Add another contact'),
+                      ),
+                    ),
+                  ],
+                ),
+                section,
+                AppFormSection(
+                  title: 'Amenities & notes',
+                  icon: Icons.park_outlined,
+                  children: [
                     _text(_amenities, 'Amenities', maxLines: 3),
                     _text(_notes, 'Notes', maxLines: 4),
                   ],
