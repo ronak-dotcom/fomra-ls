@@ -13,10 +13,11 @@ class _MenuItem {
   const _MenuItem(this.title, this.icon, this.route);
 }
 
-/// The mobile hamburger menu: Home, Workspace, Reports, Settings.
+/// The mobile hamburger menu: Home, Workspace, Competitors, Reports, Settings.
 const _menuItems = [
   _MenuItem('Home', Icons.home_outlined, '/home'),
   _MenuItem('Land Workspace', Icons.space_dashboard_outlined, '/land-lead'),
+  _MenuItem('Competitors', Icons.apartment_outlined, '/competitors'),
   _MenuItem('Reports', Icons.assessment_outlined, '/reports'),
   _MenuItem('Settings', Icons.settings_outlined, '/settings'),
 ];

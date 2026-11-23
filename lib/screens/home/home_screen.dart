@@ -50,6 +50,10 @@ import '../../widgets/property_review_summary.dart';
 import '../../widgets/team_performance_card.dart';
 import '../../analytics/team_performance.dart';
 import '../../widgets/ui/app_components.dart';
+import '../../services/competitor_service.dart';
+import '../../models/competitor_project.dart';
+import '../../utils/competitor_analysis.dart';
+import '../competitors/competitors_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -136,6 +140,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ViewScope.instance.addListener(_loadMonthlyTarget);
     }
     UniversalSearchService.warmDocumentIndex();
+    // Competitor re-check reminders (Needs attention).
+    CompetitorService.instance.addListener(_onCompetitorsChanged);
+    CompetitorService.instance.ensureLoaded();
+  }
+
+  void _onCompetitorsChanged() {
+    if (mounted) setState(() {});
   }
 
   /// Only management gets the "No Future Activity" quick action, so only
@@ -380,6 +391,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     AppStore.instance.removeListener(_onStoreUpdate);
+    CompetitorService.instance.removeListener(_onCompetitorsChanged);
     NotificationHub.instance.removeListener(_onNotificationsChanged);
     ViewScope.instance.removeListener(_loadMonthlyTarget);
     super.dispose();
@@ -722,6 +734,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final negotiation = at(LeadStatus.negotiation);
     final legal = at(LeadStatus.legal);
     final noNextStep = _noFutureActivityLeads;
+    final recheck = recheckDueFor(
+      all: CompetitorService.instance.all,
+      myEmail: AuthService.instance.currentUser?.email ?? '',
+      myLeadIds: {for (final l in _homeSummaryLeads) l.leadId},
+      allLeads: AppStore.instance.leads,
+    );
     return [
       if (_canApprove)
         AttentionItem(
@@ -794,6 +812,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             'Active sites with no Land Owner Meeting scheduled and none in '
                 'the last ${NoFutureActivityAnalytics.staleDays} days',
             noNextStep),
+      ),
+      AttentionItem(
+        icon: Icons.apartment_outlined,
+        color: AppColors.warning,
+        title: 'Competitor re-checks due',
+        subtitle: 'Projects you own or next to your sites · '
+            'check prices every ${CompetitorProject.recheckDays} days',
+        count: recheck.length,
+        clearLabel: 'competitor checks',
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => CompetitorsScreen(
+            initialDueOnly: true,
+            onlyIds: {for (final p in recheck) p.id},
+            title: 'My competitor re-checks',
+          ),
+        )),
       ),
     ];
   }

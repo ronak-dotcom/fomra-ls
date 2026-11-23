@@ -34,6 +34,7 @@ import 'screens/legal_verification/legal_verification_screen.dart';
 import 'screens/survey/survey_tracker_screen.dart';
 import 'screens/owner/owner_history_screen.dart';
 import 'screens/cost/cost_calculator_screen.dart';
+import 'screens/competitors/competitors_screen.dart';
 
 void main() {
   // Snapshot the launch URL before Flutter's hash router can rewrite the
@@ -84,6 +85,7 @@ const Set<String> _restorableRoutes = {
   '/survey-tracker',
   '/owner-history',
   '/cost-calculator',
+  '/competitors',
   '/reports',
   '/notifications',
   '/audit-trail',
@@ -144,6 +146,7 @@ class FomraLSApp extends StatelessWidget {
           '/survey-tracker':      (_) => const SurveyTrackerScreen(),
           '/owner-history':       (_) => const OwnerHistoryScreen(),
           '/cost-calculator':     (_) => const CostCalculatorScreen(),
+          '/competitors':         (_) => const CompetitorsScreen(),
           '/reports':             (_) => const ReportsScreen(),
           '/notifications':       (_) => const NotificationCenterScreen(),
           '/audit-trail':         (_) => RoleAccess.canViewAudit
